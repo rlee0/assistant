@@ -16,6 +16,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadSettings();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export default function SettingsPage() {
       window.addEventListener('keydown', handleKeyDown);
       return () => window.removeEventListener('keydown', handleKeyDown);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isJsonView, jsonValue]);
 
   if (loading) {
