@@ -1,14 +1,17 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { streamText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { toolRegistry } from '@/lib/ai/tool-registry';
 
 export async function POST(request: NextRequest) {
   try {
-    const { chatId, message, model } = await request.json();
+    const { chatId, messages: chatMessages, model } = await request.json();
 
-    if (!chatId || !message) {
-      return NextResponse.json(
-        { error: 'Missing required fields' },
-        { status: 400 }
+    if (!chatId || !chatMessages || !Array.isArray(chatMessages)) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -16,9 +19,9 @@ export async function POST(request: NextRequest) {
     const { data: { user } } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
@@ -31,29 +34,58 @@ export async function POST(request: NextRequest) {
       .single();
 
     if (chatError || !chat) {
-      return NextResponse.json(
-        { error: 'Chat not found' },
-        { status: 404 }
+      return new Response(
+        JSON.stringify({ error: 'Chat not found' }),
+        { status: 404, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
-    // Stub AI response - in production, call AI Gateway here
-    const aiResponse = {
-      content: `This is a stub response. In production, this would call the AI Gateway with model: ${model || 'default'}. Your message was: "${message}"`,
-      model: model || 'stub-model',
-      usage: {
-        prompt_tokens: 0,
-        completion_tokens: 0,
-        total_tokens: 0,
-      },
-    };
+    // Get AI Gateway configuration
+    const baseUrl = process.env.NEXT_PUBLIC_AI_GATEWAY_URL;
+    const apiKey = process.env.AI_GATEWAY_API_KEY;
 
-    return NextResponse.json(aiResponse);
+    if (!baseUrl) {
+      // Fallback to stub response if no AI Gateway configured
+      return new Response(
+        JSON.stringify({
+          content: `AI Gateway not configured. Set NEXT_PUBLIC_AI_GATEWAY_URL and AI_GATEWAY_API_KEY environment variables to enable AI responses. Your message was: "${chatMessages[chatMessages.length - 1]?.content}"`,
+          model: 'stub',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Create OpenAI-compatible client pointing to AI Gateway
+    const openai = createOpenAI({
+      baseURL: baseUrl,
+      apiKey: apiKey || 'dummy-key',
+    });
+
+    // Convert tools to ai-sdk format
+    const enabledTools = toolRegistry.getEnabledTools();
+    const tools: Record<string, any> = {};
+    
+    enabledTools.forEach((tool) => {
+      tools[tool.definition.name] = {
+        description: tool.definition.description,
+        parameters: tool.definition.parameters,
+        execute: tool.definition.execute,
+      };
+    });
+
+    // Stream the response
+    const result = await streamText({
+      model: openai(model || 'gpt-3.5-turbo'),
+      messages: chatMessages,
+      tools: Object.keys(tools).length > 0 ? tools : undefined,
+    });
+
+    return result.toTextStreamResponse();
   } catch (error) {
     console.error('AI chat error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({ error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
 }

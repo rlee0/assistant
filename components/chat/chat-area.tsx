@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/client';
 import ReactMarkdown from 'react-markdown';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -21,13 +22,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { MoreVerticalIcon, PinIcon, PinOffIcon, Trash2Icon, EditIcon } from 'lucide-react';
+import { MoreVerticalIcon, PinIcon, PinOffIcon, Trash2Icon, EditIcon, RefreshCwIcon, MoreHorizontalIcon } from 'lucide-react';
 
 export function ChatArea() {
-  const { activeChat, messages, setMessages, pinChat, unpinChat, deleteChat, updateChat } = useChatStore();
+  const { activeChat, messages, setMessages, pinChat, unpinChat, deleteChat, updateChat, updateMessage, deleteMessage } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editedContent, setEditedContent] = useState('');
 
   useEffect(() => {
     if (activeChat) {
@@ -131,6 +134,80 @@ export function ChatArea() {
     }
   };
 
+  const startEditMessage = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditedContent(content);
+  };
+
+  const saveEditedMessage = async (messageId: string) => {
+    if (!editedContent.trim()) return;
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('messages')
+        .update({ content: editedContent.trim() })
+        .eq('id', messageId);
+
+      if (error) throw error;
+
+      updateMessage(messageId, editedContent.trim());
+      setEditingMessageId(null);
+      setEditedContent('');
+    } catch (error) {
+      console.error('Failed to update message:', error);
+    }
+  };
+
+  const cancelEditMessage = () => {
+    setEditingMessageId(null);
+    setEditedContent('');
+  };
+
+  const handleDeleteMessage = async (messageId: string) => {
+    if (!confirm('Delete this message?')) return;
+
+    try {
+      const supabase = createClient();
+      const { error } = await supabase
+        .from('messages')
+        .delete()
+        .eq('id', messageId);
+
+      if (error) throw error;
+
+      deleteMessage(messageId);
+    } catch (error) {
+      console.error('Failed to delete message:', error);
+    }
+  };
+
+  const handleResendMessage = async (messageContent: string) => {
+    // This would trigger a resend by creating a new user message
+    // The prompt area would handle sending it to the AI
+    if (!activeChat) return;
+
+    try {
+      const supabase = createClient();
+      const { data: userMsg, error } = await supabase
+        .from('messages')
+        .insert([{
+          chat_id: activeChat.id,
+          role: 'user',
+          content: messageContent,
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      // This will be picked up by the chat and trigger AI response
+      loadMessages();
+    } catch (error) {
+      console.error('Failed to resend message:', error);
+    }
+  };
+
   if (!activeChat) return null;
 
   return (
@@ -193,14 +270,70 @@ export function ChatArea() {
                   message.role === 'user' ? 'justify-end' : 'justify-start'
                 }`}
               >
-                <div
-                  className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                    message.role === 'user'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-muted'
-                  }`}
-                >
-                  <ReactMarkdown>{message.content}</ReactMarkdown>
+                <div className="group relative max-w-[80%]">
+                  {editingMessageId === message.id ? (
+                    <div className="space-y-2">
+                      <Textarea
+                        value={editedContent}
+                        onChange={(e) => setEditedContent(e.target.value)}
+                        className="min-h-[100px]"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" onClick={() => saveEditedMessage(message.id)}>
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={cancelEditMessage}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div
+                        className={`rounded-lg px-4 py-2 ${
+                          message.role === 'user'
+                            ? 'bg-primary text-primary-foreground'
+                            : 'bg-muted'
+                        }`}
+                      >
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          <ReactMarkdown>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
+                      </div>
+                      <div className="absolute -top-2 right-0 hidden group-hover:block">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                              <MoreHorizontalIcon className="h-3 w-3" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            {message.role === 'user' && (
+                              <>
+                                <DropdownMenuItem onClick={() => startEditMessage(message.id, message.content)}>
+                                  <EditIcon className="mr-2 h-3 w-3" />
+                                  Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => handleResendMessage(message.content)}>
+                                  <RefreshCwIcon className="mr-2 h-3 w-3" />
+                                  Resend
+                                </DropdownMenuItem>
+                              </>
+                            )}
+                            <DropdownMenuItem 
+                              onClick={() => handleDeleteMessage(message.id)}
+                              className="text-destructive"
+                            >
+                              <Trash2Icon className="mr-2 h-3 w-3" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </div>
+                    </>
+                  )}
                 </div>
               </div>
             ))
