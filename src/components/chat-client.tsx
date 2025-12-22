@@ -16,20 +16,42 @@ import { PromptArea } from "@/components/prompt-area";
 import { CanvasPanel } from "@/components/canvas-panel";
 import { useChatStore, type ChatMessage } from "@/store/chat-store";
 import { Button } from "@/components/ui/button";
+import {
+  persistChat,
+  persistMessages,
+  persistCheckpoint,
+  deleteChatCascade,
+} from "@/lib/supabase/persistence";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import type { InitialChatData } from "@/lib/supabase/loaders";
 
-export function ChatClient() {
+type ChatClientProps = {
+  initialChats?: InitialChatData;
+};
+
+export function ChatClient({ initialChats }: ChatClientProps) {
   const {
     chats,
     selectedId,
+    hydrate,
+    hydrated,
     addChat,
     updateMessages,
     addCheckpoint,
     restoreCheckpoint,
     updateTitle,
+    deleteChat,
   } = useChatStore();
 
   const chat = selectedId ? chats[selectedId] : undefined;
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const supabase = useMemo(() => {
+    try {
+      return createSupabaseBrowserClient();
+    } catch {
+      return null;
+    }
+  }, []);
 
   const { messages, input, handleInputChange, handleSubmit, setMessages, isLoading } =
     useChat({
@@ -45,6 +67,12 @@ export function ChatClient() {
       ),
       initialMessages: chat?.messages ?? [],
     });
+
+  useEffect(() => {
+    if (initialChats && !hydrated) {
+      hydrate(initialChats);
+    }
+  }, [hydrate, hydrated, initialChats]);
 
   const setInputValue = useCallback(
     (value: string) =>
@@ -70,19 +98,53 @@ export function ChatClient() {
     }));
     updateMessages(chat.id, stamped);
     updateTitle(chat.id);
-  }, [messages, chat, updateMessages, updateTitle]);
+    if (supabase) {
+      void persistChat(chat);
+      void persistMessages(chat.id, stamped);
+    }
+  }, [messages, chat, updateMessages, updateTitle, supabase]);
+
+  useEffect(() => {
+    if (!chat || !supabase) return;
+    void persistChat(chat);
+  }, [chat, supabase]);
 
   if (!chat) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Button onClick={() => addChat()}>Create a new chat</Button>
+        <Button
+          onClick={() => {
+            const id = addChat();
+            const created = useChatStore.getState().chats[id];
+            void persistChat(created);
+          }}
+        >
+          Create a new chat
+        </Button>
       </div>
     );
   }
 
   return (
     <div className="flex h-screen bg-zinc-50 text-zinc-900">
-      {sidebarOpen && <Sidebar />}
+      {sidebarOpen && (
+        <Sidebar
+          onNewChat={() => {
+            const id = addChat();
+            const created = useChatStore.getState().chats[id];
+            void persistChat(created);
+          }}
+          onDelete={async (id) => {
+            deleteChat(id);
+            await deleteChatCascade(id);
+          }}
+          onSignOut={async () => {
+            if (!supabase) return;
+            await supabase.auth.signOut();
+            window.location.href = "/login";
+          }}
+        />
+      )}
       <div className="flex flex-1 flex-col">
         <ChatToolbar onToggleSidebar={() => setSidebarOpen((v) => !v)} />
         <div className="grid h-full grid-rows-[1fr_auto]">
@@ -99,7 +161,14 @@ export function ChatClient() {
                       : JSON.stringify(message.content)
                   );
                 }}
-                onCheckpoint={() => addCheckpoint(chat.id)}
+                onCheckpoint={() => {
+                  addCheckpoint(chat.id);
+                  const checkpoint =
+                    useChatStore.getState().chats[chat.id]?.checkpoints.at(-1);
+                  if (checkpoint && supabase) {
+                    void persistCheckpoint(chat.id, checkpoint);
+                  }
+                }}
                 onRestore={() => restoreCheckpoint(chat.id)}
               />
             </div>

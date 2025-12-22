@@ -26,6 +26,8 @@ type ChatState = {
   chats: Record<string, ChatSession>;
   order: string[];
   selectedId?: string;
+  hydrated: boolean;
+  hydrate: (data: { chats: Record<string, ChatSession>; order: string[]; selectedId?: string }) => void;
   addChat: () => string;
   selectChat: (id: string) => void;
   deleteChat: (id: string) => void;
@@ -65,6 +67,14 @@ export const useChatStore = create<ChatState>()(
       chats: { [initialChat.id]: initialChat },
       order: [initialChat.id],
       selectedId: initialChat.id,
+       hydrated: false,
+       hydrate: (data) =>
+         set(() => ({
+           chats: data.chats,
+           order: data.order,
+           selectedId: data.selectedId ?? data.order[0],
+           hydrated: true,
+         })),
       addChat: () => {
         const id = uuid();
         const now = new Date().toISOString();

@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChatClient } from "@/components/chat-client";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { loadInitialChats } from "@/lib/supabase/loaders";
 
 export default async function Page() {
   let supabase;
@@ -33,5 +34,9 @@ export default async function Page() {
     redirect("/login");
   }
 
-  return <ChatClient />;
+  const initialChats = await loadInitialChats(session.user.id);
+
+  return (
+    <ChatClient initialChats={initialChats} />
+  );
 }

@@ -1,15 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { tools } from "@/tools";
+import { toolDefinitions, defaultToolSettings } from "@/tools";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import { useCallback } from "react";
 
 const settingsSchema = z.object({
   account: z.object({
@@ -31,34 +30,27 @@ const settingsSchema = z.object({
 
 type Settings = z.infer<typeof settingsSchema>;
 
-const defaultSettings: Settings = {
-  account: {
-    email: "user@example.com",
-    displayName: "Assistant User",
-    password: "",
-  },
-  appearance: {
-    theme: "system",
-    density: "comfortable",
-  },
-  models: {
-    defaultModel: "gpt-4o-mini",
-    temperature: 0.4,
-    apiKey: "",
-  },
-  tools: Object.fromEntries(
-    tools.map((tool) => [
-      tool.id,
-      tool.settingsSchema.parse({}),
-    ])
-  ),
-};
+function buildDefaultSettings(): Settings {
+  return settingsSchema.parse({
+    account: {
+      email: "user@example.com",
+      displayName: "Assistant User",
+      password: "",
+    },
+    appearance: {
+      theme: "system",
+      density: "comfortable",
+    },
+    models: {
+      defaultModel: "gpt-4o-mini",
+      temperature: 0.4,
+      apiKey: "",
+    },
+    tools: defaultToolSettings(),
+  });
+}
 
 export default function SettingsPage() {
-  const [settings, setSettings] = useState<Settings>(defaultSettings);
-  const [jsonMode, setJsonMode] = useState(false);
-  const [status, setStatus] = useState<string | null>(null);
-
   const supabase = useMemo(() => {
     try {
       return createSupabaseBrowserClient();
@@ -67,22 +59,81 @@ export default function SettingsPage() {
     }
   }, []);
 
+  const [settings, setSettings] = useState<Settings>(buildDefaultSettings());
+  const [jsonMode, setJsonMode] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!supabase) return;
+    supabase.auth.getUser().then(({ data }) => {
+      if (data.user?.id) setUserId(data.user.id);
+    });
+  }, [supabase]);
+
+  useEffect(() => {
+    async function load() {
+      if (!supabase) return;
+      const { data } = await supabase
+        .from("settings")
+        .select("data")
+        .eq("id", userId ?? "me")
+        .maybeSingle();
+      if (data?.data) {
+        setSettings(settingsSchema.parse(data.data));
+      }
+    }
+    void load();
+  }, [supabase, userId]);
+
   const saveSettings = useCallback(async () => {
     try {
       const parsed = settingsSchema.parse(settings);
       if (supabase) {
         await supabase.from("settings").upsert({
-          id: "me",
+          id: userId ?? "me",
           data: parsed,
           updated_at: new Date().toISOString(),
         });
+        const toolRows = Object.entries(parsed.tools ?? {}).map(
+          ([id, config]) => ({
+            id,
+            user_id: userId ?? "me",
+            settings: config,
+          })
+        );
+        if (toolRows.length) {
+          await supabase.from("tools").upsert(toolRows);
+        }
       }
       setStatus("Settings saved");
     } catch (error) {
       console.error(error);
       setStatus("Failed to save");
     }
-  }, [settings, supabase]);
+  }, [settings, supabase, userId]);
+
+  const updateAccount = useCallback(async () => {
+    if (!supabase) return;
+    const parsed = settingsSchema.shape.account.parse(settings.account);
+    const { error } = await supabase.auth.updateUser({
+      email: parsed.email,
+      password: parsed.password || undefined,
+      data: { displayName: parsed.displayName },
+    });
+    setStatus(error ? error.message : "Account updated");
+  }, [settings.account, supabase]);
+
+  const deleteAccount = useCallback(async () => {
+    try {
+      await fetch("/api/account/delete", { method: "POST" });
+      if (supabase) await supabase.auth.signOut();
+      window.location.href = "/signup";
+    } catch (error) {
+      console.error(error);
+      setStatus("Unable to delete account");
+    }
+  }, [supabase]);
 
   useEffect(() => {
     const handler = (event: KeyboardEvent) => {
@@ -143,9 +194,7 @@ export default function SettingsPage() {
         <Button className="mt-4 w-full" onClick={() => saveSettings()}>
           Save settings
         </Button>
-        {status ? (
-          <p className="mt-2 text-xs text-zinc-500">{status}</p>
-        ) : null}
+        {status ? <p className="mt-2 text-xs text-zinc-500">{status}</p> : null}
       </aside>
       <main className="flex flex-col gap-4 p-6">
         {jsonMode ? (
@@ -162,7 +211,7 @@ export default function SettingsPage() {
                 onChange={(e) => {
                   try {
                     const parsed = JSON.parse(e.target.value);
-                    setSettings(parsed);
+                    setSettings(settingsSchema.parse(parsed));
                     setStatus(null);
                   } catch {
                     setStatus("Invalid JSON");
@@ -178,9 +227,7 @@ export default function SettingsPage() {
                 <Field label="Email">
                   <Input
                     value={settings.account.email}
-                    onChange={(e) =>
-                      update(["account", "email"], e.target.value)
-                    }
+                    onChange={(e) => update(["account", "email"], e.target.value)}
                   />
                 </Field>
                 <Field label="Display name">
@@ -201,6 +248,14 @@ export default function SettingsPage() {
                     }
                   />
                 </Field>
+              </div>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => updateAccount()}>
+                  Update account
+                </Button>
+                <Button variant="destructive" onClick={() => deleteAccount()}>
+                  Delete account
+                </Button>
               </div>
             </Section>
 
@@ -270,54 +325,108 @@ export default function SettingsPage() {
 
             <Section id="tools" title="Tools">
               <div className="grid grid-cols-1 gap-4">
-                {tools.map((tool) => (
-                  <Card key={tool.id}>
-                    <CardHeader className="pb-0">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <p className="text-sm font-semibold">{tool.name}</p>
-                          <p className="text-xs text-zinc-500">
-                            {tool.description}
-                          </p>
+                {toolDefinitions.map((toolDef) => {
+                  const toolSettings =
+                    (settings.tools?.[toolDef.id] as Record<string, unknown>) ??
+                    toolDef.settingsSchema.parse({});
+                  return (
+                    <Card key={toolDef.id}>
+                      <CardHeader className="pb-0">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold">{toolDef.name}</p>
+                            <p className="text-xs text-zinc-500">
+                              {toolDef.description}
+                            </p>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs text-zinc-600">
+                            <input
+                              type="checkbox"
+                              checked={(toolSettings as { enabled?: boolean }).enabled ?? true}
+                              onChange={(e) =>
+                                update(
+                                  ["tools", toolDef.id, "enabled"],
+                                  e.target.checked
+                                )
+                              }
+                            />
+                            Enabled
+                          </label>
                         </div>
-                        <label className="flex items-center gap-2 text-xs text-zinc-600">
-                          <input
-                            type="checkbox"
-                            checked={settings.tools[tool.id]?.enabled ?? false}
-                            onChange={(e) =>
-                              update(
-                                ["tools", tool.id, "enabled"],
-                                e.target.checked
-                              )
-                            }
-                          />
-                          Enabled
-                        </label>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="grid grid-cols-2 gap-4">
-                      {Object.keys(tool.settingsSchema.shape).map((key) => (
-                        <Field key={key} label={key}>
-                          <Input
-                            value={settings.tools[tool.id]?.[key] ?? ""}
-                            onChange={(e) =>
-                              update(
-                                ["tools", tool.id, key],
-                                e.target.value
-                              )
-                            }
-                          />
-                        </Field>
-                      ))}
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardHeader>
+                      <CardContent className="grid grid-cols-2 gap-4">
+                        {Object.entries(toolDef.settingsSchema.shape).map(
+                          ([key, schema]) => (
+                            <Field key={key} label={key}>
+                              {renderSettingControl({
+                                value: toolSettings[key],
+                                onChange: (val) =>
+                                  update(["tools", toolDef.id, key], val),
+                                schema,
+                              })}
+                            </Field>
+                          )
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </Section>
           </>
         )}
       </main>
     </div>
+  );
+}
+
+function renderSettingControl({
+  value,
+  onChange,
+  schema,
+}: {
+  value: unknown;
+  onChange: (v: unknown) => void;
+  schema: z.ZodTypeAny;
+}) {
+  if (schema instanceof z.ZodBoolean) {
+    return (
+      <input
+        type="checkbox"
+        checked={Boolean(value)}
+        onChange={(e) => onChange(e.target.checked)}
+      />
+    );
+  }
+  if (schema instanceof z.ZodNumber) {
+    return (
+      <Input
+        type="number"
+        value={Number(value ?? 0)}
+        onChange={(e) => onChange(Number(e.target.value))}
+      />
+    );
+  }
+  if (schema instanceof z.ZodEnum) {
+    return (
+      <select
+        className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
+        value={String(value ?? schema.options[0])}
+        onChange={(e) => onChange(e.target.value)}
+      >
+        {schema.options.map((opt) => (
+          <option key={opt} value={opt}>
+            {opt}
+          </option>
+        ))}
+      </select>
+    );
+  }
+  return (
+    <Input
+      value={String(value ?? "")}
+      onChange={(e) => onChange(e.target.value)}
+    />
   );
 }
 
@@ -349,7 +458,7 @@ function Field({
 }) {
   return (
     <label className="flex flex-col gap-1 text-sm text-zinc-700">
-      <span>{label}</span>
+      <span className="capitalize">{label}</span>
       {children}
     </label>
   );

@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import { streamText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import type { CoreMessage } from "ai";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { buildTools, defaultToolSettings } from "@/tools";
 
 export async function POST(req: Request) {
-  const { messages, model, context }: { messages: CoreMessage[]; model?: string; context?: string } =
-    await req.json();
+  const {
+    messages,
+    model,
+    context,
+  }: { messages: CoreMessage[]; model?: string; context?: string } = await req.json();
 
   const apiKey =
     process.env.AI_GATEWAY_API_KEY ??
@@ -28,12 +33,25 @@ export async function POST(req: Request) {
     baseURL: process.env.AI_GATEWAY_URL,
   });
 
-  if (!client) {
-    return NextResponse.json(
-      { error: "Model provider unavailable" },
-      { status: 500 }
-    );
+  const supabase = createSupabaseServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  const userId = user?.id;
+
+  let toolSettings = defaultToolSettings();
+  if (userId) {
+    const { data } = await supabase
+      .from("tools")
+      .select("id,settings")
+      .eq("user_id", userId);
+    if (data) {
+      toolSettings = Object.fromEntries(
+        data.map((row) => [row.id, row.settings ?? {}])
+      );
+    }
   }
+  const tools = buildTools(toolSettings);
 
   const augmentedMessages = context
     ? [
@@ -46,6 +64,8 @@ export async function POST(req: Request) {
     const result = await streamText({
       model: client(resolvedModel),
       messages: augmentedMessages,
+      tools,
+      maxSteps: 6,
     });
     return result.toAIStreamResponse();
   } catch (error) {

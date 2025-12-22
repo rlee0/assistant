@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -9,7 +9,14 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 export default function SignupPage() {
-  const supabase = createSupabaseBrowserClient();
+  const supabase = useMemo(() => {
+    try {
+      return createSupabaseBrowserClient();
+    } catch (error) {
+      console.error(error);
+      return null;
+    }
+  }, []);
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -17,6 +24,10 @@ export default function SignupPage() {
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      return;
+    }
     const { error: signUpError } = await supabase.auth.signUp({
       email,
       password,
@@ -26,6 +37,10 @@ export default function SignupPage() {
   }
 
   async function oauth(provider: "google" | "github") {
+    if (!supabase) {
+      setError("Supabase is not configured.");
+      return;
+    }
     await supabase.auth.signInWithOAuth({
       provider,
       options: { redirectTo: `${window.location.origin}/` },
@@ -59,6 +74,11 @@ export default function SignupPage() {
               Sign up
             </Button>
             {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            {!supabase ? (
+              <p className="text-xs text-red-500">
+                Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+              </p>
+            ) : null}
           </form>
           <div className="flex gap-2">
             <Button

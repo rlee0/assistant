@@ -1,7 +1,7 @@
 "use client";
 
 import { formatDistanceToNow } from "date-fns";
-import { Plus, Pin, Trash2, Settings } from "lucide-react";
+import { Plus, Pin, Trash2, Settings, LogOut } from "lucide-react";
 import { clsx } from "clsx";
 import { Button } from "./ui/button";
 import {
@@ -14,21 +14,32 @@ import {
 import { useChatStore } from "@/store/chat-store";
 import Link from "next/link";
 
-export function Sidebar() {
+type SidebarProps = {
+  onDelete?: (id: string) => void | Promise<void>;
+  onNewChat?: () => void;
+  onSignOut?: () => void;
+};
+
+export function Sidebar({ onDelete, onNewChat, onSignOut }: SidebarProps) {
   const {
     chats,
     order,
     selectedId,
     addChat,
     selectChat,
-    deleteChat,
     togglePin,
   } = useChatStore();
 
   return (
     <aside className="flex h-full w-72 flex-col border-r border-zinc-200 bg-white">
       <div className="flex items-center justify-between px-4 py-3">
-        <Button className="w-full justify-between" onClick={() => addChat()}>
+        <Button
+          className="w-full justify-between"
+          onClick={() => {
+            if (onNewChat) onNewChat();
+            else addChat();
+          }}
+        >
           <span className="flex items-center gap-2">
             <Plus className="h-4 w-4" /> New chat
           </span>
@@ -73,7 +84,10 @@ export function Sidebar() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     className="text-red-600"
-                    onClick={() => deleteChat(id)}
+                    onClick={async () => {
+                      if (onDelete) await onDelete(id);
+                      else useChatStore.getState().deleteChat(id);
+                    }}
                   >
                     <Trash2 className="mr-2 h-4 w-4" /> Delete
                   </DropdownMenuItem>
@@ -84,12 +98,30 @@ export function Sidebar() {
         </div>
       </div>
       <div className="border-t border-zinc-200 p-3">
-        <Link href="/settings" className="flex items-center gap-2">
-          <Button variant="outline" className="w-full justify-start">
-            <Settings className="mr-2 h-4 w-4" />
-            Account & Settings
-          </Button>
-        </Link>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" className="w-full justify-between">
+              <span className="flex items-center gap-2">
+                <Settings className="mr-2 h-4 w-4" />
+                Account
+              </span>
+              <span className="text-xs text-zinc-500">Open</span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="top" className="w-60">
+            <DropdownMenuItem asChild>
+              <Link href="/settings">Open settings</Link>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              className="text-red-600"
+              onClick={() => onSignOut?.()}
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign out
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </aside>
   );
