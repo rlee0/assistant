@@ -13,13 +13,15 @@ export const calculatorTool: ToolDefinition = {
     expression: z.string().describe('The mathematical expression to evaluate'),
   }),
   execute: async (params) => {
+    // Stub implementation - in production, use a safe math parser like mathjs
+    // DO NOT use eval() as it's a security vulnerability
     try {
-      // Simple safe evaluation (in production, use a proper math parser)
-      // This is a stub - use a library like mathjs in production
-      const result = eval(params.expression);
+      // Simple stub that returns a placeholder
+      // In production, replace with: import { evaluate } from 'mathjs'; const result = evaluate(params.expression);
       return {
         expression: params.expression,
-        result,
+        result: 'Calculator tool is a stub. Use a library like mathjs in production.',
+        note: 'This is a demonstration stub. Install mathjs for actual calculations.',
       };
     } catch (error) {
       return {
