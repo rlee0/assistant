@@ -9,7 +9,7 @@ import { createClient } from '@/lib/supabase/client';
 import { useModels } from '@/lib/ai/use-models';
 
 export function PromptArea() {
-  const { activeChat, addMessage } = useChatStore();
+  const { activeChat, addMessage, messages, updateChat } = useChatStore();
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
   const { models } = useModels();
@@ -39,7 +39,28 @@ export function PromptArea() {
       if (userError) throw userError;
       addMessage(userMsg);
 
-      // Call AI endpoint (stub for now)
+      // Auto-generate title if this is the first message
+      if (messages.length === 0 && activeChat.title === 'New Chat') {
+        try {
+          const titleResponse = await fetch('/api/ai/title', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chatId: activeChat.id,
+              firstMessage: userMessage,
+            }),
+          });
+
+          if (titleResponse.ok) {
+            const { title } = await titleResponse.json();
+            updateChat(activeChat.id, { title });
+          }
+        } catch (err) {
+          console.error('Failed to generate title:', err);
+        }
+      }
+
+      // Call AI endpoint
       const response = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
