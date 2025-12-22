@@ -55,6 +55,19 @@ export function ChatSidebar() {
       
       if (!user) return;
 
+      // Ensure user exists in public.users (for backward compatibility)
+      await supabase
+        .from('users')
+        .upsert({
+          id: user.id,
+          email: user.email!,
+          full_name: user.user_metadata?.full_name,
+          avatar_url: user.user_metadata?.avatar_url,
+        }, {
+          onConflict: 'id',
+          ignoreDuplicates: false,
+        });
+
       const newChat = {
         user_id: user.id,
         title: 'New Chat',
