@@ -118,6 +118,10 @@ DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile" ON public.users
   FOR UPDATE USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can create own profile" ON public.users;
+CREATE POLICY "Users can create own profile" ON public.users
+  FOR INSERT WITH CHECK (auth.uid() = id);
+
 -- RLS Policies for accounts
 DROP POLICY IF EXISTS "Users can view own accounts" ON public.accounts;
 CREATE POLICY "Users can view own accounts" ON public.accounts
