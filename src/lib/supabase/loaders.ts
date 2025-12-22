@@ -14,22 +14,19 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
 
   const { data: chatRowsData } = await supabase
     .from("chats")
-    .select("id,title,pinned,updated_at,model,context,suggestions")
-    .eq("user_id", userId)
+    .select("id,title,pinned,updated_at,context")
     .order("updated_at", { ascending: false });
   const chatRows = chatRowsData ?? [];
 
   const { data: messageRowsData } = await supabase
     .from("messages")
     .select("id,chat_id,role,content,created_at")
-    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   const messageRows = messageRowsData ?? [];
 
   const { data: checkpointRowsData } = await supabase
     .from("checkpoints")
     .select("chat_id,payload,created_at")
-    .eq("user_id", userId)
     .order("created_at", { ascending: true });
   const checkpointRows = checkpointRowsData ?? [];
 

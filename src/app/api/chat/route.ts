@@ -43,6 +43,11 @@ export async function POST(req: Request) {
     if (data) {
       toolSettings = Object.fromEntries(data.map((row) => [row.id, row.settings ?? {}]));
     }
+  } else {
+    const { data } = await supabase.from("tools").select("id,settings");
+    if (data) {
+      toolSettings = Object.fromEntries(data.map((row) => [row.id, row.settings ?? {}]));
+    }
   }
   const tools = buildTools(toolSettings);
 

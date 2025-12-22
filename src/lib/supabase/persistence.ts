@@ -23,11 +23,9 @@ export async function persistChat(session: ChatSession) {
       .from("chats")
       .upsert({
         id: session.id,
-        user_id: supabase.userId,
         title: session.title,
         pinned: session.pinned,
         updated_at: session.updatedAt ?? new Date().toISOString(),
-        model: session.model,
         context: session.context,
       })
       .select();
@@ -42,7 +40,6 @@ export async function persistMessages(chatId: string, messages: ChatMessage[]) {
   if (!supabase || !supabase.userId) return;
   const payload = messages.map((m) => ({
     id: m.id,
-    user_id: supabase.userId,
     chat_id: chatId,
     role: m.role,
     content: m.content,
@@ -64,23 +61,20 @@ export async function deleteChatCascade(chatId: string) {
     const { error: delMessagesError } = await supabase.client
       .from("messages")
       .delete()
-      .eq("chat_id", chatId)
-      .eq("user_id", supabase.userId);
+      .eq("chat_id", chatId);
     if (delMessagesError) console.error("Delete messages failed", delMessagesError);
 
     const { error: delCheckpointsError } = await supabase.client
       .from("checkpoints")
       .delete()
-      .eq("chat_id", chatId)
-      .eq("user_id", supabase.userId);
+      .eq("chat_id", chatId);
     if (delCheckpointsError)
       console.error("Delete checkpoints failed", delCheckpointsError);
 
     const { error: delChatError } = await supabase.client
       .from("chats")
       .delete()
-      .eq("id", chatId)
-      .eq("user_id", supabase.userId);
+      .eq("id", chatId);
     if (delChatError) console.error("Delete chat failed", delChatError);
   } catch (error) {
     console.error("Delete chat cascade failed", error);
@@ -92,7 +86,6 @@ export async function persistCheckpoint(chatId: string, checkpoint: ChatCheckpoi
   if (!supabase || !supabase.userId) return;
   try {
     const { error } = await supabase.client.from("checkpoints").insert({
-      user_id: supabase.userId,
       chat_id: chatId,
       payload: checkpoint,
       created_at: new Date().toISOString(),
