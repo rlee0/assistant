@@ -7,15 +7,24 @@ export async function POST(req: Request) {
   const { messages, model, context }: { messages: CoreMessage[]; model?: string; context?: string } =
     await req.json();
 
+  const apiKey =
+    process.env.AI_GATEWAY_API_KEY ??
+    process.env.OPENAI_API_KEY ??
+    process.env.AZURE_OPENAI_API_KEY ??
+    "";
+
+  if (!apiKey) {
+    return NextResponse.json(
+      { error: "Missing API key for model provider" },
+      { status: 500 }
+    );
+  }
+
   const resolvedModel =
     model || process.env.AI_MODEL || process.env.AI_GATEWAY_MODEL || "gpt-4o-mini";
 
   const client = openai({
-    apiKey:
-      process.env.AI_GATEWAY_API_KEY ??
-      process.env.OPENAI_API_KEY ??
-      process.env.AZURE_OPENAI_API_KEY ??
-      "",
+    apiKey,
     baseURL: process.env.AI_GATEWAY_URL,
   });
 

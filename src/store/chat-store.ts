@@ -193,10 +193,7 @@ export const useChatStore = create<ChatState>()(
         if (!firstUser || typeof firstUser.content !== "string") {
           return "New chat";
         }
-        const text =
-          typeof firstUser.content === "string"
-            ? firstUser.content
-            : JSON.stringify(firstUser.content);
+        const text = firstUser.content;
         return text.slice(0, 42).trim() + (text.length > 42 ? "…" : "");
       },
       generateSuggestions: (messages, context) => {

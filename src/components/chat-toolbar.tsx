@@ -3,6 +3,7 @@
 import { format } from "date-fns";
 import { EllipsisVertical, Pin, Trash2, PanelLeft } from "lucide-react";
 import { useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { Breadcrumbs } from "./breadcrumbs";
 import { Button } from "./ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -20,6 +21,7 @@ export function ChatToolbar({
 }: {
   onToggleSidebar?: () => void;
 }) {
+  const router = useRouter();
   const supabase = useMemo(() => {
     try {
       return createSupabaseBrowserClient();
@@ -77,7 +79,7 @@ export function ChatToolbar({
                 return;
               }
               await supabase.auth.signOut();
-              window.location.href = "/login";
+              router.replace("/login");
             }}
           >
             Sign out

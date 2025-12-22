@@ -21,6 +21,7 @@ export function ChatClient() {
   const {
     chats,
     selectedId,
+    addChat,
     updateMessages,
     addCheckpoint,
     restoreCheckpoint,
@@ -74,7 +75,7 @@ export function ChatClient() {
   if (!chat) {
     return (
       <div className="flex h-screen items-center justify-center">
-        <Button onClick={() => window.location.reload()}>Reload app</Button>
+        <Button onClick={() => addChat()}>Create a new chat</Button>
       </div>
     );
   }

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 
 export default function SignupPage() {
   const supabase = createSupabaseBrowserClient();
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -20,7 +22,7 @@ export default function SignupPage() {
       password,
     });
     if (signUpError) setError(signUpError.message);
-    else window.location.href = "/";
+    else router.replace("/");
   }
 
   async function oauth(provider: "google" | "github") {
