@@ -18,16 +18,23 @@ async function supabaseClient() {
 export async function persistChat(session: ChatSession) {
   const supabase = await supabaseClient();
   if (!supabase || !supabase.userId) return;
-  await supabase.client.from("chats").upsert({
-    id: session.id,
-    user_id: supabase.userId,
-    title: session.title,
-    pinned: session.pinned,
-    updated_at: session.updatedAt,
-    model: session.model,
-    context: session.context,
-    suggestions: session.suggestions,
-  });
+  try {
+    const { error } = await supabase.client
+      .from("chats")
+      .upsert({
+        id: session.id,
+        user_id: supabase.userId,
+        title: session.title,
+        pinned: session.pinned,
+        updated_at: session.updatedAt ?? new Date().toISOString(),
+        model: session.model,
+        context: session.context,
+      })
+      .select();
+    if (error) console.error("Persist chat failed", error);
+  } catch (error) {
+    console.error("Persist chat failed", error);
+  }
 }
 
 export async function persistMessages(chatId: string, messages: ChatMessage[]) {
@@ -42,35 +49,56 @@ export async function persistMessages(chatId: string, messages: ChatMessage[]) {
     created_at: m.createdAt,
   }));
   if (!payload.length) return;
-  await supabase.from("messages").upsert(payload);
+  try {
+    const { error } = await supabase.client.from("messages").upsert(payload);
+    if (error) console.error("Persist messages failed", error);
+  } catch (error) {
+    console.error("Persist messages failed", error);
+  }
 }
 
 export async function deleteChatCascade(chatId: string) {
   const supabase = await supabaseClient();
   if (!supabase || !supabase.userId) return;
-  await supabase.client
-    .from("messages")
-    .delete()
-    .eq("chat_id", chatId)
-    .eq("user_id", supabase.userId);
-  await supabase.client
-    .from("checkpoints")
-    .delete()
-    .eq("chat_id", chatId)
-    .eq("user_id", supabase.userId);
-  await supabase.client
-    .from("chats")
-    .delete()
-    .eq("id", chatId)
-    .eq("user_id", supabase.userId);
+  try {
+    const { error: delMessagesError } = await supabase.client
+      .from("messages")
+      .delete()
+      .eq("chat_id", chatId)
+      .eq("user_id", supabase.userId);
+    if (delMessagesError) console.error("Delete messages failed", delMessagesError);
+
+    const { error: delCheckpointsError } = await supabase.client
+      .from("checkpoints")
+      .delete()
+      .eq("chat_id", chatId)
+      .eq("user_id", supabase.userId);
+    if (delCheckpointsError)
+      console.error("Delete checkpoints failed", delCheckpointsError);
+
+    const { error: delChatError } = await supabase.client
+      .from("chats")
+      .delete()
+      .eq("id", chatId)
+      .eq("user_id", supabase.userId);
+    if (delChatError) console.error("Delete chat failed", delChatError);
+  } catch (error) {
+    console.error("Delete chat cascade failed", error);
+  }
 }
 
 export async function persistCheckpoint(chatId: string, checkpoint: ChatCheckpoint) {
   const supabase = await supabaseClient();
   if (!supabase || !supabase.userId) return;
-  await supabase.client.from("checkpoints").insert({
-    user_id: supabase.userId,
-    chat_id: chatId,
-    payload: checkpoint,
-  });
+  try {
+    const { error } = await supabase.client.from("checkpoints").insert({
+      user_id: supabase.userId,
+      chat_id: chatId,
+      payload: checkpoint,
+      created_at: new Date().toISOString(),
+    });
+    if (error) console.error("Persist checkpoint failed", error);
+  } catch (error) {
+    console.error("Persist checkpoint failed", error);
+  }
 }
