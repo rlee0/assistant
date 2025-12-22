@@ -1,10 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useChatStore } from '@/store/chat-store';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { SendIcon, StopCircleIcon } from 'lucide-react';
+import { SendIcon, StopCircleIcon, LightbulbIcon } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { useModels } from '@/lib/ai/use-models';
 
@@ -13,7 +13,44 @@ export function PromptArea() {
   const [input, setInput] = useState('');
   const [selectedModel, setSelectedModel] = useState('gpt-3.5-turbo');
   const [isStreaming, setIsStreaming] = useState(false);
+  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
   const { models } = useModels();
+
+  // Load suggestions when chat becomes active and has messages
+  useEffect(() => {
+    if (activeChat && storeMessages.length > 0) {
+      loadSuggestions();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChat?.id]);
+
+  const loadSuggestions = async () => {
+    if (!activeChat || loadingSuggestions) return;
+
+    setLoadingSuggestions(true);
+    try {
+      const response = await fetch('/api/ai/suggestions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chatId: activeChat.id }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSuggestions(data.suggestions || []);
+      }
+    } catch (error) {
+      console.error('Failed to load suggestions:', error);
+    } finally {
+      setLoadingSuggestions(false);
+    }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    setInput(suggestion);
+    setSuggestions([]); // Clear suggestions after using one
+  };
 
   const handleSend = async () => {
     if (!input.trim() || !activeChat || isStreaming) return;
@@ -21,6 +58,7 @@ export function PromptArea() {
     setIsStreaming(true);
     const userMessage = input.trim();
     setInput('');
+    setSuggestions([]); // Clear suggestions when sending
 
     try {
       const supabase = createClient();
@@ -111,6 +149,9 @@ export function PromptArea() {
       if (aiError) throw aiError;
       addMessage(aiMsg);
 
+      // Load new suggestions after AI response
+      setTimeout(() => loadSuggestions(), 1000);
+
     } catch (error) {
       console.error('Failed to send message:', error);
     } finally {
@@ -128,6 +169,24 @@ export function PromptArea() {
   return (
     <div className="border-t bg-background p-4">
       <div className="mx-auto max-w-4xl space-y-4">
+        {/* Suggestions */}
+        {suggestions.length > 0 && !isStreaming && (
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map((suggestion, index) => (
+              <Button
+                key={index}
+                variant="outline"
+                size="sm"
+                onClick={() => handleSuggestionClick(suggestion)}
+                className="text-xs"
+              >
+                <LightbulbIcon className="mr-1 h-3 w-3" />
+                {suggestion}
+              </Button>
+            ))}
+          </div>
+        )}
+
         {/* Model selector */}
         <div className="flex items-center gap-2">
           <select
