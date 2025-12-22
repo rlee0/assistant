@@ -110,30 +110,38 @@ ALTER TABLE public.tool_settings ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.model_preferences ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies for users
+DROP POLICY IF EXISTS "Users can view own profile" ON public.users;
 CREATE POLICY "Users can view own profile" ON public.users
   FOR SELECT USING (auth.uid() = id);
 
+DROP POLICY IF EXISTS "Users can update own profile" ON public.users;
 CREATE POLICY "Users can update own profile" ON public.users
   FOR UPDATE USING (auth.uid() = id);
 
 -- RLS Policies for accounts
+DROP POLICY IF EXISTS "Users can view own accounts" ON public.accounts;
 CREATE POLICY "Users can view own accounts" ON public.accounts
   FOR SELECT USING (auth.uid() = user_id);
 
 -- RLS Policies for chats
+DROP POLICY IF EXISTS "Users can view own chats" ON public.chats;
 CREATE POLICY "Users can view own chats" ON public.chats
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own chats" ON public.chats;
 CREATE POLICY "Users can create own chats" ON public.chats
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own chats" ON public.chats;
 CREATE POLICY "Users can update own chats" ON public.chats
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own chats" ON public.chats;
 CREATE POLICY "Users can delete own chats" ON public.chats
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for messages
+DROP POLICY IF EXISTS "Users can view own messages" ON public.messages;
 CREATE POLICY "Users can view own messages" ON public.messages
   FOR SELECT USING (
     EXISTS (
@@ -143,6 +151,7 @@ CREATE POLICY "Users can view own messages" ON public.messages
     )
   );
 
+DROP POLICY IF EXISTS "Users can create own messages" ON public.messages;
 CREATE POLICY "Users can create own messages" ON public.messages
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -152,6 +161,7 @@ CREATE POLICY "Users can create own messages" ON public.messages
     )
   );
 
+DROP POLICY IF EXISTS "Users can update own messages" ON public.messages;
 CREATE POLICY "Users can update own messages" ON public.messages
   FOR UPDATE USING (
     EXISTS (
@@ -161,6 +171,7 @@ CREATE POLICY "Users can update own messages" ON public.messages
     )
   );
 
+DROP POLICY IF EXISTS "Users can delete own messages" ON public.messages;
 CREATE POLICY "Users can delete own messages" ON public.messages
   FOR DELETE USING (
     EXISTS (
@@ -171,6 +182,7 @@ CREATE POLICY "Users can delete own messages" ON public.messages
   );
 
 -- RLS Policies for checkpoints
+DROP POLICY IF EXISTS "Users can view own checkpoints" ON public.checkpoints;
 CREATE POLICY "Users can view own checkpoints" ON public.checkpoints
   FOR SELECT USING (
     EXISTS (
@@ -180,6 +192,7 @@ CREATE POLICY "Users can view own checkpoints" ON public.checkpoints
     )
   );
 
+DROP POLICY IF EXISTS "Users can create own checkpoints" ON public.checkpoints;
 CREATE POLICY "Users can create own checkpoints" ON public.checkpoints
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -190,42 +203,54 @@ CREATE POLICY "Users can create own checkpoints" ON public.checkpoints
   );
 
 -- RLS Policies for settings
+DROP POLICY IF EXISTS "Users can view own settings" ON public.settings;
 CREATE POLICY "Users can view own settings" ON public.settings
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own settings" ON public.settings;
 CREATE POLICY "Users can create own settings" ON public.settings
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own settings" ON public.settings;
 CREATE POLICY "Users can update own settings" ON public.settings
   FOR UPDATE USING (auth.uid() = user_id);
 
 -- RLS Policies for tool_settings
+DROP POLICY IF EXISTS "Users can view own tool settings" ON public.tool_settings;
 CREATE POLICY "Users can view own tool settings" ON public.tool_settings
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own tool settings" ON public.tool_settings;
 CREATE POLICY "Users can create own tool settings" ON public.tool_settings
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own tool settings" ON public.tool_settings;
 CREATE POLICY "Users can update own tool settings" ON public.tool_settings
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own tool settings" ON public.tool_settings;
 CREATE POLICY "Users can delete own tool settings" ON public.tool_settings
   FOR DELETE USING (auth.uid() = user_id);
 
 -- RLS Policies for model_preferences
+DROP POLICY IF EXISTS "Users can view own model preferences" ON public.model_preferences;
 CREATE POLICY "Users can view own model preferences" ON public.model_preferences
   FOR SELECT USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can create own model preferences" ON public.model_preferences;
 CREATE POLICY "Users can create own model preferences" ON public.model_preferences
   FOR INSERT WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own model preferences" ON public.model_preferences;
 CREATE POLICY "Users can update own model preferences" ON public.model_preferences
   FOR UPDATE USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can delete own model preferences" ON public.model_preferences;
 CREATE POLICY "Users can delete own model preferences" ON public.model_preferences
   FOR DELETE USING (auth.uid() = user_id);
 
 -- Tools table is readable by all authenticated users
+DROP POLICY IF EXISTS "Authenticated users can view tools" ON public.tools;
 CREATE POLICY "Authenticated users can view tools" ON public.tools
   FOR SELECT USING (auth.role() = 'authenticated');
 
@@ -238,15 +263,19 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_users_updated_at ON public.users;
 CREATE TRIGGER update_users_updated_at BEFORE UPDATE ON public.users
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_chats_updated_at ON public.chats;
 CREATE TRIGGER update_chats_updated_at BEFORE UPDATE ON public.chats
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_settings_updated_at ON public.settings;
 CREATE TRIGGER update_settings_updated_at BEFORE UPDATE ON public.settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS update_tool_settings_updated_at ON public.tool_settings;
 CREATE TRIGGER update_tool_settings_updated_at BEFORE UPDATE ON public.tool_settings
   FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
 
@@ -261,6 +290,7 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
+DROP TRIGGER IF EXISTS update_chat_modified_on_message_insert ON public.messages;
 CREATE TRIGGER update_chat_modified_on_message_insert AFTER INSERT ON public.messages
   FOR EACH ROW EXECUTE FUNCTION update_chat_modified_at();
 
@@ -279,6 +309,7 @@ BEGIN
 END;
 $$ language 'plpgsql' SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();

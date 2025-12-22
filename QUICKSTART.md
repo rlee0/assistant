@@ -36,7 +36,9 @@ npm install
 5. Click **Run** (green play button)
 6. You should see "Success. No rows returned"
 
-**Important:** The migration includes a trigger that automatically creates users in `public.users` when they sign up via Supabase Auth. This is required for chat creation to work properly.
+**Important:** 
+- The migration includes a trigger that automatically creates users in `public.users` when they sign up via Supabase Auth. This is required for chat creation to work properly.
+- The migration is **idempotent** - it can be safely re-run multiple times without causing errors. All policies and triggers will be dropped and recreated if they already exist.
 
 ### 4. Configure Environment (1 minute)
 
