@@ -1,12 +1,6 @@
 "use client";
 
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useState,
-  type ChangeEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useChat } from "@ai-sdk/react";
 import { v4 as uuid } from "uuid";
 import { Sidebar } from "@/components/sidebar";
@@ -28,6 +22,19 @@ import type { InitialChatData } from "@/lib/supabase/loaders";
 type ChatClientProps = {
   initialChats?: InitialChatData;
 };
+
+function areChatMessagesEqual(a: ChatMessage[], b: ChatMessage[]) {
+  if (a.length !== b.length) return false;
+
+  return a.every((message, index) => {
+    const other = b[index];
+    if (!other) return false;
+    if (message.id !== other.id || message.role !== other.role) {
+      return false;
+    }
+    return JSON.stringify(message.content) === JSON.stringify(other.content);
+  });
+}
 
 export function ChatClient({ initialChats }: ChatClientProps) {
   const {
@@ -53,20 +60,33 @@ export function ChatClient({ initialChats }: ChatClientProps) {
     }
   }, []);
 
-  const { messages, input, handleInputChange, handleSubmit, setMessages, isLoading } =
-    useChat({
-      api: "/api/chat",
-      id: selectedId ?? "default",
-      body: useMemo(
-        () => ({
-          chatId: selectedId,
-          model: chat?.model,
-          context: chat?.context,
-        }),
-        [selectedId, chat?.model, chat?.context]
-      ),
-      initialMessages: chat?.messages ?? [],
-    });
+  const { messages, sendMessage, setMessages, status } = useChat({
+    api: "/api/chat",
+    id: selectedId ?? "default",
+    body: useMemo(
+      () => ({
+        chatId: selectedId,
+        model: chat?.model,
+        context: chat?.context,
+      }),
+      [selectedId, chat?.model, chat?.context]
+    ),
+    initialMessages: chat?.messages ?? [],
+  });
+
+  const [inputByChat, setInputByChat] = useState<Record<string, string>>({});
+  const activeChatKey = selectedId ?? "default";
+  const inputValue = inputByChat[activeChatKey] ?? "";
+  const setInputValue = useCallback(
+    (value: string) => {
+      setInputByChat((prev) => ({
+        ...prev,
+        [activeChatKey]: value,
+      }));
+    },
+    [activeChatKey]
+  );
+  const isLoading = status === "submitted" || status === "streaming";
 
   useEffect(() => {
     if (initialChats && !hydrated) {
@@ -74,20 +94,18 @@ export function ChatClient({ initialChats }: ChatClientProps) {
     }
   }, [hydrate, hydrated, initialChats]);
 
-  const setInputValue = useCallback(
-    (value: string) =>
-      handleInputChange({
-        target: { value },
-      } as unknown as ChangeEvent<HTMLTextAreaElement>),
-    [handleInputChange]
-  );
+  const handlePromptSubmit = useCallback(
+    (event: FormEvent<HTMLFormElement>) => {
+      event.preventDefault();
+      if (!inputValue.trim()) {
+        return;
+      }
 
-  useEffect(() => {
-    if (chat) {
-      setMessages(chat.messages);
+      sendMessage({ text: inputValue });
       setInputValue("");
-    }
-  }, [chat, setMessages, setInputValue]);
+    },
+    [inputValue, sendMessage, setInputValue]
+  );
 
   useEffect(() => {
     if (!chat) return;
@@ -96,6 +114,9 @@ export function ChatClient({ initialChats }: ChatClientProps) {
       id: (m as ChatMessage).id ?? uuid(),
       createdAt: (m as ChatMessage).createdAt ?? new Date().toISOString(),
     }));
+    if (areChatMessagesEqual(chat.messages ?? [], stamped)) {
+      return;
+    }
     updateMessages(chat.id, stamped);
     updateTitle(chat.id);
     if (supabase) {
@@ -117,8 +138,7 @@ export function ChatClient({ initialChats }: ChatClientProps) {
             const id = addChat();
             const created = useChatStore.getState().chats[id];
             void persistChat(created);
-          }}
-        >
+          }}>
           Create a new chat
         </Button>
       </div>
@@ -163,8 +183,7 @@ export function ChatClient({ initialChats }: ChatClientProps) {
                 }}
                 onCheckpoint={() => {
                   addCheckpoint(chat.id);
-                  const checkpoint =
-                    useChatStore.getState().chats[chat.id]?.checkpoints.at(-1);
+                  const checkpoint = useChatStore.getState().chats[chat.id]?.checkpoints.at(-1);
                   if (checkpoint && supabase) {
                     void persistCheckpoint(chat.id, checkpoint);
                   }
@@ -177,16 +196,15 @@ export function ChatClient({ initialChats }: ChatClientProps) {
               <div className="rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm">
                 <h3 className="text-sm font-semibold text-zinc-800">Context</h3>
                 <p className="mt-2 text-sm text-zinc-600">
-                  {chat.context ??
-                    "Add important details to guide the assistant for this chat."}
+                  {chat.context ?? "Add important details to guide the assistant for this chat."}
                 </p>
               </div>
             </div>
           </div>
           <PromptArea
-            input={input}
+            input={inputValue}
             setInput={setInputValue}
-            onSubmit={handleSubmit}
+            onSubmit={handlePromptSubmit}
             isLoading={isLoading}
           />
         </div>

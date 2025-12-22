@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 export async function POST() {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -14,10 +14,7 @@ export async function POST() {
 
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!serviceKey || !process.env.NEXT_PUBLIC_SUPABASE_URL) {
-    return NextResponse.json(
-      { error: "Service key not configured" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Service key not configured" }, { status: 500 });
   }
 
   const admin = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL, serviceKey);

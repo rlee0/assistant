@@ -1,5 +1,6 @@
-import { createServerClient } from "@supabase/auth-helpers-nextjs";
 import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/auth-helpers-nextjs";
+import type { CookieOptions, SetAllCookies } from "@supabase/auth-helpers-nextjs";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -10,12 +11,36 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-export function createSupabaseServerClient() {
+function normalizeCookieOptions(options?: CookieOptions) {
+  if (!options) {
+    return undefined;
+  }
+
+  const { domain, path, secure, sameSite, partitioned, httpOnly, maxAge, priority, expires } =
+    options;
+
+  return { domain, path, secure, sameSite, partitioned, httpOnly, maxAge, priority, expires };
+}
+
+export async function createSupabaseServerClient() {
+  const cookieStore = await cookies();
+
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
       "Supabase client unavailable: missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY."
     );
   }
 
-  return createServerClient(supabaseUrl, supabaseAnonKey, { cookies });
+  const cookieMethods = {
+    async getAll() {
+      return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
+    },
+    async setAll(toSet: Parameters<SetAllCookies>[0]) {
+      for (const { name, value, options } of toSet) {
+        cookieStore.set(name, value, normalizeCookieOptions(options));
+      }
+    },
+  };
+
+  return createServerClient(supabaseUrl, supabaseAnonKey, { cookies: cookieMethods });
 }

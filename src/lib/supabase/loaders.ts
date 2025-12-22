@@ -10,25 +10,28 @@ export type InitialChatData = {
 };
 
 export async function loadInitialChats(userId: string): Promise<InitialChatData> {
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
 
-  const { data: chatRows = [] } = await supabase
+  const { data: chatRowsData } = await supabase
     .from("chats")
     .select("id,title,pinned,updated_at,model,context,suggestions")
     .eq("user_id", userId)
     .order("updated_at", { ascending: false });
+  const chatRows = chatRowsData ?? [];
 
-  const { data: messageRows = [] } = await supabase
+  const { data: messageRowsData } = await supabase
     .from("messages")
     .select("id,chat_id,role,content,created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
+  const messageRows = messageRowsData ?? [];
 
-  const { data: checkpointRows = [] } = await supabase
+  const { data: checkpointRowsData } = await supabase
     .from("checkpoints")
     .select("chat_id,payload,created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: true });
+  const checkpointRows = checkpointRowsData ?? [];
 
   const chats: Record<string, ChatSession> = {};
   const order: string[] = [];

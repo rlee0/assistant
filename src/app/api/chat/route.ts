@@ -1,9 +1,10 @@
-import { NextResponse } from "next/server";
-import { streamText } from "ai";
-import { openai } from "@ai-sdk/openai";
-import type { CoreMessage } from "ai";
-import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { buildTools, defaultToolSettings } from "@/tools";
+
+import type { CoreMessage } from "ai";
+import { NextResponse } from "next/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { openai } from "@ai-sdk/openai";
+import { streamText } from "ai";
 
 export async function POST(req: Request) {
   const {
@@ -19,10 +20,7 @@ export async function POST(req: Request) {
     "";
 
   if (!apiKey) {
-    return NextResponse.json(
-      { error: "Missing API key for model provider" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Missing API key for model provider" }, { status: 500 });
   }
 
   const resolvedModel =
@@ -33,7 +31,7 @@ export async function POST(req: Request) {
     baseURL: process.env.AI_GATEWAY_URL,
   });
 
-  const supabase = createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -41,23 +39,15 @@ export async function POST(req: Request) {
 
   let toolSettings = defaultToolSettings();
   if (userId) {
-    const { data } = await supabase
-      .from("tools")
-      .select("id,settings")
-      .eq("user_id", userId);
+    const { data } = await supabase.from("tools").select("id,settings").eq("user_id", userId);
     if (data) {
-      toolSettings = Object.fromEntries(
-        data.map((row) => [row.id, row.settings ?? {}])
-      );
+      toolSettings = Object.fromEntries(data.map((row) => [row.id, row.settings ?? {}]));
     }
   }
   const tools = buildTools(toolSettings);
 
   const augmentedMessages = context
-    ? [
-        { role: "system", content: `Context: ${context}` as const },
-        ...messages,
-      ]
+    ? [{ role: "system", content: `Context: ${context}` as const }, ...messages]
     : messages;
 
   try {
@@ -70,9 +60,6 @@ export async function POST(req: Request) {
     return result.toAIStreamResponse();
   } catch (error) {
     console.error(error);
-    return NextResponse.json(
-      { error: "Failed to stream from AI gateway" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Failed to stream from AI gateway" }, { status: 500 });
   }
 }

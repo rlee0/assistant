@@ -1,13 +1,13 @@
-import Link from "next/link";
-import { redirect } from "next/navigation";
 import { ChatClient } from "@/components/chat-client";
+import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { loadInitialChats } from "@/lib/supabase/loaders";
+import { redirect } from "next/navigation";
 
 export default async function Page() {
   let supabase;
   try {
-    supabase = createSupabaseServerClient();
+    supabase = await createSupabaseServerClient();
   } catch (error) {
     console.error(error);
     return (
@@ -16,10 +16,7 @@ export default async function Page() {
           Supabase auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and
           NEXT_PUBLIC_SUPABASE_ANON_KEY to continue.
         </p>
-        <Link
-          href="/login"
-          className="text-sm text-blue-600 underline underline-offset-4"
-        >
+        <Link href="/login" className="text-sm text-blue-600 underline underline-offset-4">
           Go to login
         </Link>
       </div>
@@ -27,16 +24,14 @@ export default async function Page() {
   }
 
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
-  const initialChats = await loadInitialChats(session.user.id);
+  const initialChats = await loadInitialChats(user.id);
 
-  return (
-    <ChatClient initialChats={initialChats} />
-  );
+  return <ChatClient initialChats={initialChats} />;
 }
