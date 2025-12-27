@@ -51,16 +51,16 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
       .filter((c) => c.chat_id === id)
       .map((c) => c.payload as ChatMessage[]);
 
-      chats[id] = {
-        id,
-        title: row.title,
-        pinned: row.is_pinned ?? false,
-        updatedAt: row.updated_at ?? new Date().toISOString(),
-        model: DEFAULT_MODEL,
-        suggestions: [],
-        messages,
-        checkpoints,
-      };
+    chats[id] = {
+      id,
+      title: row.title,
+      pinned: row.is_pinned ?? false,
+      updatedAt: row.updated_at ?? new Date().toISOString(),
+      model: DEFAULT_MODEL,
+      suggestions: [],
+      messages,
+      checkpoints,
+    };
     order.push(id);
   });
 

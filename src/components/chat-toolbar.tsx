@@ -16,11 +16,7 @@ import {
 } from "./ui/dropdown-menu";
 import { useChatStore } from "@/store/chat-store";
 
-export function ChatToolbar({
-  onToggleSidebar,
-}: {
-  onToggleSidebar?: () => void;
-}) {
+export function ChatToolbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const router = useRouter();
   const supabase = useMemo(() => {
     try {
@@ -65,10 +61,7 @@ export function ChatToolbar({
             {chat.pinned ? "Unpin chat" : "Pin chat"}
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem
-            className="text-red-600"
-            onClick={() => deleteChat(chat.id)}
-          >
+          <DropdownMenuItem className="text-red-600" onClick={() => deleteChat(chat.id)}>
             <Trash2 className="mr-2 h-4 w-4" />
             Delete chat
           </DropdownMenuItem>
@@ -81,8 +74,7 @@ export function ChatToolbar({
               }
               await supabase.auth.signOut();
               router.replace("/login");
-            }}
-          >
+            }}>
             Sign out
           </DropdownMenuItem>
         </DropdownMenuContent>
