@@ -2,7 +2,7 @@
 
 import { format } from "date-fns";
 import { EllipsisVertical, Pin, Trash2, PanelLeft } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { Breadcrumbs } from "./breadcrumbs";
 import { Button } from "./ui/button";
@@ -32,7 +32,6 @@ export function ChatToolbar({
   const { selectedId, chats, togglePin, deleteChat } = useChatStore();
   const chat = selectedId ? chats[selectedId] : undefined;
   if (!chat) return null;
-  const updated = format(new Date(chat.updatedAt), "PP p");
 
   return (
     <div className="flex items-center justify-between border-b border-zinc-200 px-6 py-4">
@@ -49,7 +48,9 @@ export function ChatToolbar({
               { label: chat.title, active: true },
             ]}
           />
-          <div className="text-sm text-zinc-500">Updated {updated}</div>
+          <div className="text-sm text-zinc-500">
+            Updated <UpdatedTimestamp timestamp={chat.updatedAt} />
+          </div>
         </div>
       </div>
       <DropdownMenu>
@@ -88,4 +89,15 @@ export function ChatToolbar({
       </DropdownMenu>
     </div>
   );
+}
+
+function UpdatedTimestamp({ timestamp }: { timestamp: string }) {
+  const ref = useRef<HTMLSpanElement | null>(null);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.textContent = format(new Date(timestamp), "PP p");
+  }, [timestamp]);
+
+  return <span ref={ref}>just now</span>;
 }

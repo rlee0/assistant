@@ -3,6 +3,8 @@ import "server-only";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/store/chat-store";
 
+const DEFAULT_MODEL = "gpt-4o-mini";
+
 export type InitialChatData = {
   chats: Record<string, ChatSession>;
   order: string[];
@@ -14,7 +16,8 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
 
   const { data: chatRowsData } = await supabase
     .from("chats")
-    .select("id,title,pinned,updated_at,context")
+    .select("id,title,is_pinned,updated_at")
+    .eq("user_id", userId)
     .order("updated_at", { ascending: false });
   const chatRows = chatRowsData ?? [];
 
@@ -48,17 +51,16 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
       .filter((c) => c.chat_id === id)
       .map((c) => c.payload as ChatMessage[]);
 
-    chats[id] = {
-      id,
-      title: row.title,
-      pinned: row.pinned ?? false,
-      updatedAt: row.updated_at ?? new Date().toISOString(),
-      model: row.model,
-      context: row.context ?? undefined,
-      suggestions: (row.suggestions as string[]) ?? [],
-      messages,
-      checkpoints,
-    };
+      chats[id] = {
+        id,
+        title: row.title,
+        pinned: row.is_pinned ?? false,
+        updatedAt: row.updated_at ?? new Date().toISOString(),
+        model: DEFAULT_MODEL,
+        suggestions: [],
+        messages,
+        checkpoints,
+      };
     order.push(id);
   });
 

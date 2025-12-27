@@ -22,7 +22,7 @@ function normalizeCookieOptions(options?: CookieOptions) {
   return { domain, path, secure, sameSite, partitioned, httpOnly, maxAge, priority, expires };
 }
 
-export async function createSupabaseServerClient() {
+export async function createSupabaseServerClient(options?: { allowCookieWrite?: boolean }) {
   const cookieStore = await cookies();
 
   if (!supabaseUrl || !supabaseAnonKey) {
@@ -36,8 +36,11 @@ export async function createSupabaseServerClient() {
       return cookieStore.getAll().map(({ name, value }) => ({ name, value }));
     },
     async setAll(toSet: Parameters<SetAllCookies>[0]) {
-      for (const { name, value, options } of toSet) {
-        cookieStore.set(name, value, normalizeCookieOptions(options));
+      // Next.js restricts cookie modifications to Route Handlers or Server Actions
+      if (options?.allowCookieWrite) {
+        for (const { name, value, options: opts } of toSet) {
+          cookieStore.set(name, value, normalizeCookieOptions(opts));
+        }
       }
     },
   };

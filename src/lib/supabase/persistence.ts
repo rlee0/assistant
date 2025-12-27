@@ -1,7 +1,16 @@
 "use client";
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import type { PostgrestError } from "@supabase/supabase-js";
 import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/store/chat-store";
+import { v5 as uuidv5 } from "uuid";
+
+const MESSAGE_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+function normalizeMessageId(messageId: string) {
+  return UUID_REGEX.test(messageId) ? messageId : uuidv5(messageId, MESSAGE_NAMESPACE);
+}
 
 async function supabaseClient() {
   try {
@@ -23,10 +32,10 @@ export async function persistChat(session: ChatSession) {
       .from("chats")
       .upsert({
         id: session.id,
+        user_id: supabase.userId,
         title: session.title,
-        pinned: session.pinned,
+        is_pinned: session.pinned,
         updated_at: session.updatedAt ?? new Date().toISOString(),
-        context: session.context,
       })
       .select();
     if (error) console.error("Persist chat failed", error);
@@ -39,10 +48,10 @@ export async function persistMessages(chatId: string, messages: ChatMessage[]) {
   const supabase = await supabaseClient();
   if (!supabase || !supabase.userId) return;
   const payload = messages.map((m) => ({
-    id: m.id,
+    id: normalizeMessageId(m.id),
     chat_id: chatId,
     role: m.role,
-    content: m.content,
+    content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
     created_at: m.createdAt,
   }));
   if (!payload.length) return;
@@ -68,13 +77,9 @@ export async function deleteChatCascade(chatId: string) {
       .from("checkpoints")
       .delete()
       .eq("chat_id", chatId);
-    if (delCheckpointsError)
-      console.error("Delete checkpoints failed", delCheckpointsError);
+    if (delCheckpointsError) console.error("Delete checkpoints failed", delCheckpointsError);
 
-    const { error: delChatError } = await supabase.client
-      .from("chats")
-      .delete()
-      .eq("id", chatId);
+    const { error: delChatError } = await supabase.client.from("chats").delete().eq("id", chatId);
     if (delChatError) console.error("Delete chat failed", delChatError);
   } catch (error) {
     console.error("Delete chat cascade failed", error);
@@ -85,12 +90,27 @@ export async function persistCheckpoint(chatId: string, checkpoint: ChatCheckpoi
   const supabase = await supabaseClient();
   if (!supabase || !supabase.userId) return;
   try {
-    const { error } = await supabase.client.from("checkpoints").insert({
-      chat_id: chatId,
-      payload: checkpoint,
-      created_at: new Date().toISOString(),
-    });
-    if (error) console.error("Persist checkpoint failed", error);
+    const normalized = checkpoint.map((m) => ({
+      ...m,
+      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+    }));
+    const { error } = await supabase.client
+      .from("checkpoints")
+      .insert({
+        chat_id: chatId,
+        payload: normalized,
+        created_at: new Date().toISOString(),
+      })
+      .select();
+    if (error) {
+      const pgError = error as PostgrestError;
+      console.error("Persist checkpoint failed", {
+        message: pgError?.message,
+        details: pgError?.details,
+        hint: pgError?.hint,
+        code: pgError?.code,
+      });
+    }
   } catch (error) {
     console.error("Persist checkpoint failed", error);
   }

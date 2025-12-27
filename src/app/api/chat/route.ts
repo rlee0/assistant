@@ -3,15 +3,18 @@ import { buildTools, defaultToolSettings } from "@/tools";
 import type { CoreMessage } from "ai";
 import { NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { openai } from "@ai-sdk/openai";
+import { createOpenAI } from "@ai-sdk/openai";
 import { streamText } from "ai";
 
 export async function POST(req: Request) {
-  const {
-    messages,
-    model,
-    context,
-  }: { messages: CoreMessage[]; model?: string; context?: string } = await req.json();
+  const body = (await req.json()) as Partial<{
+    messages: CoreMessage[];
+    model: string;
+    context: string;
+  }>;
+  const messages: CoreMessage[] = Array.isArray(body?.messages) ? body!.messages! : [];
+  const model = body?.model;
+  const context = body?.context;
 
   const apiKey =
     process.env.AI_GATEWAY_API_KEY ??
@@ -26,12 +29,12 @@ export async function POST(req: Request) {
   const resolvedModel =
     model || process.env.AI_MODEL || process.env.AI_GATEWAY_MODEL || "gpt-4o-mini";
 
-  const client = openai({
+  const client = createOpenAI({
     apiKey,
     baseURL: process.env.AI_GATEWAY_URL,
   });
 
-  const supabase = await createSupabaseServerClient();
+  const supabase = await createSupabaseServerClient({ allowCookieWrite: true });
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -51,8 +54,8 @@ export async function POST(req: Request) {
   }
   const tools = buildTools(toolSettings);
 
-  const augmentedMessages = context
-    ? [{ role: "system", content: `Context: ${context}` as const }, ...messages]
+  const augmentedMessages: CoreMessage[] = context
+    ? [{ role: "system" as const, content: `Context: ${context}` }, ...messages]
     : messages;
 
   try {
@@ -60,11 +63,11 @@ export async function POST(req: Request) {
       model: client(resolvedModel),
       messages: augmentedMessages,
       tools,
-      maxSteps: 6,
     });
-    return result.toAIStreamResponse();
+    return result.toUIMessageStreamResponse();
   } catch (error) {
-    console.error(error);
-    return NextResponse.json({ error: "Failed to stream from AI gateway" }, { status: 500 });
+    const message = error instanceof Error ? error.message : "Failed to stream from AI gateway";
+    console.error("AI gateway error", message, error);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
