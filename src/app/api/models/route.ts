@@ -9,9 +9,12 @@ export async function GET() {
         },
         cache: "no-store",
       });
+
       if (res.ok) {
-        const data: { models?: Array<{ id?: string; name?: string; provider?: string; contextTokens?: number }> } =
-          await res.json();
+        const data: {
+          models?: Array<{ id?: string; name?: string; provider?: string; contextTokens?: number }>;
+        } = await res.json();
+
         if (data.models) {
           return NextResponse.json(
             data.models.map((m) => ({

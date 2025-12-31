@@ -2,8 +2,8 @@ import { buildTools, defaultToolSettings } from "@/tools";
 
 import type { CoreMessage } from "ai";
 import { NextResponse } from "next/server";
-import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { createOpenAI } from "@ai-sdk/openai";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { streamText } from "ai";
 
 export async function POST(req: Request) {
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
       messages: augmentedMessages,
       tools,
     });
-    return result.toUIMessageStreamResponse();
+    return result.toTextStreamResponse();
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to stream from AI gateway";
     console.error("AI gateway error", message, error);
