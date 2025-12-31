@@ -83,7 +83,13 @@ export function ChatClient({ initialChats }: ChatClientProps) {
   }, [hydrate, hydrated, initialChats]);
 
   const handlePromptSubmit = useCallback(
-    (message: { text: string; files?: Array<{ url: string; mediaType?: string; filename?: string }> }, event: FormEvent<HTMLFormElement>) => {
+    (
+      message: {
+        text: string;
+        files?: Array<{ url: string; mediaType?: string; filename?: string }>;
+      },
+      event: FormEvent<HTMLFormElement>
+    ) => {
       event.preventDefault();
       if (!message.text.trim()) {
         return;
@@ -98,17 +104,17 @@ export function ChatClient({ initialChats }: ChatClientProps) {
     if (!chat) return;
     const stamped: ChatMessage[] = messages.map((m: any) => {
       // Convert new message format (with parts) to old format (with content)
-      let content: unknown = '';
+      let content: unknown = "";
       if (Array.isArray(m.parts)) {
         // Extract text content from parts
         const textParts = m.parts
-          .filter((p: any) => p && typeof p === 'object' && p.type === 'text')
+          .filter((p: any) => p && typeof p === "object" && p.type === "text")
           .map((p: any) => p.text)
           .filter(Boolean);
-        content = textParts.length > 0 ? textParts.join('\n') : '';
+        content = textParts.length > 0 ? textParts.join("\n") : "";
       }
       return {
-        role: m.role as 'user' | 'assistant' | 'system',
+        role: m.role as "user" | "assistant" | "system",
         content,
         id: m.id ?? uuid(),
         createdAt: m.createdAt ?? new Date().toISOString(),
@@ -178,7 +184,7 @@ export function ChatClient({ initialChats }: ChatClientProps) {
                   const convertedMessages = filtered.map((m: any) => ({
                     id: m.id,
                     role: m.role,
-                    parts: [{ type: 'text' as const, text: m.content ?? '' }],
+                    parts: [{ type: "text" as const, text: m.content ?? "" }],
                   }));
                   setMessages(convertedMessages as any);
                   setInputValue(getMessageText(message.content));

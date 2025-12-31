@@ -7,11 +7,7 @@ import {
   ConversationEmptyState,
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
-import {
-  Message,
-  MessageContent,
-  MessageToolbar,
-} from "@/components/ai-elements/message";
+import { Message, MessageContent, MessageToolbar } from "@/components/ai-elements/message";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -28,48 +24,48 @@ export function MessageList({ messages, onEdit, onCheckpoint, onRestore }: Messa
       <Conversation className="flex-1">
         <ConversationContent>
           {messages.length === 0 ? (
-            <ConversationEmptyState title="No messages yet" description="Start a conversation to see messages here" />
+            <ConversationEmptyState
+              title="No messages yet"
+              description="Start a conversation to see messages here"
+            />
           ) : (
             messages
               .filter((message) => message.role === "user" || message.role === "assistant")
               .map((message) => (
-              <Message key={message.id} from={message.role}>
-                <MessageContent>
-                  <div className="prose prose-sm dark:prose-invert max-w-none">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                      {getMessageText(message.content ?? "")}
-                    </ReactMarkdown>
-                  </div>
-                </MessageContent>
-                <MessageToolbar>
-                  {message.role === "user" ? (
-                    <button
-                      onClick={() => onEdit?.(message)}
-                      className="text-xs text-blue-600 hover:underline dark:text-blue-400"
-                    >
-                      Edit & resend
-                    </button>
-                  ) : null}
-                  <div className="ml-auto flex items-center gap-1">
-                    <button
-                      onClick={onCheckpoint}
-                      className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-                      title="Save checkpoint"
-                    >
-                      Save
-                    </button>
-                    <span className="text-xs text-zinc-400">·</span>
-                    <button
-                      onClick={onRestore}
-                      className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
-                      title="Restore last checkpoint"
-                    >
-                      Restore
-                    </button>
-                  </div>
-                </MessageToolbar>
-              </Message>
-            ))
+                <Message key={message.id} from={message.role}>
+                  <MessageContent>
+                    <div className="prose prose-sm dark:prose-invert max-w-none">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        {getMessageText(message.content ?? "")}
+                      </ReactMarkdown>
+                    </div>
+                  </MessageContent>
+                  <MessageToolbar>
+                    {message.role === "user" ? (
+                      <button
+                        onClick={() => onEdit?.(message)}
+                        className="text-xs text-blue-600 hover:underline dark:text-blue-400">
+                        Edit & resend
+                      </button>
+                    ) : null}
+                    <div className="ml-auto flex items-center gap-1">
+                      <button
+                        onClick={onCheckpoint}
+                        className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        title="Save checkpoint">
+                        Save
+                      </button>
+                      <span className="text-xs text-zinc-400">·</span>
+                      <button
+                        onClick={onRestore}
+                        className="text-xs text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-200"
+                        title="Restore last checkpoint">
+                        Restore
+                      </button>
+                    </div>
+                  </MessageToolbar>
+                </Message>
+              ))
           )}
         </ConversationContent>
         <ConversationScrollButton />

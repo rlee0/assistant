@@ -35,9 +35,7 @@ export const toolDefinitions: ToolDefinition[] = [];
 export type ToolSettingsMap = Record<string, unknown>;
 
 export function defaultToolSettings(): ToolSettingsMap {
-  return Object.fromEntries(
-    toolDefinitions.map((def) => [def.id, def.settingsSchema.parse({})])
-  );
+  return Object.fromEntries(toolDefinitions.map((def) => [def.id, def.settingsSchema.parse({})]));
 }
 
 export function buildTools(settings: ToolSettingsMap): Record<string, Tool> {

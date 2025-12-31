@@ -65,11 +65,7 @@ export function PromptArea({ input, setInput, onSubmitMessage, isLoading }: Prom
     <div className="sticky bottom-0 z-10 border-t border-zinc-200 bg-white p-4 shadow-[0_-6px_12px_-12px_rgba(0,0,0,0.25)]">
       <PromptInputProvider initialInput={input}>
         <Suggestions setInput={setInput} suggestions={chat.suggestions} />
-        <PromptInput
-          onSubmit={onSubmitMessage}
-          className="mt-2"
-          globalDrop
-        >
+        <PromptInput onSubmit={onSubmitMessage} className="mt-2" globalDrop>
           <PromptInputBody>
             <PromptInputAttachmentsDisplay />
             <PromptInputTextarea
@@ -116,8 +112,7 @@ export function PromptArea({ input, setInput, onSubmitMessage, isLoading }: Prom
                             onSelect={() => {
                               setModel(chat.id, m.id);
                               setModelDialogOpen(false);
-                            }}
-                          >
+                            }}>
                             {m.label}
                           </ModelSelectorItem>
                         ))
@@ -135,7 +130,13 @@ export function PromptArea({ input, setInput, onSubmitMessage, isLoading }: Prom
   );
 }
 
-function Suggestions({ suggestions, setInput }: { suggestions: string[]; setInput: (v: string) => void }) {
+function Suggestions({
+  suggestions,
+  setInput,
+}: {
+  suggestions: string[];
+  setInput: (v: string) => void;
+}) {
   const controller = usePromptInputController();
   if (!suggestions.length) return null;
   return (
@@ -151,8 +152,7 @@ function Suggestions({ suggestions, setInput }: { suggestions: string[]; setInpu
             onClick={() => {
               setInput(s);
               controller.textInput.setInput(s);
-            }}
-          >
+            }}>
             {s}
           </PromptInputButton>
         ))}

@@ -1,13 +1,12 @@
 "use client";
 
-import { useState } from "react";
-import { Maximize2, Minimize2, Globe2, Code2, FileText } from "lucide-react";
+import { Code2, FileText, Globe2, Maximize2, Minimize2 } from "lucide-react";
+
 import { Button } from "./ui/button";
+import { useState } from "react";
 export function CanvasPanel() {
   const [expanded, setExpanded] = useState(false);
-  const [activeTab, setActiveTab] = useState<"browser" | "code" | "rich">(
-    "browser"
-  );
+  const [activeTab, setActiveTab] = useState<"browser" | "code" | "rich">("browser");
 
   return (
     <div
@@ -15,8 +14,7 @@ export function CanvasPanel() {
         expanded
           ? "fixed inset-0 z-40 flex flex-col"
           : "h-64 flex flex-col rounded-2xl border border-zinc-200 bg-white shadow-sm"
-      }`}
-    >
+      }`}>
       <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
         <div className="flex items-center gap-3">
           <Globe2 className="h-4 w-4 text-zinc-600" />
@@ -30,13 +28,8 @@ export function CanvasPanel() {
                   activeTab === tab
                     ? "bg-zinc-900 text-white"
                     : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
-                }`}
-              >
-                {tab === "browser"
-                  ? "Browser"
-                  : tab === "code"
-                    ? "Code"
-                    : "Rich"}
+                }`}>
+                {tab === "browser" ? "Browser" : tab === "code" ? "Code" : "Rich"}
               </button>
             ))}
           </div>
@@ -45,13 +38,8 @@ export function CanvasPanel() {
           variant="ghost"
           size="icon"
           onClick={() => setExpanded((v) => !v)}
-          aria-label={expanded ? "Collapse" : "Expand"}
-        >
-          {expanded ? (
-            <Minimize2 className="h-4 w-4" />
-          ) : (
-            <Maximize2 className="h-4 w-4" />
-          )}
+          aria-label={expanded ? "Collapse" : "Expand"}>
+          {expanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
         </Button>
       </div>
       <div className="flex-1 overflow-hidden">

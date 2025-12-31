@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
-import Link from "next/link";
-import { z } from "zod";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { defaultToolSettings, toolDefinitions } from "@/tools";
+import { useCallback, useEffect, useMemo, useState } from "react";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import Link from "next/link";
 import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { toolDefinitions, defaultToolSettings } from "@/tools";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { z } from "zod";
 
 const settingsSchema = z.object({
   account: z.object({
@@ -95,13 +96,11 @@ export default function SettingsPage() {
           data: parsed,
           updated_at: new Date().toISOString(),
         });
-        const toolRows = Object.entries(parsed.tools ?? {}).map(
-          ([id, config]) => ({
-            id,
-            user_id: userId ?? "me",
-            settings: config,
-          })
-        );
+        const toolRows = Object.entries(parsed.tools ?? {}).map(([id, config]) => ({
+          id,
+          user_id: userId ?? "me",
+          settings: config,
+        }));
         if (toolRows.length) {
           await supabase.from("tools").upsert(toolRows);
         }
@@ -206,7 +205,7 @@ export default function SettingsPage() {
             </CardHeader>
             <CardContent>
               <Textarea
-                className="min-h-[400px] font-mono text-xs"
+                className="min-h-100 font-mono text-xs"
                 value={JSON.stringify(settings, null, 2)}
                 onChange={(e) => {
                   try {
@@ -233,9 +232,7 @@ export default function SettingsPage() {
                 <Field label="Display name">
                   <Input
                     value={settings.account.displayName}
-                    onChange={(e) =>
-                      update(["account", "displayName"], e.target.value)
-                    }
+                    onChange={(e) => update(["account", "displayName"], e.target.value)}
                   />
                 </Field>
                 <Field label="Change password">
@@ -243,9 +240,7 @@ export default function SettingsPage() {
                     type="password"
                     placeholder="Leave blank to keep current"
                     value={settings.account.password ?? ""}
-                    onChange={(e) =>
-                      update(["account", "password"], e.target.value)
-                    }
+                    onChange={(e) => update(["account", "password"], e.target.value)}
                   />
                 </Field>
               </div>
@@ -265,10 +260,7 @@ export default function SettingsPage() {
                   <select
                     className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
                     value={settings.appearance.theme}
-                    onChange={(e) =>
-                      update(["appearance", "theme"], e.target.value)
-                    }
-                  >
+                    onChange={(e) => update(["appearance", "theme"], e.target.value)}>
                     <option value="system">System</option>
                     <option value="light">Light</option>
                     <option value="dark">Dark</option>
@@ -278,10 +270,7 @@ export default function SettingsPage() {
                   <select
                     className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
                     value={settings.appearance.density}
-                    onChange={(e) =>
-                      update(["appearance", "density"], e.target.value)
-                    }
-                  >
+                    onChange={(e) => update(["appearance", "density"], e.target.value)}>
                     <option value="comfortable">Comfortable</option>
                     <option value="compact">Compact</option>
                   </select>
@@ -294,9 +283,7 @@ export default function SettingsPage() {
                 <Field label="Default model">
                   <Input
                     value={settings.models.defaultModel}
-                    onChange={(e) =>
-                      update(["models", "defaultModel"], e.target.value)
-                    }
+                    onChange={(e) => update(["models", "defaultModel"], e.target.value)}
                   />
                 </Field>
                 <Field label="Temperature">
@@ -306,18 +293,14 @@ export default function SettingsPage() {
                     max={1}
                     step={0.1}
                     value={settings.models.temperature}
-                    onChange={(e) =>
-                      update(["models", "temperature"], Number(e.target.value))
-                    }
+                    onChange={(e) => update(["models", "temperature"], Number(e.target.value))}
                   />
                 </Field>
                 <Field label="AI Gateway API key">
                   <Input
                     type="password"
                     value={settings.models.apiKey ?? ""}
-                    onChange={(e) =>
-                      update(["models", "apiKey"], e.target.value)
-                    }
+                    onChange={(e) => update(["models", "apiKey"], e.target.value)}
                   />
                 </Field>
               </div>
@@ -335,19 +318,14 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between">
                           <div>
                             <p className="text-sm font-semibold">{toolDef.name}</p>
-                            <p className="text-xs text-zinc-500">
-                              {toolDef.description}
-                            </p>
+                            <p className="text-xs text-zinc-500">{toolDef.description}</p>
                           </div>
                           <label className="flex items-center gap-2 text-xs text-zinc-600">
                             <input
                               type="checkbox"
                               checked={(toolSettings as { enabled?: boolean }).enabled ?? true}
                               onChange={(e) =>
-                                update(
-                                  ["tools", toolDef.id, "enabled"],
-                                  e.target.checked
-                                )
+                                update(["tools", toolDef.id, "enabled"], e.target.checked)
                               }
                             />
                             Enabled
@@ -355,18 +333,15 @@ export default function SettingsPage() {
                         </div>
                       </CardHeader>
                       <CardContent className="grid grid-cols-2 gap-4">
-                        {Object.entries(toolDef.settingsSchema.shape).map(
-                          ([key, schema]) => (
-                            <Field key={key} label={key}>
-                              {renderSettingControl({
-                                value: toolSettings[key],
-                                onChange: (val) =>
-                                  update(["tools", toolDef.id, key], val),
-                                schema: schema as z.ZodTypeAny,
-                              })}
-                            </Field>
-                          )
-                        )}
+                        {Object.entries(toolDef.settingsSchema.shape).map(([key, schema]) => (
+                          <Field key={key} label={key}>
+                            {renderSettingControl({
+                              value: toolSettings[key],
+                              onChange: (val) => update(["tools", toolDef.id, key], val),
+                              schema: schema as z.ZodTypeAny,
+                            })}
+                          </Field>
+                        ))}
                       </CardContent>
                     </Card>
                   );
@@ -412,8 +387,7 @@ function renderSettingControl({
       <select
         className="rounded-md border border-zinc-200 px-3 py-2 text-sm"
         value={String(value ?? schema.options[0])}
-        onChange={(e) => onChange(e.target.value)}
-      >
+        onChange={(e) => onChange(e.target.value)}>
         {schema.options.map((opt) => (
           <option key={opt} value={opt}>
             {opt}
@@ -422,12 +396,7 @@ function renderSettingControl({
       </select>
     );
   }
-  return (
-    <Input
-      value={String(value ?? "")}
-      onChange={(e) => onChange(e.target.value)}
-    />
-  );
+  return <Input value={String(value ?? "")} onChange={(e) => onChange(e.target.value)} />;
 }
 
 function Section({
@@ -449,13 +418,7 @@ function Section({
   );
 }
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex flex-col gap-1 text-sm text-zinc-700">
       <span className="capitalize">{label}</span>
