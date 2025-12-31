@@ -25,7 +25,7 @@ const settingsSchema = z.object({
     temperature: z.number().min(0).max(1),
     apiKey: z.string().optional(),
   }),
-  tools: z.record(z.any()),
+  tools: z.record(z.string(), z.any()),
 });
 
 type Settings = z.infer<typeof settingsSchema>;
@@ -35,7 +35,7 @@ function buildDefaultSettings(): Settings {
     account: {
       email: "user@example.com",
       displayName: "Assistant User",
-      password: "",
+      password: undefined,
     },
     appearance: {
       theme: "system",
@@ -362,7 +362,7 @@ export default function SettingsPage() {
                                 value: toolSettings[key],
                                 onChange: (val) =>
                                   update(["tools", toolDef.id, key], val),
-                                schema,
+                                schema: schema as z.ZodTypeAny,
                               })}
                             </Field>
                           )

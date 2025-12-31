@@ -1,29 +1,57 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
-import { Sparkles, Send } from "lucide-react";
-import { Button } from "./ui/button";
-import { Textarea } from "./ui/textarea";
+import { useEffect, useState, FormEvent } from "react";
+import { Sparkles } from "lucide-react";
 import { fetchModels, type Model } from "@/lib/models";
 import { useChatStore } from "@/store/chat-store";
+import {
+  PromptInputProvider,
+  PromptInput,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputHeader,
+  PromptInputFooter,
+  PromptInputTools,
+  PromptInputButton,
+  PromptInputSubmit,
+  PromptInputActionAddAttachments,
+  PromptInputAttachments,
+  PromptInputAttachment,
+  usePromptInputController,
+  usePromptInputAttachments,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+} from "@/components/ui/dropdown-menu";
+import {
+  ModelSelector,
+  ModelSelectorTrigger,
+  ModelSelectorContent,
+  ModelSelectorInput,
+  ModelSelectorList,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorItem,
+} from "@/components/ai-elements/model-selector";
+import { Badge } from "./ui/badge";
 
 type PromptAreaProps = {
   input: string;
   setInput: (v: string) => void;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onSubmitMessage: (message: PromptInputMessage, e: FormEvent<HTMLFormElement>) => void;
   isLoading?: boolean;
 };
 
-export function PromptArea({
-  input,
-  setInput,
-  onSubmit,
-  isLoading,
-}: PromptAreaProps) {
+export function PromptArea({ input, setInput, onSubmitMessage, isLoading }: PromptAreaProps) {
   const { selectedId, chats, setModel } = useChatStore();
   const chat = selectedId ? chats[selectedId] : undefined;
   const [models, setModels] = useState<Model[]>([]);
   const [loadingModels, setLoadingModels] = useState(true);
+  const [modelDialogOpen, setModelDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchModels()
@@ -34,63 +62,111 @@ export function PromptArea({
   if (!chat) return null;
 
   return (
-    <form
-      onSubmit={onSubmit}
-      className="sticky bottom-0 z-10 flex flex-col gap-3 border-t border-zinc-200 bg-white p-4 shadow-[0_-6px_12px_-12px_rgba(0,0,0,0.25)]"
-    >
-      <div className="flex flex-wrap items-center gap-2 text-sm text-zinc-600">
+    <div className="sticky bottom-0 z-10 border-t border-zinc-200 bg-white p-4 shadow-[0_-6px_12px_-12px_rgba(0,0,0,0.25)]">
+      <PromptInputProvider initialInput={input}>
+        <Suggestions setInput={setInput} suggestions={chat.suggestions} />
+        <PromptInput
+          onSubmit={onSubmitMessage}
+          className="mt-2"
+          globalDrop
+        >
+          <PromptInputBody>
+            <PromptInputAttachmentsDisplay />
+            <PromptInputTextarea
+              placeholder="Ask anything…"
+              onChange={(e) => setInput(e.target.value)}
+            />
+          </PromptInputBody>
+          <PromptInputFooter>
+            <PromptInputTools>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <PromptInputButton variant="ghost" size="icon-sm">
+                    🔗
+                  </PromptInputButton>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start">
+                  <DropdownMenuGroup>
+                    <PromptInputActionAddAttachments />
+                  </DropdownMenuGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+              <ModelSelector open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
+                <ModelSelectorTrigger asChild>
+                  <PromptInputButton variant="outline">
+                    <Badge variant="outline" className="pointer-events-none">
+                      {loadingModels
+                        ? "Loading…"
+                        : models.find((m) => m.id === chat.model)?.label || "Select model"}
+                    </Badge>
+                  </PromptInputButton>
+                </ModelSelectorTrigger>
+                <ModelSelectorContent>
+                  <ModelSelectorInput placeholder="Search models…" />
+                  <ModelSelectorList>
+                    <ModelSelectorEmpty>No models found</ModelSelectorEmpty>
+                    <ModelSelectorGroup heading="Available Models">
+                      {loadingModels ? (
+                        <ModelSelectorItem disabled>Loading models…</ModelSelectorItem>
+                      ) : (
+                        models.map((m) => (
+                          <ModelSelectorItem
+                            key={m.id}
+                            value={m.id}
+                            onSelect={() => {
+                              setModel(chat.id, m.id);
+                              setModelDialogOpen(false);
+                            }}
+                          >
+                            {m.label}
+                          </ModelSelectorItem>
+                        ))
+                      )}
+                    </ModelSelectorGroup>
+                  </ModelSelectorList>
+                </ModelSelectorContent>
+              </ModelSelector>
+            </PromptInputTools>
+            <PromptInputSubmit status={isLoading ? "submitted" : undefined} />
+          </PromptInputFooter>
+        </PromptInput>
+      </PromptInputProvider>
+    </div>
+  );
+}
+
+function Suggestions({ suggestions, setInput }: { suggestions: string[]; setInput: (v: string) => void }) {
+  const controller = usePromptInputController();
+  if (!suggestions.length) return null;
+  return (
+    <PromptInputHeader>
+      <div className="flex items-center gap-2 text-sm text-zinc-600">
         <Sparkles className="h-4 w-4 text-amber-500" />
         <span className="font-medium">Suggestions:</span>
-        {chat.suggestions.map((s) => (
-          <button
+        {suggestions.map((s) => (
+          <PromptInputButton
             key={s}
-            type="button"
-            onClick={() => setInput(s)}
-            className="rounded-full bg-zinc-100 px-3 py-1 text-xs hover:bg-zinc-200"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setInput(s);
+              controller.textInput.setInput(s);
+            }}
           >
             {s}
-          </button>
+          </PromptInputButton>
         ))}
       </div>
-      <div className="flex gap-3">
-        <div className="flex-1">
-          <Textarea
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Ask anything…"
-            className="min-h-[120px]"
-          />
-          {chat.context ? (
-            <p className="mt-2 text-xs text-zinc-500">
-              Context: {chat.context}
-            </p>
-          ) : null}
-        </div>
-        <div className="flex w-56 flex-col gap-2">
-          <label className="text-xs font-medium text-zinc-600">
-            Model
-            <select
-              className="mt-1 w-full rounded-md border border-zinc-200 px-3 py-2 text-sm"
-              value={chat.model}
-              onChange={(e) => setModel(chat.id, e.target.value)}
-            >
-              {loadingModels ? (
-                <option>Loading models…</option>
-              ) : (
-                models.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.label}
-                  </option>
-                ))
-              )}
-            </select>
-          </label>
-          <Button type="submit" loading={isLoading}>
-            <Send className="mr-2 h-4 w-4" />
-            Send
-          </Button>
-        </div>
-      </div>
-    </form>
+    </PromptInputHeader>
+  );
+}
+
+function PromptInputAttachmentsDisplay() {
+  const attachments = usePromptInputAttachments();
+  if (!attachments.files.length) return null;
+  return (
+    <PromptInputAttachments>
+      {(file) => <PromptInputAttachment key={file.id} data={file} />}
+    </PromptInputAttachments>
   );
 }

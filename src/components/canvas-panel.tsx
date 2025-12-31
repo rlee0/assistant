@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { Maximize2, Minimize2, Globe2, Code2, FileText } from "lucide-react";
 import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader } from "./ui/card";
-
 export function CanvasPanel() {
   const [expanded, setExpanded] = useState(false);
   const [activeTab, setActiveTab] = useState<"browser" | "code" | "rich">(
@@ -12,44 +10,42 @@ export function CanvasPanel() {
   );
 
   return (
-    <Card
-      className={`transition-all ${expanded ? "fixed inset-4 z-40" : "h-64"}`}
+    <div
+      className={`transition-all ${
+        expanded
+          ? "fixed inset-0 z-40 flex flex-col"
+          : "h-64 flex flex-col rounded-2xl border border-zinc-200 bg-white shadow-sm"
+      }`}
     >
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div className="flex items-center gap-2 text-sm font-medium text-zinc-700">
-          <Globe2 className="h-4 w-4" />
-          Canvas
-          <span className="text-zinc-400">·</span>
-          <button
-            className={`rounded px-2 py-1 text-xs ${
-              activeTab === "browser" ? "bg-zinc-900 text-white" : "bg-zinc-100"
-            }`}
-            onClick={() => setActiveTab("browser")}
-          >
-            Browser
-          </button>
-          <button
-            className={`rounded px-2 py-1 text-xs ${
-              activeTab === "code" ? "bg-zinc-900 text-white" : "bg-zinc-100"
-            }`}
-            onClick={() => setActiveTab("code")}
-          >
-            Code editor
-          </button>
-          <button
-            className={`rounded px-2 py-1 text-xs ${
-              activeTab === "rich" ? "bg-zinc-900 text-white" : "bg-zinc-100"
-            }`}
-            onClick={() => setActiveTab("rich")}
-          >
-            Rich text
-          </button>
+      <div className="flex items-center justify-between border-b border-zinc-200 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <Globe2 className="h-4 w-4 text-zinc-600" />
+          <span className="text-sm font-medium">Canvas</span>
+          <div className="flex gap-1">
+            {["browser", "code", "rich"].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setActiveTab(tab as "browser" | "code" | "rich")}
+                className={`rounded px-2 py-1 text-xs transition-colors ${
+                  activeTab === tab
+                    ? "bg-zinc-900 text-white"
+                    : "bg-zinc-100 text-zinc-700 hover:bg-zinc-200"
+                }`}
+              >
+                {tab === "browser"
+                  ? "Browser"
+                  : tab === "code"
+                    ? "Code"
+                    : "Rich"}
+              </button>
+            ))}
+          </div>
         </div>
         <Button
           variant="ghost"
           size="icon"
           onClick={() => setExpanded((v) => !v)}
-          aria-label={expanded ? "Collapse canvas" : "Expand canvas"}
+          aria-label={expanded ? "Collapse" : "Expand"}
         >
           {expanded ? (
             <Minimize2 className="h-4 w-4" />
@@ -57,24 +53,33 @@ export function CanvasPanel() {
             <Maximize2 className="h-4 w-4" />
           )}
         </Button>
-      </CardHeader>
-      <CardContent className="h-full space-y-2">
+      </div>
+      <div className="flex-1 overflow-hidden">
         {activeTab === "browser" && (
-          <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
-            <Globe2 className="mr-2 h-4 w-4" /> Interactive browser placeholder
+          <div className="flex h-full items-center justify-center border-t border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
+            <div className="flex flex-col items-center gap-2">
+              <Globe2 className="h-8 w-8" />
+              <span>Interactive browser</span>
+            </div>
           </div>
         )}
         {activeTab === "code" && (
-          <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
-            <Code2 className="mr-2 h-4 w-4" /> Code editor placeholder
+          <div className="flex h-full items-center justify-center border-t border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
+            <div className="flex flex-col items-center gap-2">
+              <Code2 className="h-8 w-8" />
+              <span>Code editor</span>
+            </div>
           </div>
         )}
         {activeTab === "rich" && (
-          <div className="flex h-40 items-center justify-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
-            <FileText className="mr-2 h-4 w-4" /> Rich text editor placeholder
+          <div className="flex h-full items-center justify-center border-t border-zinc-200 bg-zinc-50 text-sm text-zinc-500">
+            <div className="flex flex-col items-center gap-2">
+              <FileText className="h-8 w-8" />
+              <span>Rich text editor</span>
+            </div>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

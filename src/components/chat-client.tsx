@@ -60,19 +60,7 @@ export function ChatClient({ initialChats }: ChatClientProps) {
     }
   }, []);
 
-  const { messages, sendMessage, setMessages, status } = useChat({
-    api: "/api/chat",
-    id: selectedId ?? "default",
-    body: useMemo(
-      () => ({
-        chatId: selectedId,
-        model: chat?.model,
-        context: chat?.context,
-      }),
-      [selectedId, chat?.model, chat?.context]
-    ),
-    initialMessages: chat?.messages ?? [],
-  });
+  const { messages, sendMessage, setMessages, status } = useChat({});
 
   const [inputByChat, setInputByChat] = useState<Record<string, string>>({});
   const activeChatKey = selectedId ?? "default";
@@ -95,25 +83,37 @@ export function ChatClient({ initialChats }: ChatClientProps) {
   }, [hydrate, hydrated, initialChats]);
 
   const handlePromptSubmit = useCallback(
-    (event: FormEvent<HTMLFormElement>) => {
+    (message: { text: string; files?: Array<{ url: string; mediaType?: string; filename?: string }> }, event: FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      if (!inputValue.trim()) {
+      if (!message.text.trim()) {
         return;
       }
-
-      sendMessage({ text: inputValue });
+      sendMessage({ text: message.text });
       setInputValue("");
     },
-    [inputValue, sendMessage, setInputValue]
+    [sendMessage, setInputValue]
   );
 
   useEffect(() => {
     if (!chat) return;
-    const stamped: ChatMessage[] = messages.map((m) => ({
-      ...m,
-      id: (m as ChatMessage).id ?? uuid(),
-      createdAt: (m as ChatMessage).createdAt ?? new Date().toISOString(),
-    }));
+    const stamped: ChatMessage[] = messages.map((m: any) => {
+      // Convert new message format (with parts) to old format (with content)
+      let content: unknown = '';
+      if (Array.isArray(m.parts)) {
+        // Extract text content from parts
+        const textParts = m.parts
+          .filter((p: any) => p && typeof p === 'object' && p.type === 'text')
+          .map((p: any) => p.text)
+          .filter(Boolean);
+        content = textParts.length > 0 ? textParts.join('\n') : '';
+      }
+      return {
+        role: m.role as 'user' | 'assistant' | 'system',
+        content,
+        id: m.id ?? uuid(),
+        createdAt: m.createdAt ?? new Date().toISOString(),
+      } as ChatMessage;
+    });
     if (areChatMessagesEqual(chat.messages ?? [], stamped)) {
       return;
     }
@@ -174,12 +174,14 @@ export function ChatClient({ initialChats }: ChatClientProps) {
                 messages={chat.messages}
                 onEdit={(message) => {
                   const filtered = chat.messages.filter((m) => m.id !== message.id);
-                  setMessages(filtered);
-                  setInputValue(
-                    typeof message.content === "string"
-                      ? message.content
-                      : JSON.stringify(message.content)
-                  );
+                  // Convert back to new format for setMessages
+                  const convertedMessages = filtered.map((m: any) => ({
+                    id: m.id,
+                    role: m.role,
+                    parts: [{ type: 'text' as const, text: m.content ?? '' }],
+                  }));
+                  setMessages(convertedMessages as any);
+                  setInputValue(getMessageText(message.content));
                 }}
                 onCheckpoint={() => {
                   addCheckpoint(chat.id);
@@ -204,11 +206,36 @@ export function ChatClient({ initialChats }: ChatClientProps) {
           <PromptArea
             input={inputValue}
             setInput={setInputValue}
-            onSubmit={handlePromptSubmit}
+            onSubmitMessage={handlePromptSubmit}
             isLoading={isLoading}
           />
         </div>
       </div>
     </div>
   );
+}
+
+function getMessageText(content: unknown): string {
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((p) => {
+        if (typeof p === "string") return p;
+        if (p && typeof p === "object") {
+          const anyPart = p as Record<string, unknown>;
+          if (typeof anyPart.text === "string") return anyPart.text;
+          if (typeof anyPart.content === "string") return anyPart.content;
+        }
+        return "";
+      })
+      .filter((s) => s && s.trim().length > 0);
+    if (parts.length > 0) return parts.join("\n\n");
+    return JSON.stringify(content);
+  }
+  if (content && typeof content === "object") {
+    const anyObj = content as Record<string, unknown>;
+    if (typeof anyObj.text === "string") return anyObj.text;
+    if (typeof anyObj.content === "string") return anyObj.content;
+  }
+  return "";
 }

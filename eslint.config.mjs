@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Ignore vendor-scaffolded AI Elements components to keep lint clean.
+    "src/components/ai-elements/**",
   ]),
 ]);
 

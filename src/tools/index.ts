@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { tool, type Tool } from "ai";
 
-export type ToolDefinition<T extends z.ZodTypeAny = z.AnyZodObject> = {
+export type ToolDefinition<T extends z.ZodTypeAny = z.ZodObject<any>> = {
   id: string;
   name: string;
   description: string;
@@ -30,82 +30,7 @@ const searchSettings = z.object({
   region: z.string().default("us"),
 });
 
-export const toolDefinitions: ToolDefinition[] = [
-  {
-    id: "browser",
-    name: "Browser Automation",
-    description: "Navigate web pages and extract information",
-    settingsSchema: browserSettings,
-    build: (settings) =>
-      tool({
-        description: "Fetch a web page and return a concise text snippet.",
-        parameters: z.object({
-          url: z.string().url(),
-        }),
-        execute: async ({ url }) => {
-          const res = await fetch(url, {
-            headers: { "User-Agent": settings.userAgent },
-            signal: AbortSignal.timeout(settings.timeoutMs),
-          });
-          const text = await res.text();
-          const snippet = text.slice(0, 1200);
-          return `Fetched ${url}. Preview: ${snippet}`;
-        },
-      }),
-  },
-  {
-    id: "code-runner",
-    name: "Code Runner",
-    description: "Execute code snippets in a sandbox",
-    settingsSchema: codeRunnerSettings,
-    build: (settings) =>
-      tool({
-        description: "Run small JavaScript snippets safely and return output.",
-        parameters: z.object({
-          code: z.string(),
-        }),
-        execute: async ({ code }) => {
-          if (!settings.enabled) return "Code runner disabled.";
-          const fn = new Function(`"use strict"; ${code}`);
-          const result = await Promise.race([
-            Promise.resolve().then(fn),
-            new Promise((_, reject) =>
-              setTimeout(() => reject(new Error("Timeout")), settings.timeoutMs)
-            ),
-          ]);
-          return typeof result === "string" ? result : JSON.stringify(result);
-        },
-      }),
-  },
-  {
-    id: "search",
-    name: "Search",
-    description: "Perform semantic or keyword web search",
-    settingsSchema: searchSettings,
-    build: (settings) =>
-      tool({
-        description: "Search DuckDuckGo for a query.",
-        parameters: z.object({
-          query: z.string(),
-        }),
-        execute: async ({ query }) => {
-          const url = new URL("https://api.duckduckgo.com/");
-          url.searchParams.set("q", query);
-          url.searchParams.set("format", "json");
-          const res = await fetch(url.toString(), {
-            signal: AbortSignal.timeout(8000),
-          });
-          const data = (await res.json()) as { AbstractText?: string; RelatedTopics?: Array<{ Text?: string }> };
-          const related =
-            data.RelatedTopics?.map((t) => t.Text).filter(Boolean).slice(0, 5) ??
-            [];
-          return `Region: ${settings.region}. Summary: ${
-            data.AbstractText ?? "n/a"
-          }\nRelated: ${related.join(" | ")}`;
-        },
-      }),
-  },
-];
+export const toolDefinitions: ToolDefinition[] = [];
 
 export type ToolSettingsMap = Record<string, unknown>;
 
