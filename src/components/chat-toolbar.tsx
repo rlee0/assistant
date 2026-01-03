@@ -70,13 +70,13 @@ export function ChatToolbar({ onToggleSidebar }: { onToggleSidebar?: () => void 
           <DropdownMenuItem
             onClick={async () => {
               if (!supabase) {
-                console.warn("Supabase not configured; cannot sign out.");
+                console.warn("Supabase not configured; cannot log out.");
                 return;
               }
               await supabase.auth.signOut();
               router.replace("/signup");
             }}>
-            Sign out
+            Log out
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

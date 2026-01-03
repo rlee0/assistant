@@ -164,7 +164,7 @@ export function ChatClient({ initialChats }: ChatClientProps) {
             deleteChat(id);
             await deleteChatCascade(id);
           }}
-          onSignOut={async () => {
+          onLogOut={async () => {
             if (!supabase) return;
             await supabase.auth.signOut();
             window.location.href = "/signup";

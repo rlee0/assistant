@@ -1,10 +1,5 @@
 "use client";
 
-import { formatDistanceToNow } from "date-fns";
-import { useEffect, useRef } from "react";
-import { Plus, Pin, Trash2, Settings, LogOut } from "lucide-react";
-import { clsx } from "clsx";
-import { Button } from "./ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,16 +7,22 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
-import { useChatStore } from "@/store/chat-store";
+import { LogOut, Pin, Plus, Settings, Trash2 } from "lucide-react";
+import { useEffect, useRef } from "react";
+
+import { Button } from "./ui/button";
 import Link from "next/link";
+import { clsx } from "clsx";
+import { formatDistanceToNow } from "date-fns";
+import { useChatStore } from "@/store/chat-store";
 
 type SidebarProps = {
   onDelete?: (id: string) => void | Promise<void>;
   onNewChat?: () => void;
-  onSignOut?: () => void;
+  onLogOut?: () => void;
 };
 
-export function Sidebar({ onDelete, onNewChat, onSignOut }: SidebarProps) {
+export function Sidebar({ onDelete, onNewChat, onLogOut }: SidebarProps) {
   const { chats, order, selectedId, addChat, selectChat, togglePin } = useChatStore();
 
   return (
@@ -96,9 +97,9 @@ export function Sidebar({ onDelete, onNewChat, onSignOut }: SidebarProps) {
               <Link href="/settings">Open settings</Link>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="text-red-600" onClick={() => onSignOut?.()}>
+            <DropdownMenuItem className="text-red-600" onClick={() => onLogOut?.()}>
               <LogOut className="mr-2 h-4 w-4" />
-              Sign out
+              Log out
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
