@@ -1,16 +1,13 @@
 "use client";
 
-import { usePathname } from "next/navigation";
-import Link from "next/link";
-import { Home } from "lucide-react";
 import {
   Breadcrumb,
-  BreadcrumbList,
+  BreadcrumbEllipsis,
   BreadcrumbItem,
   BreadcrumbLink,
+  BreadcrumbList,
   BreadcrumbPage,
   BreadcrumbSeparator,
-  BreadcrumbEllipsis,
 } from "@/components/ui/breadcrumb";
 import {
   DropdownMenu,
@@ -18,6 +15,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+
+import { Home } from "lucide-react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 
 interface BreadcrumbSegment {
   label: string;
@@ -107,12 +108,8 @@ export function Breadcrumbs({
 
   // Determine if we need to collapse items
   const shouldCollapse = items.length > maxItems + 1;
-  const visibleItems = shouldCollapse
-    ? [items[0], ...items.slice(-(maxItems - 1))]
-    : items;
-  const collapsedItems = shouldCollapse
-    ? items.slice(1, items.length - (maxItems - 1))
-    : [];
+  const visibleItems = shouldCollapse ? [items[0], ...items.slice(-(maxItems - 1))] : items;
+  const collapsedItems = shouldCollapse ? items.slice(1, items.length - (maxItems - 1)) : [];
 
   return (
     <Breadcrumb className={className}>
@@ -129,11 +126,7 @@ export function Breadcrumbs({
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
                       <Link href={item.href}>
-                        {showHomeIcon ? (
-                          <Home className="h-4 w-4" />
-                        ) : (
-                          item.label
-                        )}
+                        {showHomeIcon ? <Home className="h-4 w-4" /> : item.label}
                       </Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
@@ -146,9 +139,7 @@ export function Breadcrumbs({
                       <DropdownMenuContent align="start">
                         {collapsedItems.map((collapsedItem) => (
                           <DropdownMenuItem key={collapsedItem.href} asChild>
-                            <Link href={collapsedItem.href}>
-                              {collapsedItem.label}
-                            </Link>
+                            <Link href={collapsedItem.href}>{collapsedItem.label}</Link>
                           </DropdownMenuItem>
                         ))}
                       </DropdownMenuContent>
@@ -179,11 +170,7 @@ export function Breadcrumbs({
                   <BreadcrumbItem>
                     <BreadcrumbLink asChild>
                       <Link href={item.href}>
-                        {showHomeIcon ? (
-                          <Home className="h-4 w-4" />
-                        ) : (
-                          item.label
-                        )}
+                        {showHomeIcon ? <Home className="h-4 w-4" /> : item.label}
                       </Link>
                     </BreadcrumbLink>
                   </BreadcrumbItem>
