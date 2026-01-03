@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useRouter } from "next/navigation";
 
-export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
+export function SignUpForm({ className, ...props }: React.ComponentProps<"div">) {
   const supabase = useMemo(() => {
     try {
       return createSupabaseBrowserClient();
@@ -25,7 +25,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
     if (!supabase) {
       setError("Supabase is not configured.");
@@ -54,11 +54,11 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     <div className={cn("flex flex-col gap-6", className)} {...props}>
       <Card>
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
-          <CardDescription>Enter your email below to login to your account</CardDescription>
+          <CardTitle>Sign up for your account</CardTitle>
+          <CardDescription>Enter your email below to sign up for your account</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleLogin}>
+          <form onSubmit={handleSignUp}>
             <FieldGroup>
               <Field>
                 <FieldLabel htmlFor="email">Email</FieldLabel>
@@ -89,7 +89,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 />
               </Field>
               <Field>
-                <Button type="submit">Login</Button>
+                <Button type="submit">Sign Up</Button>
                 {error ? <p className="text-sm text-red-600">{error}</p> : null}
                 {!supabase ? (
                   <p className="text-xs text-red-500">
@@ -97,7 +97,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                   </p>
                 ) : null}
                 <Button variant="outline" type="button" onClick={() => oauth("google")}>
-                  Login with Google
+                  Sign up with Google
                 </Button>
                 <FieldDescription className="text-center">
                   Don&apos;t have an account?{" "}

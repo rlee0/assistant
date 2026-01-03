@@ -16,8 +16,8 @@ export default async function Page() {
           Supabase auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and
           NEXT_PUBLIC_SUPABASE_ANON_KEY to continue.
         </p>
-        <Link href="/login" className="text-sm text-blue-600 underline underline-offset-4">
-          Go to login
+        <Link href="/signup" className="text-sm text-blue-600 underline underline-offset-4">
+          Go to sign up
         </Link>
       </div>
     );
@@ -28,7 +28,7 @@ export default async function Page() {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    redirect("/login");
+    redirect("/signup");
   }
 
   const initialChats = await loadInitialChats(user.id);

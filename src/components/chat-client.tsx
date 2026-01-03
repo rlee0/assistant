@@ -167,7 +167,7 @@ export function ChatClient({ initialChats }: ChatClientProps) {
           onSignOut={async () => {
             if (!supabase) return;
             await supabase.auth.signOut();
-            window.location.href = "/login";
+            window.location.href = "/signup";
           }}
         />
       )}

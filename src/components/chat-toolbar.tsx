@@ -1,12 +1,5 @@
 "use client";
 
-import { format } from "date-fns";
-import { EllipsisVertical, Pin, Trash2, PanelLeft } from "lucide-react";
-import { useEffect, useMemo, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Breadcrumbs } from "./breadcrumbs";
-import { Button } from "./ui/button";
-import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,7 +7,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { EllipsisVertical, PanelLeft, Pin, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useRef } from "react";
+
+import { Breadcrumbs } from "./breadcrumbs";
+import { Button } from "./ui/button";
+import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { format } from "date-fns";
 import { useChatStore } from "@/store/chat-store";
+import { useRouter } from "next/navigation";
 
 export function ChatToolbar({ onToggleSidebar }: { onToggleSidebar?: () => void }) {
   const router = useRouter();
@@ -73,7 +74,7 @@ export function ChatToolbar({ onToggleSidebar }: { onToggleSidebar?: () => void 
                 return;
               }
               await supabase.auth.signOut();
-              router.replace("/login");
+              router.replace("/signup");
             }}>
             Sign out
           </DropdownMenuItem>
