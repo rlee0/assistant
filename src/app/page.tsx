@@ -33,5 +33,5 @@ export default async function Page() {
 
   const initialChats = await loadInitialChats(user.id);
 
-  return <ChatClient initialChats={initialChats} />;
+  return <ChatClient />;
 }
