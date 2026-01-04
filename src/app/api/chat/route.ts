@@ -1,9 +1,12 @@
+import { APIError, authenticationError, handleAPIError } from "@/lib/api/errors";
+import { NextRequest, NextResponse } from "next/server";
 import { buildTools, defaultToolSettings } from "@/tools";
+import { validateArray, validateObject, validateString } from "@/lib/api/validation";
 
 import type { CoreMessage } from "ai";
-import { NextResponse } from "next/server";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { parseRequestBody } from "@/lib/api/middleware";
 import { streamText } from "ai";
 
 interface ChatRequest {
@@ -12,23 +15,23 @@ interface ChatRequest {
   context?: string;
 }
 
-function validateChatRequest(body: unknown): ChatRequest | { error: string } {
-  if (typeof body !== "object" || body === null) {
-    return { error: "Request body must be a JSON object" };
+function validateChatRequest(body: unknown): ChatRequest {
+  if (!validateObject(body)) {
+    throw new APIError("Request body must be a JSON object", 400);
   }
 
   const { messages, model, context } = body as Record<string, unknown>;
 
-  if (!Array.isArray(messages) || messages.length === 0) {
-    return { error: "Messages array is required and must not be empty" };
+  if (!validateArray(messages) || messages.length === 0) {
+    throw new APIError("Messages array is required and must not be empty", 400);
   }
 
-  if (model !== undefined && typeof model !== "string") {
-    return { error: "Model must be a string" };
+  if (model !== undefined && !validateString(model, true)) {
+    throw new APIError("Model must be a string", 400);
   }
 
-  if (context !== undefined && typeof context !== "string") {
-    return { error: "Context must be a string" };
+  if (context !== undefined && !validateString(context, true)) {
+    throw new APIError("Context must be a string", 400);
   }
 
   return { messages, model, context };
@@ -36,14 +39,12 @@ function validateChatRequest(body: unknown): ChatRequest | { error: string } {
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
-    const validation = validateChatRequest(body);
-
-    if ("error" in validation) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+    const bodyResult = await parseRequestBody(req as NextRequest);
+    if (bodyResult instanceof NextResponse) {
+      return bodyResult;
     }
 
-    const { messages, model: requestModel, context } = validation;
+    const { messages, model: requestModel, context } = validateChatRequest(bodyResult);
 
     const apiKey =
       process.env.AI_GATEWAY_API_KEY ??
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
       process.env.AZURE_OPENAI_API_KEY;
 
     if (!apiKey) {
-      return NextResponse.json({ error: "Missing API key for model provider" }, { status: 500 });
+      throw new APIError("Missing API key for model provider", 500);
     }
 
     const resolvedModel =
@@ -92,8 +93,6 @@ export async function POST(req: Request) {
     });
     return result.toTextStreamResponse();
   } catch (error) {
-    const message = error instanceof Error ? error.message : "Failed to process chat request";
-    console.error("Chat request error:", message, error);
-    return NextResponse.json({ error: message }, { status: 500 });
+    return handleAPIError(error);
   }
 }

@@ -1,6 +1,15 @@
+import { APIError, handleAPIError } from "@/lib/api/errors";
+import {
+  MIN_PASSWORD_LENGTH,
+  validateEmail,
+  validateObject,
+  validatePassword,
+  validateString,
+} from "@/lib/api/validation";
 import { NextRequest, NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { parseRequestBody } from "@/lib/api/middleware";
 
 interface CreateAccountRequest {
   email: string;
@@ -8,30 +17,23 @@ interface CreateAccountRequest {
   fullName: string;
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
-
-function validateCreateAccountRequest(body: unknown): CreateAccountRequest | { error: string } {
-  if (typeof body !== "object" || body === null) {
-    return { error: "Request body must be a JSON object" };
+function validateCreateAccountRequest(body: unknown): CreateAccountRequest {
+  if (!validateObject(body)) {
+    throw new APIError("Request body must be a JSON object", 400);
   }
 
   const { email, password, fullName } = body as Record<string, unknown>;
 
-  if (typeof email !== "string" || !email.trim()) {
-    return { error: "Email is required" };
+  if (!validateEmail(email)) {
+    throw new APIError("Email is required and must be valid", 400);
   }
 
-  if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
-    return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long` };
+  if (!validatePassword(password)) {
+    throw new APIError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`, 400);
   }
 
-  if (!EMAIL_REGEX.test(email)) {
-    return { error: "Invalid email format" };
-  }
-
-  if (typeof fullName !== "string" || !fullName.trim()) {
-    return { error: "Full name is required" };
+  if (!validateString(fullName)) {
+    throw new APIError("Full name is required", 400);
   }
 
   return { email: email.trim(), password, fullName: fullName.trim() };
@@ -39,13 +41,12 @@ function validateCreateAccountRequest(body: unknown): CreateAccountRequest | { e
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const validation = validateCreateAccountRequest(body);
-
-    if ("error" in validation) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+    const bodyResult = await parseRequestBody(request);
+    if (bodyResult instanceof NextResponse) {
+      return bodyResult;
     }
 
+    const validation = validateCreateAccountRequest(bodyResult);
     const { email, password, fullName } = validation;
 
     const supabase = await createSupabaseServerClient({ allowCookieWrite: true });
@@ -61,11 +62,11 @@ export async function POST(request: NextRequest) {
     });
 
     if (signUpError) {
-      return NextResponse.json({ error: signUpError.message }, { status: 400 });
+      throw new APIError(signUpError.message, 400);
     }
 
     if (!data.user) {
-      return NextResponse.json({ error: "Failed to create account" }, { status: 500 });
+      throw new APIError("Failed to create account", 500);
     }
 
     return NextResponse.json(
@@ -80,7 +81,6 @@ export async function POST(request: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
-    console.error("Account creation error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleAPIError(error);
   }
 }

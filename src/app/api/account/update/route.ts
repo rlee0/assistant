@@ -1,7 +1,16 @@
+import { APIError, authenticationError, handleAPIError } from "@/lib/api/errors";
+import {
+  MIN_PASSWORD_LENGTH,
+  validateEmail,
+  validateObject,
+  validatePassword,
+  validateString,
+} from "@/lib/api/validation";
 import { NextRequest, NextResponse } from "next/server";
 
 import type { User } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { parseRequestBody } from "@/lib/api/middleware";
 
 interface UpdateAccountRequest {
   email?: string;
@@ -9,47 +18,37 @@ interface UpdateAccountRequest {
   fullName?: string;
 }
 
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const MIN_PASSWORD_LENGTH = 8;
-
-function validateUpdateAccountRequest(body: unknown): UpdateAccountRequest | { error: string } {
-  if (typeof body !== "object" || body === null) {
-    return { error: "Request body must be a JSON object" };
+function validateUpdateAccountRequest(body: unknown): UpdateAccountRequest {
+  if (!validateObject(body)) {
+    throw new APIError("Request body must be a JSON object", 400);
   }
 
   const { email, password, fullName } = body as Record<string, unknown>;
   const request: UpdateAccountRequest = {};
 
-  // Validate email if provided
   if (email !== undefined) {
-    if (typeof email !== "string" || !email.trim()) {
-      return { error: "Email must be a non-empty string" };
-    }
-    if (!EMAIL_REGEX.test(email)) {
-      return { error: "Invalid email format" };
+    if (!validateEmail(email)) {
+      throw new APIError("Email must be a valid email address", 400);
     }
     request.email = email.trim();
   }
 
-  // Validate password if provided
   if (password !== undefined) {
-    if (typeof password !== "string" || password.length < MIN_PASSWORD_LENGTH) {
-      return { error: `Password must be at least ${MIN_PASSWORD_LENGTH} characters long` };
+    if (!validatePassword(password)) {
+      throw new APIError(`Password must be at least ${MIN_PASSWORD_LENGTH} characters long`, 400);
     }
     request.password = password;
   }
 
-  // Validate fullName if provided
   if (fullName !== undefined) {
-    if (typeof fullName !== "string" || !fullName.trim()) {
-      return { error: "Full name must be a non-empty string" };
+    if (!validateString(fullName)) {
+      throw new APIError("Full name must be a non-empty string", 400);
     }
     request.fullName = fullName.trim();
   }
 
-  // Check that at least one field is provided
   if (Object.keys(request).length === 0) {
-    return { error: "At least one field to update is required" };
+    throw new APIError("At least one field to update is required", 400);
   }
 
   return request;
@@ -63,17 +62,15 @@ export async function PUT(request: NextRequest) {
     } = await supabase.auth.getUser();
 
     if (!user) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+      return authenticationError();
     }
 
-    const body = await request.json();
-    const validation = validateUpdateAccountRequest(body);
-
-    if ("error" in validation) {
-      return NextResponse.json({ error: validation.error }, { status: 400 });
+    const bodyResult = await parseRequestBody(request);
+    if (bodyResult instanceof NextResponse) {
+      return bodyResult;
     }
 
-    const { email, password, fullName } = validation;
+    const { email, password, fullName } = validateUpdateAccountRequest(bodyResult);
     let updatedUser: User = user;
 
     // Build update payload
@@ -89,7 +86,7 @@ export async function PUT(request: NextRequest) {
     });
 
     if (updateError) {
-      return NextResponse.json({ error: updateError.message }, { status: 400 });
+      throw new APIError(updateError.message, 400);
     }
 
     if (data.user) {
@@ -108,7 +105,6 @@ export async function PUT(request: NextRequest) {
       { status: 200 }
     );
   } catch (error) {
-    console.error("Account update error:", error);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return handleAPIError(error);
   }
 }
