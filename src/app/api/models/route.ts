@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { gateway } from "@ai-sdk/gateway";
 
 interface Model {
   id: string;
@@ -14,11 +15,7 @@ interface ModelResponse {
   contextTokens?: number;
 }
 
-const DEFAULT_MODELS: ModelResponse[] = [
-  { id: "gpt-4o-mini", label: "GPT-4o mini", provider: "ai-gateway" },
-  { id: "gpt-4o", label: "GPT-4o", provider: "ai-gateway" },
-  { id: "claude-3-5-sonnet", label: "Claude 3.5 Sonnet", provider: "ai-gateway" },
-];
+const DEFAULT_MODELS = await gateway.getAvailableModels();
 
 function transformModel(model: Model): ModelResponse {
   return {
