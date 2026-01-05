@@ -1,5 +1,22 @@
 import { z } from "zod";
 import { tool, type Tool } from "ai";
+import {
+  BROWSER_DEFAULT_ENABLED,
+  BROWSER_DEFAULT_USER_AGENT,
+  BROWSER_DEFAULT_MAX_DEPTH,
+  BROWSER_MAX_DEPTH_LIMIT,
+  BROWSER_DEFAULT_TIMEOUT_MS,
+  BROWSER_TIMEOUT_MIN_MS,
+  BROWSER_TIMEOUT_MAX_MS,
+  CODE_RUNNER_DEFAULT_ENABLED,
+  CODE_RUNNER_DEFAULT_RUNTIME,
+  CODE_RUNNER_DEFAULT_TIMEOUT_MS,
+  CODE_RUNNER_TIMEOUT_MIN_MS,
+  CODE_RUNNER_TIMEOUT_MAX_MS,
+  SEARCH_DEFAULT_ENABLED,
+  SEARCH_DEFAULT_PROVIDER,
+  SEARCH_DEFAULT_REGION,
+} from "@/lib/constants";
 
 export type ToolDefinition<T extends z.ZodTypeAny = z.ZodObject<any>> = {
   id: string;
@@ -10,24 +27,34 @@ export type ToolDefinition<T extends z.ZodTypeAny = z.ZodObject<any>> = {
 };
 
 const browserSettings = z.object({
-  enabled: z.boolean().default(true),
-  userAgent: z.string().default("Mozilla/5.0"),
-  maxDepth: z.number().int().min(1).max(5).default(2),
-  timeoutMs: z.number().int().min(1000).max(20000).default(8000),
+  enabled: z.boolean().default(BROWSER_DEFAULT_ENABLED),
+  userAgent: z.string().default(BROWSER_DEFAULT_USER_AGENT),
+  maxDepth: z.number().int().min(1).max(BROWSER_MAX_DEPTH_LIMIT).default(BROWSER_DEFAULT_MAX_DEPTH),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(BROWSER_TIMEOUT_MIN_MS)
+    .max(BROWSER_TIMEOUT_MAX_MS)
+    .default(BROWSER_DEFAULT_TIMEOUT_MS),
 });
 
 const codeRunnerSettings = z.object({
-  enabled: z.boolean().default(true),
-  runtime: z.enum(["nodejs"]).default("nodejs"),
-  timeoutMs: z.number().int().min(1000).max(20000).default(10000),
+  enabled: z.boolean().default(CODE_RUNNER_DEFAULT_ENABLED),
+  runtime: z.enum(["nodejs"]).default(CODE_RUNNER_DEFAULT_RUNTIME),
+  timeoutMs: z
+    .number()
+    .int()
+    .min(CODE_RUNNER_TIMEOUT_MIN_MS)
+    .max(CODE_RUNNER_TIMEOUT_MAX_MS)
+    .default(CODE_RUNNER_DEFAULT_TIMEOUT_MS),
   apiKey: z.string().optional(),
 });
 
 const searchSettings = z.object({
-  enabled: z.boolean().default(true),
-  provider: z.enum(["duckduckgo", "serpapi"]).default("duckduckgo"),
+  enabled: z.boolean().default(SEARCH_DEFAULT_ENABLED),
+  provider: z.enum(["duckduckgo", "serpapi"]).default(SEARCH_DEFAULT_PROVIDER),
   apiKey: z.string().optional(),
-  region: z.string().default("us"),
+  region: z.string().default(SEARCH_DEFAULT_REGION),
 });
 
 export const toolDefinitions: ToolDefinition[] = [];

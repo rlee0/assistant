@@ -1,6 +1,15 @@
 "use client";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import {
+  DEFAULT_DENSITY,
+  DEFAULT_MODEL,
+  DEFAULT_TEMPERATURE,
+  DEFAULT_THEME,
+  DEFAULT_USER_DISPLAY_NAME,
+  DEFAULT_USER_EMAIL,
+  TEMPERATURE_STEP,
+} from "@/lib/constants";
 import { defaultToolSettings, toolDefinitions } from "@/tools";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
@@ -34,17 +43,17 @@ type Settings = z.infer<typeof settingsSchema>;
 function buildDefaultSettings(): Settings {
   return settingsSchema.parse({
     account: {
-      email: "user@example.com",
-      displayName: "Assistant User",
+      email: DEFAULT_USER_EMAIL,
+      displayName: DEFAULT_USER_DISPLAY_NAME,
       password: undefined,
     },
     appearance: {
-      theme: "system",
-      density: "comfortable",
+      theme: DEFAULT_THEME,
+      density: DEFAULT_DENSITY,
     },
     models: {
-      defaultModel: "gpt-4o-mini",
-      temperature: 0.4,
+      defaultModel: DEFAULT_MODEL,
+      temperature: DEFAULT_TEMPERATURE,
       apiKey: "",
     },
     tools: defaultToolSettings(),
@@ -291,7 +300,7 @@ export default function SettingsPage() {
                     type="number"
                     min={0}
                     max={1}
-                    step={0.1}
+                    step={TEMPERATURE_STEP}
                     value={settings.models.temperature}
                     onChange={(e) => update(["models", "temperature"], Number(e.target.value))}
                   />

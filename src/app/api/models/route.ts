@@ -3,7 +3,7 @@ import { gateway } from "@ai-sdk/gateway";
 
 interface Model {
   id: string;
-  label: string;
+  name: string;
   provider?: string;
   contextTokens?: number;
 }

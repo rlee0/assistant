@@ -4,8 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/store/chat-store";
 import { validateUUID } from "@/lib/api/validation";
 import { handleAPIError, authenticationError, notFoundError } from "@/lib/api/errors";
-
-const DEFAULT_MODEL = "gpt-4o-mini";
+import { DEFAULT_MODEL } from "@/lib/constants";
 
 export async function GET(request: NextRequest) {
   try {

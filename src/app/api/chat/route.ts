@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { buildTools, defaultToolSettings } from "@/tools";
 import { validateArray, validateObject, validateString } from "@/lib/api/validation";
 
+import { DEFAULT_MODEL } from "@/lib/constants";
 import type { ModelMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     }
 
     const resolvedModel =
-      requestModel || process.env.AI_MODEL || process.env.AI_GATEWAY_MODEL || "gpt-4o-mini";
+      requestModel || process.env.AI_MODEL || process.env.AI_GATEWAY_MODEL || DEFAULT_MODEL;
 
     const client = createOpenAI({
       apiKey,

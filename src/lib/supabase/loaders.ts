@@ -2,8 +2,7 @@ import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/store/chat-store";
-
-const DEFAULT_MODEL = "gpt-4o-mini";
+import { DEFAULT_MODEL } from "@/lib/constants";
 
 export type InitialChatData = {
   chats: Record<string, ChatSession>;

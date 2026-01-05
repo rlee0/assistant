@@ -46,17 +46,25 @@ type ChatState = {
   generateSuggestions: (messages: ChatMessage[], context?: string) => string[];
 };
 
-const defaultModel = "gpt-4o-mini";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_CHAT_CONTEXT,
+  DEFAULT_SUGGESTIONS,
+  DEFAULT_CHAT_TITLE,
+  INITIAL_SUGGESTIONS,
+  CONTEXT_SUGGESTIONS_BASE,
+  NO_CONTEXT_SUGGESTIONS,
+  SUGGESTION_TRIGGERS,
+} from "@/lib/constants";
 
 const initialChat: ChatSession = {
   id: uuid(),
-  title: "New chat",
+  title: DEFAULT_CHAT_TITLE,
   pinned: false,
   updatedAt: new Date().toISOString(),
-  model: defaultModel,
-  context:
-    "You are an assistant that helps with coding and research tasks. Keep responses concise and actionable.",
-  suggestions: ["Summarize this code change", "Draft a follow-up question", "Generate test cases"],
+  model: DEFAULT_MODEL,
+  context: DEFAULT_CHAT_CONTEXT,
+  suggestions: [...DEFAULT_SUGGESTIONS],
   messages: [],
   checkpoints: [],
 };
@@ -83,12 +91,12 @@ export const useChatStore = create<ChatState>()(
             ...state.chats,
             [id]: {
               id,
-              title: "New chat",
+              title: DEFAULT_CHAT_TITLE,
               pinned: false,
               updatedAt: now,
-              model: defaultModel,
+              model: DEFAULT_MODEL,
               context: state.chats[state.selectedId ?? initialChat.id]?.context,
-              suggestions: ["Ask a quick question", "Generate an outline"],
+              suggestions: [...INITIAL_SUGGESTIONS],
               messages: [],
               checkpoints: [],
             },
@@ -130,7 +138,7 @@ export const useChatStore = create<ChatState>()(
               updatedAt: new Date().toISOString(),
               suggestions: state.generateSuggestions(messages, state.chats[id]?.context),
               title:
-                state.chats[id]?.title === "New chat"
+                state.chats[id]?.title === DEFAULT_CHAT_TITLE
                   ? state.generateTitle(messages)
                   : state.chats[id]?.title,
             },
@@ -194,27 +202,27 @@ export const useChatStore = create<ChatState>()(
       generateTitle: (messages) => {
         const firstUser = messages.find((m) => m.role === "user");
         if (!firstUser || typeof firstUser.content !== "string") {
-          return "New chat";
+          return DEFAULT_CHAT_TITLE;
         }
         const text = firstUser.content;
         return text.slice(0, 42).trim() + (text.length > 42 ? "…" : "");
       },
       generateSuggestions: (messages, context) => {
         const lastUser = [...messages].reverse().find((m) => m.role === "user");
-        const base = context
-          ? [`Clarify ${context}`, "Adjust model temperature"]
-          : ["Ask a follow-up", "Request a summary"];
+        const base: string[] = context
+          ? [...CONTEXT_SUGGESTIONS_BASE]
+          : [...NO_CONTEXT_SUGGESTIONS];
         if (!lastUser || typeof lastUser.content !== "string") return base;
         const text = lastUser.content.toLowerCase();
         const suggestions = [...base];
         if (text.includes("test")) {
-          suggestions.push("Generate test cases");
+          suggestions.push(SUGGESTION_TRIGGERS.TEST);
         }
         if (text.includes("code")) {
-          suggestions.push("Show refactor ideas");
+          suggestions.push(SUGGESTION_TRIGGERS.CODE);
         }
         if (text.includes("plan")) {
-          suggestions.push("Break into actionable steps");
+          suggestions.push(SUGGESTION_TRIGGERS.PLAN);
         }
         return Array.from(new Set(suggestions)).slice(0, 5);
       },
