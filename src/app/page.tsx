@@ -31,7 +31,7 @@ export default async function Page() {
     redirect("/signup");
   }
 
-  const initialChats = await loadInitialChats(user.id);
+  await loadInitialChats(user.id);
 
   return <ChatClient />;
 }

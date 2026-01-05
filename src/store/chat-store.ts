@@ -1,9 +1,9 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { v4 as uuid } from "uuid";
-import { type CoreMessage } from "ai";
+import { type ModelMessage } from "ai";
 
-export type ChatMessage = CoreMessage & {
+export type ChatMessage = ModelMessage & {
   id: string;
   createdAt: string;
 };
@@ -27,7 +27,11 @@ type ChatState = {
   order: string[];
   selectedId?: string;
   hydrated: boolean;
-  hydrate: (data: { chats: Record<string, ChatSession>; order: string[]; selectedId?: string }) => void;
+  hydrate: (data: {
+    chats: Record<string, ChatSession>;
+    order: string[];
+    selectedId?: string;
+  }) => void;
   addChat: () => string;
   selectChat: (id: string) => void;
   deleteChat: (id: string) => void;
@@ -52,11 +56,7 @@ const initialChat: ChatSession = {
   model: defaultModel,
   context:
     "You are an assistant that helps with coding and research tasks. Keep responses concise and actionable.",
-  suggestions: [
-    "Summarize this code change",
-    "Draft a follow-up question",
-    "Generate test cases",
-  ],
+  suggestions: ["Summarize this code change", "Draft a follow-up question", "Generate test cases"],
   messages: [],
   checkpoints: [],
 };
@@ -67,14 +67,14 @@ export const useChatStore = create<ChatState>()(
       chats: { [initialChat.id]: initialChat },
       order: [initialChat.id],
       selectedId: initialChat.id,
-       hydrated: false,
-       hydrate: (data) =>
-         set(() => ({
-           chats: data.chats,
-           order: data.order,
-           selectedId: data.selectedId ?? data.order[0],
-           hydrated: true,
-         })),
+      hydrated: false,
+      hydrate: (data) =>
+        set(() => ({
+          chats: data.chats,
+          order: data.order,
+          selectedId: data.selectedId ?? data.order[0],
+          hydrated: true,
+        })),
       addChat: () => {
         const id = uuid();
         const now = new Date().toISOString();
@@ -128,10 +128,7 @@ export const useChatStore = create<ChatState>()(
               ...state.chats[id],
               messages,
               updatedAt: new Date().toISOString(),
-              suggestions: state.generateSuggestions(
-                messages,
-                state.chats[id]?.context
-              ),
+              suggestions: state.generateSuggestions(messages, state.chats[id]?.context),
               title:
                 state.chats[id]?.title === "New chat"
                   ? state.generateTitle(messages)
@@ -175,18 +172,14 @@ export const useChatStore = create<ChatState>()(
             ...state.chats,
             [id]: {
               ...state.chats[id],
-              checkpoints: [
-                ...state.chats[id].checkpoints,
-                state.chats[id].messages,
-              ],
+              checkpoints: [...state.chats[id].checkpoints, state.chats[id].messages],
             },
           },
         })),
       restoreCheckpoint: (id, index) =>
         set((state) => {
           const checkpoints = state.chats[id]?.checkpoints ?? [];
-          const checkpoint =
-            checkpoints[index ?? checkpoints.length - 1] ?? checkpoints.at(-1);
+          const checkpoint = checkpoints[index ?? checkpoints.length - 1] ?? checkpoints.at(-1);
           if (!checkpoint) return state;
           return {
             chats: {

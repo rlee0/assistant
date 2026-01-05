@@ -1,16 +1,16 @@
-import { APIError, authenticationError, handleAPIError } from "@/lib/api/errors";
+import { APIError, handleAPIError } from "@/lib/api/errors";
 import { NextRequest, NextResponse } from "next/server";
 import { buildTools, defaultToolSettings } from "@/tools";
 import { validateArray, validateObject, validateString } from "@/lib/api/validation";
 
-import type { CoreMessage } from "ai";
+import type { ModelMessage } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { parseRequestBody } from "@/lib/api/middleware";
 import { streamText } from "ai";
 
 interface ChatRequest {
-  messages: CoreMessage[];
+  messages: ModelMessage[];
   model?: string;
   context?: string;
 }
@@ -34,7 +34,7 @@ function validateChatRequest(body: unknown): ChatRequest {
     throw new APIError("Context must be a string", 400);
   }
 
-  return { messages, model, context };
+  return { messages: messages as ModelMessage[], model, context };
 }
 
 export async function POST(req: Request) {
@@ -82,7 +82,7 @@ export async function POST(req: Request) {
     }
     const tools = buildTools(toolSettings);
 
-    const augmentedMessages: CoreMessage[] = context
+    const augmentedMessages: ModelMessage[] = context
       ? [{ role: "system" as const, content: `Context: ${context}` }, ...messages]
       : messages;
 

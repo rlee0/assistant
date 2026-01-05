@@ -1,13 +1,5 @@
 "use client";
 
-import { Badge } from "@/components/ui/badge";
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
-import type { ToolUIPart } from "ai";
 import {
   CheckCircleIcon,
   ChevronDownIcon,
@@ -16,17 +8,19 @@ import {
   WrenchIcon,
   XCircleIcon,
 } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { ComponentProps, ReactNode } from "react";
-import { isValidElement } from "react";
+
+import { Badge } from "@/components/ui/badge";
 import { CodeBlock } from "./code-block";
+import type { ToolUIPart } from "ai";
+import { cn } from "@/lib/utils";
+import { isValidElement } from "react";
 
 export type ToolProps = ComponentProps<typeof Collapsible>;
 
 export const Tool = ({ className, ...props }: ToolProps) => (
-  <Collapsible
-    className={cn("not-prose mb-4 w-full rounded-md border", className)}
-    {...props}
-  />
+  <Collapsible className={cn("not-prose mb-4 w-full rounded-md border", className)} {...props} />
 );
 
 export type ToolHeaderProps = {
@@ -40,7 +34,6 @@ const getStatusBadge = (status: ToolUIPart["state"]) => {
   const labels: Record<ToolUIPart["state"], string> = {
     "input-streaming": "Pending",
     "input-available": "Running",
-    // @ts-expect-error state only available in AI SDK v6
     "approval-requested": "Awaiting Approval",
     "approval-responded": "Responded",
     "output-available": "Completed",
@@ -51,7 +44,6 @@ const getStatusBadge = (status: ToolUIPart["state"]) => {
   const icons: Record<ToolUIPart["state"], ReactNode> = {
     "input-streaming": <CircleIcon className="size-4" />,
     "input-available": <ClockIcon className="size-4 animate-pulse" />,
-    // @ts-expect-error state only available in AI SDK v6
     "approval-requested": <ClockIcon className="size-4 text-yellow-600" />,
     "approval-responded": <CheckCircleIcon className="size-4 text-blue-600" />,
     "output-available": <CheckCircleIcon className="size-4 text-green-600" />,
@@ -67,25 +59,13 @@ const getStatusBadge = (status: ToolUIPart["state"]) => {
   );
 };
 
-export const ToolHeader = ({
-  className,
-  title,
-  type,
-  state,
-  ...props
-}: ToolHeaderProps) => (
+export const ToolHeader = ({ className, title, type, state, ...props }: ToolHeaderProps) => (
   <CollapsibleTrigger
-    className={cn(
-      "flex w-full items-center justify-between gap-4 p-3",
-      className
-    )}
-    {...props}
-  >
+    className={cn("flex w-full items-center justify-between gap-4 p-3", className)}
+    {...props}>
     <div className="flex items-center gap-2">
       <WrenchIcon className="size-4 text-muted-foreground" />
-      <span className="font-medium text-sm">
-        {title ?? type.split("-").slice(1).join("-")}
-      </span>
+      <span className="font-medium text-sm">{title ?? type.split("-").slice(1).join("-")}</span>
       {getStatusBadge(state)}
     </div>
     <ChevronDownIcon className="size-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
@@ -124,12 +104,7 @@ export type ToolOutputProps = ComponentProps<"div"> & {
   errorText: ToolUIPart["errorText"];
 };
 
-export const ToolOutput = ({
-  className,
-  output,
-  errorText,
-  ...props
-}: ToolOutputProps) => {
+export const ToolOutput = ({ className, output, errorText, ...props }: ToolOutputProps) => {
   if (!(output || errorText)) {
     return null;
   }
@@ -137,9 +112,7 @@ export const ToolOutput = ({
   let Output = <div>{output as ReactNode}</div>;
 
   if (typeof output === "object" && !isValidElement(output)) {
-    Output = (
-      <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />
-    );
+    Output = <CodeBlock code={JSON.stringify(output, null, 2)} language="json" />;
   } else if (typeof output === "string") {
     Output = <CodeBlock code={output} language="json" />;
   }
@@ -152,11 +125,8 @@ export const ToolOutput = ({
       <div
         className={cn(
           "overflow-x-auto rounded-md text-xs [&_table]:w-full",
-          errorText
-            ? "bg-destructive/10 text-destructive"
-            : "bg-muted/50 text-foreground"
-        )}
-      >
+          errorText ? "bg-destructive/10 text-destructive" : "bg-muted/50 text-foreground"
+        )}>
         {errorText && <div>{errorText}</div>}
         {Output}
       </div>
