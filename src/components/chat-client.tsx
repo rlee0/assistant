@@ -1,5 +1,11 @@
 "use client";
 
+import { Sidebar } from "@/components/ui/sidebar";
+
 export function ChatClient() {
-  return "chat client placeholder";
+  return (
+    <div>
+      <Sidebar />
+    </div>
+  );
 }
