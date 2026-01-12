@@ -1,8 +1,9 @@
+import { APIError, ErrorCodes, authenticationError, handleAPIError } from "@/lib/api/errors";
 import { NextRequest, NextResponse } from "next/server";
+import { buildDefaultSettings, settingsSchema } from "@/lib/settings";
+
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { loadSettings } from "@/lib/supabase/settings";
-import { settingsSchema, buildDefaultSettings } from "@/lib/settings";
-import { APIError, authenticationError, handleAPIError } from "@/lib/api/errors";
 import { parseRequestBody } from "@/lib/api/middleware";
 
 /**
@@ -42,6 +43,26 @@ export async function GET() {
 }
 
 /**
+ * Validate that settings object is complete before persistence
+ * Ensures all required nested objects are present
+ */
+function validateSettingsIntegrity(data: unknown): boolean {
+  if (typeof data !== "object" || data === null) {
+    return false;
+  }
+
+  const settings = data as Record<string, unknown>;
+
+  // Check that all required top-level keys are present and have values
+  const hasAccount = settings.account && typeof settings.account === "object";
+  const hasAppearance = settings.appearance && typeof settings.appearance === "object";
+  const hasModels = settings.models && typeof settings.models === "object";
+  const hasTools = settings.tools !== undefined && settings.tools !== null;
+
+  return !!(hasAccount && hasAppearance && hasModels && hasTools);
+}
+
+/**
  * PUT /api/settings
  *
  * Persist the authenticated user's settings to the database.
@@ -67,12 +88,23 @@ export async function PUT(request: NextRequest) {
     }
 
     const bodyResult = await parseRequestBody(request);
-    if (bodyResult instanceof NextResponse) {
-      return bodyResult;
+    if (!bodyResult.ok) {
+      throw bodyResult.error;
+    }
+
+    const body = bodyResult.value;
+
+    // Pre-validate integrity before schema parsing
+    if (!validateSettingsIntegrity(body)) {
+      throw new APIError(
+        "Settings payload is incomplete. Required fields: account, appearance, models, tools",
+        400,
+        ErrorCodes.VALIDATION_ERROR
+      );
     }
 
     // Validate settings against schema to ensure data integrity
-    const validatedSettings = settingsSchema.parse(bodyResult);
+    const validatedSettings = settingsSchema.parse(body);
 
     // Persist to database with upsert semantics
     // The settings table uses user_id as a required column to link settings to users

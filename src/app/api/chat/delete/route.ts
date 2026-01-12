@@ -35,11 +35,11 @@ export async function DELETE(request: NextRequest) {
     }
 
     const bodyResult = await parseRequestBody(request);
-    if (bodyResult instanceof NextResponse) {
-      return bodyResult;
+    if (!bodyResult.ok) {
+      throw bodyResult.error;
     }
 
-    const { id } = validateDeleteChatRequest(bodyResult);
+    const { id } = validateDeleteChatRequest(bodyResult.value);
 
     // Verify chat belongs to user
     const { data: existingChat, error: fetchError } = await supabase

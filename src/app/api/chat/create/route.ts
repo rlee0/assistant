@@ -65,11 +65,11 @@ export async function POST(request: NextRequest) {
     }
 
     const bodyResult = await parseRequestBody(request);
-    if (bodyResult instanceof NextResponse) {
-      return bodyResult;
+    if (!bodyResult.ok) {
+      throw bodyResult.error;
     }
 
-    const { title, model, context, pinned } = validateCreateChatRequest(bodyResult);
+    const { title, model, context, pinned } = validateCreateChatRequest(bodyResult.value);
     const chatId = uuid();
     const now = new Date().toISOString();
 

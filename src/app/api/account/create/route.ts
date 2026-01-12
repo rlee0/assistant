@@ -42,11 +42,11 @@ function validateCreateAccountRequest(body: unknown): CreateAccountRequest {
 export async function POST(request: NextRequest) {
   try {
     const bodyResult = await parseRequestBody(request);
-    if (bodyResult instanceof NextResponse) {
-      return bodyResult;
+    if (!bodyResult.ok) {
+      throw bodyResult.error;
     }
 
-    const validation = validateCreateAccountRequest(bodyResult);
+    const validation = validateCreateAccountRequest(bodyResult.value);
     const { email, password, fullName } = validation;
 
     const supabase = await createSupabaseServerClient({ allowCookieWrite: true });

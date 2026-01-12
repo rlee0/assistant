@@ -258,6 +258,12 @@ MessagePartRenderer.displayName = "MessagePartRenderer";
 /**
  * Manages model selection and fetching with validation
  * Fetches models once on mount and validates current selection against available models
+ *
+ * Features:
+ * - Handles AbortController cleanup to prevent memory leaks
+ * - Validates model on every mount (but applies update only once)
+ * - Gracefully handles errors without throwing
+ *
  * @throws Does not throw; gracefully handles errors with fallback
  */
 function useModelManagement(
@@ -269,29 +275,37 @@ function useModelManagement(
 } {
   const [models, setModels] = useState<Model[]>([]);
   const hasValidatedRef = useRef(false);
+  const isMountedRef = useRef(true);
 
   useEffect(() => {
+    // Track if component is still mounted
+    isMountedRef.current = true;
     const controller = new AbortController();
 
     const loadModels = async () => {
       try {
         const list = await fetchModels();
 
-        if (controller.signal.aborted) return;
+        // Check both abort signal and mount status
+        if (controller.signal.aborted || !isMountedRef.current) return;
+
         setModels(list);
 
         // Validate selected model is still available (only once after fetch)
-        if (!hasValidatedRef.current) {
+        if (!hasValidatedRef.current && isMountedRef.current) {
           hasValidatedRef.current = true;
           if (list.length > 0 && !list.some((m) => m.id === currentModel)) {
             onModelUpdate(list[0].id);
           }
         }
       } catch (err) {
-        if (controller.signal.aborted) return;
+        if (controller.signal.aborted || !isMountedRef.current) return;
 
         const message = err instanceof Error ? err.message : "Failed to fetch available models";
-        console.error("Model loading error:", { message, isProduction: !process.env.NODE_ENV });
+        console.error("[Chat] Model loading error:", {
+          message,
+          isDevelopment: process.env.NODE_ENV === "development",
+        });
       }
     };
 
@@ -299,6 +313,7 @@ function useModelManagement(
 
     return () => {
       controller.abort();
+      isMountedRef.current = false;
     };
   }, []); // Empty dependency array: fetch only once on mount
 
@@ -315,6 +330,7 @@ function useModelManagement(
 
 /**
  * Memoizes grouped models by provider
+ * Prevents unnecessary re-grouping on every render
  */
 function useGroupedModels(models: Model[]): Record<string, Model[]> {
   return useMemo(() => {
@@ -331,12 +347,13 @@ function useGroupedModels(models: Model[]): Record<string, Model[]> {
 
 /**
  * Handles keyboard shortcuts in textarea (Enter to submit, Shift+Enter for newline)
+ * Returns stable callback reference to prevent re-renders
  */
 function useTextareaKeyboardShortcuts(
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
 ): (e: KeyboardEvent<HTMLTextAreaElement>) => void {
   return useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
       const form = e.currentTarget.form;
       form?.requestSubmit();
@@ -346,6 +363,7 @@ function useTextareaKeyboardShortcuts(
 
 /**
  * Auto-scrolls to bottom when messages change
+ * Uses observer pattern to detect scroll area changes
  */
 function useAutoScroll(
   scrollAreaRef: React.RefObject<HTMLDivElement | null>,

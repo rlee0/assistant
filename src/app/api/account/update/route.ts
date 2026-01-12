@@ -66,11 +66,11 @@ export async function PUT(request: NextRequest) {
     }
 
     const bodyResult = await parseRequestBody(request);
-    if (bodyResult instanceof NextResponse) {
-      return bodyResult;
+    if (!bodyResult.ok) {
+      throw bodyResult.error;
     }
 
-    const { email, password, fullName } = validateUpdateAccountRequest(bodyResult);
+    const { email, password, fullName } = validateUpdateAccountRequest(bodyResult.value);
     let updatedUser: User = user;
 
     // Build update payload
