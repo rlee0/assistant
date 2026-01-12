@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type DynamicToolUIPart } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
+import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -195,8 +196,8 @@ const MessagePartRenderer = memo<{
   // Text content
   if (part.type === "text") {
     return (
-      <div key={index} className="whitespace-pre-wrap">
-        {part.text}
+      <div key={index} className="prose prose-sm dark:prose-invert max-w-none">
+        <ReactMarkdown>{part.text}</ReactMarkdown>
       </div>
     );
   }

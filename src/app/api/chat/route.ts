@@ -181,6 +181,9 @@ export async function POST(req: Request): Promise<Response> {
       tools: {
         getDateTime: getDateTime(),
       },
+      // Allow multiple steps: tool call -> tool result -> final text response
+      // Without this, it stops after the first step (tool call only)
+      stopWhen: [],
       onStepFinish: (step) => {
         if (isDevelopment) {
           console.debug("[Chat] Step finished:", {
