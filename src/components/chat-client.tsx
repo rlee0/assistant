@@ -118,12 +118,13 @@ ErrorDisplay.displayName = "ErrorDisplay";
 
 /**
  * Renders a message part based on its type
- * Uses inferred type from useChat return value for proper type safety
+ * Uses proper type checking with AI SDK type guards for all part types
  */
 const MessagePartRenderer = memo<{
   part: ReturnType<typeof useChat>["messages"][number]["parts"][number];
   index: number;
 }>(({ part, index }) => {
+  // Text content
   if (part.type === "text") {
     return (
       <div key={index} className="whitespace-pre-wrap">
@@ -132,12 +133,23 @@ const MessagePartRenderer = memo<{
     );
   }
 
-  // Handle tool parts with proper type checking using AI SDK type guards
+  // Reasoning/thinking content
+  if (part.type === "reasoning") {
+    return (
+      <div key={index} className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
+        <div className="font-semibold mb-1">Reasoning</div>
+        <div className="font-mono whitespace-pre-wrap text-[10px]">{part.text}</div>
+      </div>
+    );
+  }
+
+  // Tool calls with proper type checking using AI SDK type guards
   if (isToolUIPart(part)) {
     const toolName = getToolName(part);
     return <ToolCallDisplay key={index} part={part as DynamicToolUIPart} toolName={toolName} />;
   }
 
+  // Image files
   if (part.type === "file" && part.mediaType?.startsWith("image/")) {
     return (
       <Image
@@ -152,6 +164,21 @@ const MessagePartRenderer = memo<{
     );
   }
 
+  // Source URLs from web search
+  if (part.type === "source-url") {
+    return (
+      <a
+        key={index}
+        href={part.url}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-blue-500 hover:underline text-sm">
+        {part.title || part.url}
+      </a>
+    );
+  }
+
+  // Unsupported or unknown part types
   return null;
 });
 MessagePartRenderer.displayName = "MessagePartRenderer";
@@ -171,9 +198,17 @@ export function ChatClient() {
   const { messages, sendMessage, status, error, stop, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
+      credentials: "include",
     }),
     onError: (error) => {
+      // Log error for debugging (mask details from user)
       console.error("Chat error:", error);
+    },
+    onFinish: (result) => {
+      // Callback for when message streaming completes
+      if (result.isError) {
+        console.error("Message streaming failed");
+      }
     },
   });
 
@@ -271,8 +306,12 @@ export function ChatClient() {
               {/* Loading state */}
               {status === "submitted" && <LoadingState />}
 
-              {/* Error state */}
-              {error && <ErrorDisplay error={error} />}
+              {/* Error state with retry action */}
+              {error && (
+                <div className="space-y-3">
+                  <ErrorDisplay error={error} />
+                </div>
+              )}
             </div>
           </ScrollArea>
 

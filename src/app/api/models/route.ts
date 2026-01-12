@@ -8,8 +8,6 @@ interface Model {
   contextTokens?: number;
 }
 
-const DEFAULT_MODELS = await gateway.getAvailableModels();
-
 export async function GET() {
   try {
     const gatewayUrl = process.env.AI_GATEWAY_URL;
@@ -36,9 +34,11 @@ export async function GET() {
     }
 
     // Return default models as fallback
-    return NextResponse.json(DEFAULT_MODELS, { status: 200 });
+    const defaultModels = await gateway.getAvailableModels();
+    return NextResponse.json(defaultModels, { status: 200 });
   } catch (error) {
     console.error("Models endpoint error:", error);
-    return NextResponse.json(DEFAULT_MODELS, { status: 200 });
+    // Return minimal fallback on error
+    return NextResponse.json([{ id: "gpt-4o-mini", name: "GPT-4o mini" }], { status: 200 });
   }
 }

@@ -156,6 +156,22 @@ export async function POST(req: Request): Promise<Response> {
       headers: {
         "x-vercel-ai-ui-message-stream": "v1",
       },
+      onError: (error) => {
+        // Return user-friendly error message (masks implementation details)
+        console.error("Tool execution error:", error);
+        return "An error occurred while processing your request.";
+      },
+      messageMetadata: ({ part }) => {
+        // Track token usage and model information
+        if (part.type === "finish") {
+          return {
+            model: selectedModel,
+            totalTokens: part.totalUsage?.totalTokens ?? 0,
+            inputTokens: part.totalUsage?.inputTokens ?? 0,
+            outputTokens: part.totalUsage?.outputTokens ?? 0,
+          };
+        }
+      },
     });
   } catch (error) {
     // Log error for debugging (sensitive details hidden in production)
