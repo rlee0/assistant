@@ -239,6 +239,8 @@ export function ChatClient() {
       if (input.trim() && status === "ready") {
         sendMessage({ text: input });
         setInput("");
+        // Keep focus on the textarea so users can continue typing immediately
+        requestAnimationFrame(() => textareaRef.current?.focus());
       }
     },
     [input, status, sendMessage]
@@ -325,7 +327,6 @@ export function ChatClient() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
-                  disabled={status !== "ready"}
                   className="min-h-15 max-h-50 resize-none"
                   rows={2}
                 />
