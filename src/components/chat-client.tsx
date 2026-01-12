@@ -481,12 +481,6 @@ const ChatInput = memo<ChatInputProps>(
                   </ModelSelectorLogoGroup>
                   <span className="text-xs">{selectedModelInfo.name}</span>
                 </PromptInputButton>
-
-                {(status === "submitted" || status === "streaming") && (
-                  <PromptInputButton variant="destructive" onClick={stop} aria-label="Stop">
-                    <StopCircleIcon className="size-4" />
-                  </PromptInputButton>
-                )}
               </PromptInputTools>
 
               <PromptInputSubmit disabled={!text && status !== "streaming"} status={status} />
