@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { v5 as uuidv5 } from "uuid";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { type ChatMessage } from "@/store/chat-store";
+import { type ChatMessage } from "@/types/chat";
 import {
   validateString,
   validateBoolean,

@@ -2,7 +2,7 @@
 
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import type { PostgrestError } from "@supabase/supabase-js";
-import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/store/chat-store";
+import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/types/chat";
 import { v5 as uuidv5 } from "uuid";
 
 const MESSAGE_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/store/chat-store";
+import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/types/chat";
 import { validateUUID } from "@/lib/api/validation";
 import { handleAPIError, authenticationError, notFoundError } from "@/lib/api/errors";
 import { DEFAULT_MODEL } from "@/lib/constants";

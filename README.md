@@ -7,7 +7,7 @@ Next.js App Router AI workspace with Supabase auth, streaming ai-sdk chat, confi
 - Supabase email/password + OAuth (SSR-aware clients for routing and server actions).
 - Chat workspace with pinned sessions, streaming markdown, editable/resend messages, checkpoints, suggestions, and model picker backed by the AI gateway.
 - Settings page with VS Code–style navigation, zod-driven forms, and a JSON editor for advanced edits; tool registry plumbing in place for per-user tool settings.
-- Data stored in Supabase (`chats`, `messages`, `checkpoints`, `settings`, `tools`) with local hydration via Zustand for fast loads.
+- Data stored in Supabase (`chats`, `messages`, `checkpoints`, `settings`, `tools`) with real-time sync via the useChat hook from AI SDK UI.
 - UI built from ai-elements, Radix primitives, Tailwind CSS 4, Motion, and lucide icons.
 
 ## Tech stack
@@ -15,7 +15,7 @@ Next.js App Router AI workspace with Supabase auth, streaming ai-sdk chat, confi
 - Next.js 16 (React 19, App Router), TypeScript
 - Supabase auth/DB via `@supabase/ssr`
 - ai-sdk + ai-elements for streaming and rich responses (shiki + remark-gfm for markdown)
-- State: Zustand; Forms/validation: React Hook Form + Zod
+- State: AI SDK UI (useChat hook), Settings: Zustand; Forms/validation: React Hook Form + Zod
 - Styling: Tailwind CSS 4, Radix UI, Motion/Embla/Recharts utilities
 
 ## Prerequisites
@@ -76,8 +76,8 @@ Notes:
 - `src/app` — App Router routes, layouts, API handlers, auth pages, settings UI
 - `src/components` — chat UI, ai-elements wrappers, shared UI primitives
 - `src/lib` — constants, utilities, validation, Supabase clients/loaders/persistence, settings helpers
-- `src/store` — Zustand stores (chat, settings)
-- `src/tools` — tool registry scaffolding and defaults
+- `src/store` — Zustand store for settings only
+- `src/types` — shared type definitions (chat types, etc.)
 
 ## Development notes
 
