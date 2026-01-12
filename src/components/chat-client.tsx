@@ -42,6 +42,8 @@ import {
 import { fetchModels, type Model } from "@/lib/models";
 import { DEFAULT_MODEL } from "@/lib/constants";
 import { StopCircleIcon, PlusIcon } from "lucide-react";
+import { useSettingsStore } from "@/store/settings-store";
+import { useSettingsSync } from "@/hooks/use-settings-sync";
 
 // ============================================================================
 // Constants
@@ -268,29 +270,38 @@ export function ChatClient() {
 
   // ----- Input + model state
   const [text, setText] = useState("");
-  const [model, setModel] = useState<string>(DEFAULT_MODEL);
   const [models, setModels] = useState<Model[]>([]);
   const [selectorOpen, setSelectorOpen] = useState(false);
+
+  // Get model from settings store and sync with server
+  useSettingsSync();
+  const settings = useSettingsStore((state) => state.settings);
+  const updateSettings = useSettingsStore((state) => state.update);
+  const model = settings.models.defaultModel;
 
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Load models from AI Gateway (with fallback handled in fetchModels)
+  // Runs once on mount to populate available models
   useEffect(() => {
-    let mounted = true;
+    const controller = new AbortController();
 
     fetchModels()
       .then((list) => {
-        if (!mounted) return;
+        if (controller.signal.aborted) return;
         setModels(list);
-        // Ensure selected model remains valid using functional update
-        setModel((prev) => {
-          const ids = new Set(list.map((m) => m.id));
-          return ids.has(prev) ? prev : list[0]?.id ?? prev;
-        });
+
+        // Validate selected model is still available
+        const availableModelIds = new Set(list.map((m) => m.id));
+        const currentModel = settings.models.defaultModel;
+
+        if (!availableModelIds.has(currentModel) && list.length > 0) {
+          updateSettings(["models", "defaultModel"], list[0].id);
+        }
       })
       .catch((error) => {
-        if (process.env.NODE_ENV === "development") {
+        if (process.env.NODE_ENV === "development" && !controller.signal.aborted) {
           console.error(
             "Failed to fetch models:",
             error instanceof Error ? error.message : String(error)
@@ -299,9 +310,9 @@ export function ChatClient() {
       });
 
     return () => {
-      mounted = false;
+      controller.abort();
     };
-  }, []);
+  }, [settings.models.defaultModel, updateSettings]);
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
@@ -499,7 +510,7 @@ export function ChatClient() {
                         <ModelSelectorItem
                           key={m.id}
                           onSelect={() => {
-                            setModel(m.id);
+                            updateSettings(["models", "defaultModel"], m.id);
                             setSelectorOpen(false);
                           }}>
                           <ModelSelectorLogoGroup>
