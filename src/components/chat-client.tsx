@@ -277,48 +277,50 @@ export function ChatClient() {
       </Sidebar>
 
       <SidebarInset>
-        <div className="flex h-screen flex-col">
+        <div className="flex h-svh max-h-svh flex-col">
           {/* Header */}
-          <header className="border-b px-4 py-3 flex items-center gap-2">
+          <header className="sticky top-0 z-20 border-b bg-background px-4 py-3 flex items-center gap-2">
             <SidebarTrigger />
             <h1 className="text-lg font-semibold">Chat</h1>
           </header>
 
           {/* Messages Area */}
-          <ScrollArea ref={scrollAreaRef} className="flex-1 px-4">
-            <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH} py-8 space-y-6`}>
-              {messages.length === 0 && <EmptyState />}
+          <div className="flex-1 min-h-0">
+            <ScrollArea ref={scrollAreaRef} className="h-full px-4">
+              <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH} py-8 space-y-6`}>
+                {messages.length === 0 && <EmptyState />}
 
-              {messages.map((message) => (
-                <Message key={message.id} from={message.role}>
-                  <MessageContent>
-                    {message.parts.map((part, index) => (
-                      <MessagePartRenderer key={index} part={part} index={index} />
-                    ))}
-                  </MessageContent>
+                {messages.map((message) => (
+                  <Message key={message.id} from={message.role}>
+                    <MessageContent>
+                      {message.parts.map((part, index) => (
+                        <MessagePartRenderer key={index} part={part} index={index} />
+                      ))}
+                    </MessageContent>
 
-                  {message.role === "assistant" && (
-                    <MessageActions>
-                      {/* Future: Add copy, regenerate, and other actions */}
-                    </MessageActions>
-                  )}
-                </Message>
-              ))}
+                    {message.role === "assistant" && (
+                      <MessageActions>
+                        {/* Future: Add copy, regenerate, and other actions */}
+                      </MessageActions>
+                    )}
+                  </Message>
+                ))}
 
-              {/* Loading state */}
-              {status === "submitted" && <LoadingState />}
+                {/* Loading state */}
+                {status === "submitted" && <LoadingState />}
 
-              {/* Error state with retry action */}
-              {error && (
-                <div className="space-y-3">
-                  <ErrorDisplay error={error} />
-                </div>
-              )}
-            </div>
-          </ScrollArea>
+                {/* Error state with retry action */}
+                {error && (
+                  <div className="space-y-3">
+                    <ErrorDisplay error={error} />
+                  </div>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
 
           {/* Input Area */}
-          <div className="border-t p-4">
+          <div className="sticky bottom-0 z-20 border-t bg-background p-4">
             <form onSubmit={handleSubmit} className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
               <div className="relative flex items-end gap-2">
                 <Textarea
