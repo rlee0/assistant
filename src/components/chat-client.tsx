@@ -2,26 +2,59 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type DynamicToolUIPart } from "ai";
-import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  memo,
-  type FormEvent,
-  type KeyboardEvent,
-} from "react";
+import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Message, MessageContent, MessageActions } from "@/components/ai-elements/message";
 import { Spinner } from "@/components/ui/spinner";
-import { StopCircleIcon, SendIcon, PlusIcon } from "lucide-react";
+import {
+  PromptInput,
+  PromptInputHeader,
+  PromptInputAttachments,
+  PromptInputAttachment,
+  PromptInputBody,
+  PromptInputTextarea,
+  PromptInputFooter,
+  PromptInputTools,
+  PromptInputActionMenu,
+  PromptInputActionMenuTrigger,
+  PromptInputActionMenuContent,
+  PromptInputActionAddAttachments,
+  PromptInputSpeechButton,
+  PromptInputSubmit,
+  PromptInputButton,
+  usePromptInputAttachments,
+  type PromptInputMessage,
+} from "@/components/ai-elements/prompt-input";
+import {
+  ModelSelectorDialog,
+  ModelSelectorInput,
+  ModelSelectorList,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorItem,
+  ModelSelectorLogo,
+  ModelSelectorLogoGroup,
+  ModelSelectorName,
+} from "@/components/ai-elements/model-selector";
+import { fetchModels, type Model } from "@/lib/models";
+import { DEFAULT_MODEL } from "@/lib/constants";
+import { StopCircleIcon, PlusIcon } from "lucide-react";
+
+// ============================================================================
+// Constants
+// ============================================================================
 
 /** Maximum width for chat container */
 const CHAT_CONTAINER_MAX_WIDTH = "max-w-3xl";
+
+/** Default provider logo when provider is unknown */
+const DEFAULT_PROVIDER = "openai" as const;
+
+/** Radix UI scroll area viewport selector */
+const SCROLL_AREA_VIEWPORT_SELECTOR = "[data-radix-scroll-area-viewport]" as const;
 
 /**
  * Renders a tool call with its current state
@@ -101,6 +134,27 @@ const LoadingState = memo(() => (
   </Message>
 ));
 LoadingState.displayName = "LoadingState";
+
+/**
+ * Internal component that uses PromptInput attachment hook.
+ * Must be rendered within PromptInput context.
+ */
+const AttachmentHeaderInner = memo(() => {
+  const attachments = usePromptInputAttachments();
+
+  if (!attachments.files.length) {
+    return null;
+  }
+
+  return (
+    <PromptInputHeader>
+      <PromptInputAttachments>
+        {(attachment) => <PromptInputAttachment data={attachment} />}
+      </PromptInputAttachments>
+    </PromptInputHeader>
+  );
+});
+AttachmentHeaderInner.displayName = "AttachmentHeaderInner";
 
 /**
  * Renders an error message with accessible ARIA attributes
@@ -212,19 +266,48 @@ export function ChatClient() {
     },
   });
 
-  const [input, setInput] = useState("");
+  // ----- Input + model state
+  const [text, setText] = useState("");
+  const [model, setModel] = useState<string>(DEFAULT_MODEL);
+  const [models, setModels] = useState<Model[]>([]);
+  const [selectorOpen, setSelectorOpen] = useState(false);
+
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Load models from AI Gateway (with fallback handled in fetchModels)
+  useEffect(() => {
+    let mounted = true;
+
+    fetchModels()
+      .then((list) => {
+        if (!mounted) return;
+        setModels(list);
+        // Ensure selected model remains valid using functional update
+        setModel((prev) => {
+          const ids = new Set(list.map((m) => m.id));
+          return ids.has(prev) ? prev : list[0]?.id ?? prev;
+        });
+      })
+      .catch((error) => {
+        if (process.env.NODE_ENV === "development") {
+          console.error(
+            "Failed to fetch models:",
+            error instanceof Error ? error.message : String(error)
+          );
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollElement = scrollAreaRef.current.querySelector(
-        "[data-radix-scroll-area-viewport]"
-      );
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
+    const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
+    if (scrollElement instanceof HTMLElement) {
+      scrollElement.scrollTop = scrollElement.scrollHeight;
     }
   }, [messages]);
 
@@ -233,34 +316,53 @@ export function ChatClient() {
     textareaRef.current?.focus();
   }, []);
 
-  const handleSubmit = useCallback(
-    (e: FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      if (input.trim() && status === "ready") {
-        sendMessage({ text: input });
-        setInput("");
-        // Keep focus on the textarea so users can continue typing immediately
-        requestAnimationFrame(() => textareaRef.current?.focus());
+  const handlePromptSubmit = useCallback(
+    (message: PromptInputMessage) => {
+      const hasText = Boolean(message.text);
+      const hasAttachments = Boolean(message.files?.length);
+      if (!(hasText || hasAttachments) || status !== "ready") {
+        return;
       }
+
+      sendMessage(
+        {
+          text: message.text || "Sent with attachments",
+          files: message.files,
+        },
+        {
+          body: {
+            model,
+          },
+        }
+      );
+
+      setText("");
+      requestAnimationFrame(() => {
+        textareaRef.current?.focus();
+      });
     },
-    [input, status, sendMessage]
+    [model, status, sendMessage]
   );
 
-  const handleKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLTextAreaElement>) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        handleSubmit(e as unknown as FormEvent<HTMLFormElement>);
-      }
-    },
-    [handleSubmit]
-  );
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      // Trigger form submit via PromptInput
+      const form = e.currentTarget.form;
+      form?.requestSubmit();
+    }
+  }, []);
 
   const handleNewChat = useCallback(() => {
     setMessages([]);
-    setInput("");
+    setText("");
     textareaRef.current?.focus();
   }, [setMessages]);
+
+  // Memoize selected model info to avoid redundant array lookups
+  const selectedModel = models.find((m) => m.id === model);
+  const selectedModelName = selectedModel?.name || model;
+  const selectedModelProvider = selectedModel?.provider || DEFAULT_PROVIDER;
 
   return (
     <SidebarProvider>
@@ -321,40 +423,96 @@ export function ChatClient() {
 
           {/* Input Area */}
           <div className="sticky bottom-0 z-20 border-t bg-background p-4">
-            <form onSubmit={handleSubmit} className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
-              <div className="relative flex items-end gap-2">
-                <Textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
-                  className="min-h-15 max-h-50 resize-none"
-                  rows={2}
-                />
+            <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
+              <PromptInput
+                onSubmit={(message) => handlePromptSubmit(message)}
+                className="mt-0"
+                globalDrop
+                multiple>
+                {/* Conditionally render header only when there are attachments */}
+                <AttachmentHeaderInner />
 
-                {status === "submitted" || status === "streaming" ? (
-                  <Button
-                    type="button"
-                    onClick={stop}
-                    variant="destructive"
-                    size="icon"
-                    className="shrink-0">
-                    <StopCircleIcon className="size-5" />
-                    <span className="sr-only">Stop</span>
-                  </Button>
-                ) : (
-                  <Button
-                    type="submit"
-                    disabled={!input.trim() || status !== "ready"}
-                    size="icon"
-                    className="shrink-0">
-                    <SendIcon className="size-5" />
-                    <span className="sr-only">Send</span>
-                  </Button>
-                )}
-              </div>
-            </form>
+                <PromptInputBody>
+                  <PromptInputTextarea
+                    onChange={(e) => setText(e.target.value)}
+                    ref={textareaRef}
+                    value={text}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+                  />
+                </PromptInputBody>
+
+                <PromptInputFooter>
+                  <PromptInputTools>
+                    {/* Action menu for attachments */}
+                    <PromptInputActionMenu>
+                      <PromptInputActionMenuTrigger />
+                      <PromptInputActionMenuContent>
+                        <PromptInputActionAddAttachments />
+                      </PromptInputActionMenuContent>
+                    </PromptInputActionMenu>
+
+                    {/* Speech input */}
+                    <PromptInputSpeechButton
+                      onTranscriptionChange={setText}
+                      textareaRef={textareaRef}
+                    />
+
+                    {/* Model selector dialog trigger */}
+                    <PromptInputButton
+                      variant="ghost"
+                      onClick={() => setSelectorOpen(true)}
+                      className="flex items-center gap-2"
+                      aria-label="Select model">
+                      <ModelSelectorLogoGroup>
+                        <ModelSelectorLogo provider={selectedModelProvider} />
+                      </ModelSelectorLogoGroup>
+                      <span className="text-xs">{selectedModelName}</span>
+                    </PromptInputButton>
+
+                    {/* Stop button during streaming */}
+                    {(status === "submitted" || status === "streaming") && (
+                      <PromptInputButton variant="destructive" onClick={stop} aria-label="Stop">
+                        <StopCircleIcon className="size-4" />
+                      </PromptInputButton>
+                    )}
+                  </PromptInputTools>
+
+                  <PromptInputSubmit disabled={!text && status !== "streaming"} status={status} />
+                </PromptInputFooter>
+              </PromptInput>
+
+              {/* Model Selector dialog */}
+              <ModelSelectorDialog open={selectorOpen} onOpenChange={setSelectorOpen}>
+                <ModelSelectorInput placeholder="Search models..." />
+                <ModelSelectorList>
+                  <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+                  {Object.entries(
+                    models.reduce<Record<string, Model[]>>((acc, m) => {
+                      const key = m.provider || "provider";
+                      (acc[key] ||= []).push(m);
+                      return acc;
+                    }, {})
+                  ).map(([provider, group]) => (
+                    <ModelSelectorGroup key={provider} heading={provider}>
+                      {group.map((m) => (
+                        <ModelSelectorItem
+                          key={m.id}
+                          onSelect={() => {
+                            setModel(m.id);
+                            setSelectorOpen(false);
+                          }}>
+                          <ModelSelectorLogoGroup>
+                            <ModelSelectorLogo provider={m.provider || DEFAULT_PROVIDER} />
+                          </ModelSelectorLogoGroup>
+                          <ModelSelectorName>{m.name}</ModelSelectorName>
+                        </ModelSelectorItem>
+                      ))}
+                    </ModelSelectorGroup>
+                  ))}
+                </ModelSelectorList>
+              </ModelSelectorDialog>
+            </div>
           </div>
         </div>
       </SidebarInset>

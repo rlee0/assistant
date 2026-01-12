@@ -8,9 +8,19 @@ export type Model = {
 };
 
 export async function fetchModels(): Promise<Model[]> {
-  const res = await fetch("/api/models");
-  if (!res.ok) {
+  try {
+    const res = await fetch("/api/models");
+    if (!res.ok) {
+      return [...DEFAULT_FALLBACK_MODELS];
+    }
+    const data = await res.json();
+    // Ensure response is always an array
+    return Array.isArray(data)
+      ? data
+      : Array.isArray(data.models)
+      ? data.models
+      : [...DEFAULT_FALLBACK_MODELS];
+  } catch {
     return [...DEFAULT_FALLBACK_MODELS];
   }
-  return res.json();
 }

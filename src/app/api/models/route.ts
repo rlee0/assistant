@@ -35,7 +35,12 @@ export async function GET() {
 
     // Return default models as fallback
     const defaultModels = await gateway.getAvailableModels();
-    return NextResponse.json(defaultModels, { status: 200 });
+    // Ensure always returning an array
+    const modelsArray = Array.isArray(defaultModels) ? defaultModels : defaultModels?.models || [];
+    return NextResponse.json(
+      modelsArray.length > 0 ? modelsArray : [{ id: "gpt-4o-mini", name: "GPT-4o mini" }],
+      { status: 200 }
+    );
   } catch (error) {
     console.error("Models endpoint error:", error);
     // Return minimal fallback on error
