@@ -137,32 +137,27 @@ export async function POST(req: Request): Promise<Response> {
     // Prepare system message
     const systemMessage = context ? `Context: ${context}` : "You are a helpful assistant.";
 
-    // Create custom OpenAI-compatible provider for AI Gateway
+    // Create custom OpenAI-compatible provider for AI Gateway (expects OpenAI chat/completions)
     const provider = createOpenAI({
       name: "ai-gateway",
       baseURL: config.baseURL,
       apiKey: config.apiKey,
     });
+    const model = provider.chat(selectedModel as Parameters<typeof provider.chat>[0]);
 
-    // Use AI SDK streamText for proper streaming with UIMessage protocol
+    // Use AI SDK streamText for proper streaming via chat/completions
     const result = streamText({
-      model: provider(selectedModel),
+      model,
       messages: [{ role: "system", content: systemMessage }, ...modelMessages],
       temperature: 0.7,
     });
 
-    // Return proper UIMessageStream response compatible with useChat hook
+    // Return UIMessageStream response expected by DefaultChatTransport/useChat
     return result.toUIMessageStreamResponse({
       headers: {
         "x-vercel-ai-ui-message-stream": "v1",
       },
-      onError: (error) => {
-        // Return user-friendly error message (masks implementation details)
-        console.error("Tool execution error:", error);
-        return "An error occurred while processing your request.";
-      },
       messageMetadata: ({ part }) => {
-        // Track token usage and model information
         if (part.type === "finish") {
           return {
             model: selectedModel,
@@ -171,6 +166,10 @@ export async function POST(req: Request): Promise<Response> {
             outputTokens: part.totalUsage?.outputTokens ?? 0,
           };
         }
+      },
+      onError: (error) => {
+        console.error("Stream error:", error);
+        return "An error occurred while processing your request.";
       },
     });
   } catch (error) {
