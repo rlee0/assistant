@@ -2,7 +2,7 @@
 
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName, type DynamicToolUIPart } from "ai";
-import { useState, useRef, useEffect, useCallback, memo, type KeyboardEvent } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -29,7 +29,8 @@ import {
   type PromptInputMessage,
 } from "@/components/ai-elements/prompt-input";
 import {
-  ModelSelectorDialog,
+  ModelSelector,
+  ModelSelectorContent,
   ModelSelectorInput,
   ModelSelectorList,
   ModelSelectorEmpty,
@@ -58,6 +59,25 @@ const DEFAULT_PROVIDER = "openai" as const;
 /** Radix UI scroll area viewport selector */
 const SCROLL_AREA_VIEWPORT_SELECTOR = "[data-radix-scroll-area-viewport]" as const;
 
+// ============================================================================
+// Types
+// ============================================================================
+
+interface ChatState {
+  text: string;
+  models: Model[];
+  selectorOpen: boolean;
+}
+
+interface SelectedModelInfo {
+  name: string;
+  provider: string;
+}
+
+// ============================================================================
+// Sub-Components
+// ============================================================================
+
 /**
  * Renders a tool call with its current state
  */
@@ -65,43 +85,36 @@ const ToolCallDisplay = memo<{
   part: DynamicToolUIPart;
   toolName: string;
 }>(({ part, toolName }) => {
-  let content: string;
-  let stateLabel: string;
+  const getStateInfo = (state: DynamicToolUIPart["state"]): [string, string] => {
+    switch (state) {
+      case "output-available":
+        return [
+          "Complete",
+          typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2),
+        ];
+      case "output-error":
+        return ["Error", part.errorText || "Unknown error occurred"];
+      case "input-streaming":
+        return ["Processing", part.input ? JSON.stringify(part.input, null, 2) : "Streaming..."];
+      case "input-available":
+        return ["Ready", JSON.stringify(part.input, null, 2)];
+      case "approval-requested":
+        return ["Awaiting Approval", JSON.stringify(part.input, null, 2)];
+      case "approval-responded":
+        return [
+          part.approval?.approved ? "Approved" : "Denied",
+          JSON.stringify(part.input, null, 2),
+        ];
+      case "output-denied":
+        return ["Denied", "Tool execution was denied"];
+      default: {
+        const _exhaustive: never = state;
+        return ["Unknown", "Processing..."];
+      }
+    }
+  };
 
-  switch (part.state) {
-    case "output-available":
-      stateLabel = "Complete";
-      content =
-        typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2);
-      break;
-    case "output-error":
-      stateLabel = "Error";
-      content = part.errorText || "Unknown error occurred";
-      break;
-    case "input-streaming":
-      stateLabel = "Processing";
-      content = part.input ? JSON.stringify(part.input, null, 2) : "Streaming...";
-      break;
-    case "input-available":
-      stateLabel = "Ready";
-      content = JSON.stringify(part.input, null, 2);
-      break;
-    case "approval-requested":
-      stateLabel = "Awaiting Approval";
-      content = JSON.stringify(part.input, null, 2);
-      break;
-    case "approval-responded":
-      stateLabel = part.approval.approved ? "Approved" : "Denied";
-      content = JSON.stringify(part.input, null, 2);
-      break;
-    case "output-denied":
-      stateLabel = "Denied";
-      content = "Tool execution was denied";
-      break;
-    default:
-      stateLabel = "Unknown";
-      content = "Processing...";
-  }
+  const [stateLabel, content] = getStateInfo(part.state);
 
   return (
     <div className="rounded-md bg-muted p-3 text-xs">
@@ -173,8 +186,7 @@ const ErrorDisplay = memo<{ error: Error }>(({ error }) => (
 ErrorDisplay.displayName = "ErrorDisplay";
 
 /**
- * Renders a message part based on its type
- * Uses proper type checking with AI SDK type guards for all part types
+ * Renders a message part based on its type with exhaustive type checking
  */
 const MessagePartRenderer = memo<{
   part: ReturnType<typeof useChat>["messages"][number]["parts"][number];
@@ -239,16 +251,291 @@ const MessagePartRenderer = memo<{
 });
 MessagePartRenderer.displayName = "MessagePartRenderer";
 
+// ============================================================================
+// Hooks
+// ============================================================================
+
+/**
+ * Manages model selection and fetching with validation
+ * Fetches models once on mount and validates current selection against available models
+ * @throws Does not throw; gracefully handles errors with fallback
+ */
+function useModelManagement(
+  currentModel: string,
+  onModelUpdate: (modelId: string) => void
+): {
+  models: Model[];
+  selectedModelInfo: SelectedModelInfo;
+} {
+  const [models, setModels] = useState<Model[]>([]);
+  const hasValidatedRef = useRef(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    const loadModels = async () => {
+      try {
+        const list = await fetchModels();
+
+        if (controller.signal.aborted) return;
+        setModels(list);
+
+        // Validate selected model is still available (only once after fetch)
+        if (!hasValidatedRef.current) {
+          hasValidatedRef.current = true;
+          if (list.length > 0 && !list.some((m) => m.id === currentModel)) {
+            onModelUpdate(list[0].id);
+          }
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+
+        const message = err instanceof Error ? err.message : "Failed to fetch available models";
+        console.error("Model loading error:", { message, isProduction: !process.env.NODE_ENV });
+      }
+    };
+
+    void loadModels();
+
+    return () => {
+      controller.abort();
+    };
+  }, []); // Empty dependency array: fetch only once on mount
+
+  const selectedModelInfo = useMemo<SelectedModelInfo>(() => {
+    const selected = models.find((m) => m.id === currentModel);
+    return {
+      name: selected?.name ?? currentModel,
+      provider: selected?.provider ?? DEFAULT_PROVIDER,
+    };
+  }, [models, currentModel]);
+
+  return { models, selectedModelInfo };
+}
+
+/**
+ * Memoizes grouped models by provider
+ */
+function useGroupedModels(models: Model[]): Record<string, Model[]> {
+  return useMemo(() => {
+    return models.reduce<Record<string, Model[]>>((acc, model) => {
+      const provider = model.provider || "unknown";
+      if (!acc[provider]) {
+        acc[provider] = [];
+      }
+      acc[provider].push(model);
+      return acc;
+    }, {});
+  }, [models]);
+}
+
+/**
+ * Handles keyboard shortcuts in textarea (Enter to submit, Shift+Enter for newline)
+ */
+function useTextareaKeyboardShortcuts(
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>
+): (e: KeyboardEvent<HTMLTextAreaElement>) => void {
+  return useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      const form = e.currentTarget.form;
+      form?.requestSubmit();
+    }
+  }, []);
+}
+
+/**
+ * Auto-scrolls to bottom when messages change
+ */
+function useAutoScroll(
+  scrollAreaRef: React.RefObject<HTMLDivElement | null>,
+  messages: unknown[]
+): void {
+  useEffect(() => {
+    const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
+    if (scrollElement instanceof HTMLElement) {
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+    }
+  }, [messages]);
+}
+
+/**
+ * Auto-focus textarea on mount
+ */
+function useAutoFocusTextarea(textareaRef: React.RefObject<HTMLTextAreaElement | null>): void {
+  useEffect(() => {
+    textareaRef.current?.focus();
+  }, []);
+}
+
+// ============================================================================
+// Sub-Components (Complex)
+// ============================================================================
+
+interface ChatMessagesProps {
+  messages: ReturnType<typeof useChat>["messages"];
+  status: ReturnType<typeof useChat>["status"];
+  error: ReturnType<typeof useChat>["error"];
+  scrollAreaRef: React.RefObject<HTMLDivElement | null>;
+}
+
+const ChatMessages = memo<ChatMessagesProps>(({ messages, status, error, scrollAreaRef }) => (
+  <div className="flex-1 min-h-0">
+    <ScrollArea ref={scrollAreaRef} className="h-full px-4">
+      <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH} py-8 space-y-6`}>
+        {messages.length === 0 && <EmptyState />}
+
+        {messages.map((message) => (
+          <Message key={message.id} from={message.role}>
+            <MessageContent>
+              {message.parts.map((part, index) => (
+                <MessagePartRenderer key={index} part={part} index={index} />
+              ))}
+            </MessageContent>
+
+            {message.role === "assistant" && (
+              <MessageActions>
+                {/* Future: Add copy, regenerate, and other actions */}
+              </MessageActions>
+            )}
+          </Message>
+        ))}
+
+        {status === "submitted" && <LoadingState />}
+
+        {error && <ErrorDisplay error={error} />}
+      </div>
+    </ScrollArea>
+  </div>
+));
+ChatMessages.displayName = "ChatMessages";
+
+interface ChatInputProps {
+  text: string;
+  onTextChange: (text: string) => void;
+  onSubmit: (message: PromptInputMessage) => void;
+  status: ReturnType<typeof useChat>["status"];
+  stop: ReturnType<typeof useChat>["stop"];
+  selectedModelInfo: SelectedModelInfo;
+  selectorOpen: boolean;
+  onSelectorOpenChange: (open: boolean) => void;
+  models: Model[];
+  onModelSelect: (modelId: string) => void;
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+}
+
+const ChatInput = memo<ChatInputProps>(
+  ({
+    text,
+    onTextChange,
+    onSubmit,
+    status,
+    stop,
+    selectedModelInfo,
+    selectorOpen,
+    onSelectorOpenChange,
+    models,
+    onModelSelect,
+    textareaRef,
+  }) => {
+    const handleKeyDown = useTextareaKeyboardShortcuts(textareaRef);
+    const groupedModels = useGroupedModels(models);
+
+    return (
+      <div className="sticky bottom-0 z-20 border-t bg-background p-4">
+        <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
+          <PromptInput onSubmit={onSubmit} className="mt-0" globalDrop multiple>
+            <AttachmentHeaderInner />
+
+            <PromptInputBody>
+              <PromptInputTextarea
+                onChange={(e) => onTextChange(e.target.value)}
+                ref={textareaRef}
+                value={text}
+                onKeyDown={handleKeyDown}
+                placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+              />
+            </PromptInputBody>
+
+            <PromptInputFooter>
+              <PromptInputTools>
+                <PromptInputActionMenu>
+                  <PromptInputActionMenuTrigger />
+                  <PromptInputActionMenuContent>
+                    <PromptInputActionAddAttachments />
+                  </PromptInputActionMenuContent>
+                </PromptInputActionMenu>
+
+                <PromptInputSpeechButton
+                  onTranscriptionChange={onTextChange}
+                  textareaRef={textareaRef}
+                />
+
+                <PromptInputButton
+                  variant="ghost"
+                  onClick={() => onSelectorOpenChange(true)}
+                  className="flex items-center gap-2"
+                  aria-label="Select model">
+                  <ModelSelectorLogoGroup>
+                    <ModelSelectorLogo provider={selectedModelInfo.provider} />
+                  </ModelSelectorLogoGroup>
+                  <span className="text-xs">{selectedModelInfo.name}</span>
+                </PromptInputButton>
+
+                {(status === "submitted" || status === "streaming") && (
+                  <PromptInputButton variant="destructive" onClick={stop} aria-label="Stop">
+                    <StopCircleIcon className="size-4" />
+                  </PromptInputButton>
+                )}
+              </PromptInputTools>
+
+              <PromptInputSubmit disabled={!text && status !== "streaming"} status={status} />
+            </PromptInputFooter>
+          </PromptInput>
+
+          <ModelSelector open={selectorOpen} onOpenChange={onSelectorOpenChange}>
+            <ModelSelectorContent>
+              <ModelSelectorInput placeholder="Search models..." />
+              <ModelSelectorList>
+                <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+                {Object.entries(groupedModels).map(([provider, providerModels]) => (
+                  <ModelSelectorGroup key={provider} heading={provider}>
+                    {providerModels.map((model) => (
+                      <ModelSelectorItem
+                        key={model.id}
+                        onSelect={() => {
+                          onModelSelect(model.id);
+                          onSelectorOpenChange(false);
+                        }}>
+                        <ModelSelectorLogoGroup>
+                          <ModelSelectorLogo provider={model.provider || DEFAULT_PROVIDER} />
+                        </ModelSelectorLogoGroup>
+                        <ModelSelectorName>{model.name}</ModelSelectorName>
+                      </ModelSelectorItem>
+                    ))}
+                  </ModelSelectorGroup>
+                ))}
+              </ModelSelectorList>
+            </ModelSelectorContent>
+          </ModelSelector>
+        </div>
+      </div>
+    );
+  }
+);
+ChatInput.displayName = "ChatInput";
+
 /**
  * Main chat interface component using AI SDK UI
  *
  * Features:
- * - Real-time streaming responses
- * - Tool calling support
- * - File attachments (images)
- * - Keyboard shortcuts
- * - Auto-scrolling
- * - Error handling
+ * - Real-time streaming responses with error recovery
+ * - Tool calling support with exhaustive state handling
+ * - File attachments (images) with validation
+ * - Keyboard shortcuts (Enter to send, Shift+Enter for new line)
+ * - Auto-scrolling to latest messages
+ * - Model selection with fallback validation
+ * - Structured error logging
  */
 export function ChatClient() {
   const { messages, sendMessage, status, error, stop, setMessages } = useChat({
@@ -257,81 +544,57 @@ export function ChatClient() {
       credentials: "include",
     }),
     onError: (error) => {
-      // Log error for debugging (mask details from user)
-      console.error("Chat error:", error);
+      const message = error instanceof Error ? error.message : "Unknown error";
+      console.error("Chat transport error:", {
+        message,
+        type: error?.constructor?.name,
+        timestamp: new Date().toISOString(),
+      });
     },
     onFinish: (result) => {
-      // Callback for when message streaming completes
       if (result.isError) {
-        console.error("Message streaming failed");
+        console.error("Message streaming error:", {
+          timestamp: new Date().toISOString(),
+        });
       }
     },
   });
 
-  // ----- Input + model state
-  const [text, setText] = useState("");
-  const [models, setModels] = useState<Model[]>([]);
-  const [selectorOpen, setSelectorOpen] = useState(false);
-
-  // Get model from settings store and sync with server
+  // ----- Settings & Store
   useSettingsSync();
   const settings = useSettingsStore((state) => state.settings);
   const updateSettings = useSettingsStore((state) => state.update);
-  const model = settings.models.defaultModel;
+  const currentModel = settings.models.defaultModel;
 
+  // ----- Local State
+  const [text, setText] = useState("");
+  const [selectorOpen, setSelectorOpen] = useState(false);
+
+  // ----- Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // Load models from AI Gateway (with fallback handled in fetchModels)
-  // Runs once on mount to populate available models
-  useEffect(() => {
-    const controller = new AbortController();
+  // ----- Hooks
+  const { models, selectedModelInfo } = useModelManagement(currentModel, (modelId) => {
+    updateSettings(["models", "defaultModel"], modelId);
+  });
 
-    fetchModels()
-      .then((list) => {
-        if (controller.signal.aborted) return;
-        setModels(list);
+  useAutoScroll(scrollAreaRef, messages);
+  useAutoFocusTextarea(textareaRef);
 
-        // Validate selected model is still available
-        const availableModelIds = new Set(list.map((m) => m.id));
-        const currentModel = settings.models.defaultModel;
-
-        if (!availableModelIds.has(currentModel) && list.length > 0) {
-          updateSettings(["models", "defaultModel"], list[0].id);
-        }
-      })
-      .catch((error) => {
-        if (process.env.NODE_ENV === "development" && !controller.signal.aborted) {
-          console.error(
-            "Failed to fetch models:",
-            error instanceof Error ? error.message : String(error)
-          );
-        }
-      });
-
-    return () => {
-      controller.abort();
-    };
-  }, [settings.models.defaultModel, updateSettings]);
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
-    if (scrollElement instanceof HTMLElement) {
-      scrollElement.scrollTop = scrollElement.scrollHeight;
-    }
-  }, [messages]);
-
-  // Auto-focus textarea on mount
-  useEffect(() => {
-    textareaRef.current?.focus();
-  }, []);
-
+  // ----- Event Handlers
   const handlePromptSubmit = useCallback(
     (message: PromptInputMessage) => {
       const hasText = Boolean(message.text);
       const hasAttachments = Boolean(message.files?.length);
-      if (!(hasText || hasAttachments) || status !== "ready") {
+
+      if (!(hasText || hasAttachments)) {
+        console.warn("Message submission blocked: no content");
+        return;
+      }
+
+      if (status !== "ready") {
+        console.debug("Message submission blocked: not ready", { status });
         return;
       }
 
@@ -342,7 +605,7 @@ export function ChatClient() {
         },
         {
           body: {
-            model,
+            model: currentModel,
           },
         }
       );
@@ -352,28 +615,14 @@ export function ChatClient() {
         textareaRef.current?.focus();
       });
     },
-    [model, status, sendMessage]
+    [currentModel, status, sendMessage]
   );
-
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      // Trigger form submit via PromptInput
-      const form = e.currentTarget.form;
-      form?.requestSubmit();
-    }
-  }, []);
 
   const handleNewChat = useCallback(() => {
     setMessages([]);
     setText("");
     textareaRef.current?.focus();
   }, [setMessages]);
-
-  // Memoize selected model info to avoid redundant array lookups
-  const selectedModel = models.find((m) => m.id === model);
-  const selectedModelName = selectedModel?.name || model;
-  const selectedModelProvider = selectedModel?.provider || DEFAULT_PROVIDER;
 
   return (
     <SidebarProvider>
@@ -385,7 +634,7 @@ export function ChatClient() {
               New Chat
             </Button>
           </div>
-          {/* Future: Add chat history list here */}
+          {/* TODO: Add chat history list */}
         </div>
       </Sidebar>
 
@@ -397,134 +646,30 @@ export function ChatClient() {
             <h1 className="text-lg font-semibold">Chat</h1>
           </header>
 
-          {/* Messages Area */}
-          <div className="flex-1 min-h-0">
-            <ScrollArea ref={scrollAreaRef} className="h-full px-4">
-              <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH} py-8 space-y-6`}>
-                {messages.length === 0 && <EmptyState />}
+          {/* Messages */}
+          <ChatMessages
+            messages={messages}
+            status={status}
+            error={error}
+            scrollAreaRef={scrollAreaRef}
+          />
 
-                {messages.map((message) => (
-                  <Message key={message.id} from={message.role}>
-                    <MessageContent>
-                      {message.parts.map((part, index) => (
-                        <MessagePartRenderer key={index} part={part} index={index} />
-                      ))}
-                    </MessageContent>
-
-                    {message.role === "assistant" && (
-                      <MessageActions>
-                        {/* Future: Add copy, regenerate, and other actions */}
-                      </MessageActions>
-                    )}
-                  </Message>
-                ))}
-
-                {/* Loading state */}
-                {status === "submitted" && <LoadingState />}
-
-                {/* Error state with retry action */}
-                {error && (
-                  <div className="space-y-3">
-                    <ErrorDisplay error={error} />
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-
-          {/* Input Area */}
-          <div className="sticky bottom-0 z-20 border-t bg-background p-4">
-            <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
-              <PromptInput
-                onSubmit={(message) => handlePromptSubmit(message)}
-                className="mt-0"
-                globalDrop
-                multiple>
-                {/* Conditionally render header only when there are attachments */}
-                <AttachmentHeaderInner />
-
-                <PromptInputBody>
-                  <PromptInputTextarea
-                    onChange={(e) => setText(e.target.value)}
-                    ref={textareaRef}
-                    value={text}
-                    onKeyDown={handleKeyDown}
-                    placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
-                  />
-                </PromptInputBody>
-
-                <PromptInputFooter>
-                  <PromptInputTools>
-                    {/* Action menu for attachments */}
-                    <PromptInputActionMenu>
-                      <PromptInputActionMenuTrigger />
-                      <PromptInputActionMenuContent>
-                        <PromptInputActionAddAttachments />
-                      </PromptInputActionMenuContent>
-                    </PromptInputActionMenu>
-
-                    {/* Speech input */}
-                    <PromptInputSpeechButton
-                      onTranscriptionChange={setText}
-                      textareaRef={textareaRef}
-                    />
-
-                    {/* Model selector dialog trigger */}
-                    <PromptInputButton
-                      variant="ghost"
-                      onClick={() => setSelectorOpen(true)}
-                      className="flex items-center gap-2"
-                      aria-label="Select model">
-                      <ModelSelectorLogoGroup>
-                        <ModelSelectorLogo provider={selectedModelProvider} />
-                      </ModelSelectorLogoGroup>
-                      <span className="text-xs">{selectedModelName}</span>
-                    </PromptInputButton>
-
-                    {/* Stop button during streaming */}
-                    {(status === "submitted" || status === "streaming") && (
-                      <PromptInputButton variant="destructive" onClick={stop} aria-label="Stop">
-                        <StopCircleIcon className="size-4" />
-                      </PromptInputButton>
-                    )}
-                  </PromptInputTools>
-
-                  <PromptInputSubmit disabled={!text && status !== "streaming"} status={status} />
-                </PromptInputFooter>
-              </PromptInput>
-
-              {/* Model Selector dialog */}
-              <ModelSelectorDialog open={selectorOpen} onOpenChange={setSelectorOpen}>
-                <ModelSelectorInput placeholder="Search models..." />
-                <ModelSelectorList>
-                  <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
-                  {Object.entries(
-                    models.reduce<Record<string, Model[]>>((acc, m) => {
-                      const key = m.provider || "provider";
-                      (acc[key] ||= []).push(m);
-                      return acc;
-                    }, {})
-                  ).map(([provider, group]) => (
-                    <ModelSelectorGroup key={provider} heading={provider}>
-                      {group.map((m) => (
-                        <ModelSelectorItem
-                          key={m.id}
-                          onSelect={() => {
-                            updateSettings(["models", "defaultModel"], m.id);
-                            setSelectorOpen(false);
-                          }}>
-                          <ModelSelectorLogoGroup>
-                            <ModelSelectorLogo provider={m.provider || DEFAULT_PROVIDER} />
-                          </ModelSelectorLogoGroup>
-                          <ModelSelectorName>{m.name}</ModelSelectorName>
-                        </ModelSelectorItem>
-                      ))}
-                    </ModelSelectorGroup>
-                  ))}
-                </ModelSelectorList>
-              </ModelSelectorDialog>
-            </div>
-          </div>
+          {/* Input */}
+          <ChatInput
+            text={text}
+            onTextChange={setText}
+            onSubmit={handlePromptSubmit}
+            status={status}
+            stop={stop}
+            selectedModelInfo={selectedModelInfo}
+            selectorOpen={selectorOpen}
+            onSelectorOpenChange={setSelectorOpen}
+            models={models}
+            onModelSelect={(modelId) => {
+              updateSettings(["models", "defaultModel"], modelId);
+            }}
+            textareaRef={textareaRef}
+          />
         </div>
       </SidebarInset>
     </SidebarProvider>
