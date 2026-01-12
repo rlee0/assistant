@@ -29,10 +29,9 @@ export type ToolDefinition<T extends z.ZodTypeAny = z.ZodTypeAny> = {
  */
 
 // Import all registered tools
-import browserToolDef from "./browser/index";
-import searchToolDef from "./search/index";
+export { getDateTime } from "./datetime";
 
-export const toolDefinitions: ToolDefinition[] = [browserToolDef, searchToolDef];
+export const toolDefinitions: ToolDefinition[] = [];
 
 export type ToolSettingsMap = Record<string, unknown>;
 
