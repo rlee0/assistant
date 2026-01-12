@@ -4,6 +4,8 @@ import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { loadInitialChats } from "@/lib/supabase/loaders";
 import { redirect } from "next/navigation";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   let supabase;
   try {

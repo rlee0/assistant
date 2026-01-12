@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { tool, type Tool } from "ai";
+import { type Tool } from "ai";
 import {
   BROWSER_DEFAULT_ENABLED,
   BROWSER_DEFAULT_USER_AGENT,
@@ -18,7 +18,7 @@ import {
   SEARCH_DEFAULT_REGION,
 } from "@/lib/constants";
 
-export type ToolDefinition<T extends z.ZodTypeAny = z.ZodObject<any>> = {
+export type ToolDefinition<T extends z.ZodTypeAny = z.ZodTypeAny> = {
   id: string;
   name: string;
   description: string;
@@ -26,7 +26,7 @@ export type ToolDefinition<T extends z.ZodTypeAny = z.ZodObject<any>> = {
   build: (settings: z.infer<T>) => Tool;
 };
 
-const browserSettings = z.object({
+export const browserSettings = z.object({
   enabled: z.boolean().default(BROWSER_DEFAULT_ENABLED),
   userAgent: z.string().default(BROWSER_DEFAULT_USER_AGENT),
   maxDepth: z.number().int().min(1).max(BROWSER_MAX_DEPTH_LIMIT).default(BROWSER_DEFAULT_MAX_DEPTH),
@@ -38,7 +38,7 @@ const browserSettings = z.object({
     .default(BROWSER_DEFAULT_TIMEOUT_MS),
 });
 
-const codeRunnerSettings = z.object({
+export const codeRunnerSettings = z.object({
   enabled: z.boolean().default(CODE_RUNNER_DEFAULT_ENABLED),
   runtime: z.enum(["nodejs"]).default(CODE_RUNNER_DEFAULT_RUNTIME),
   timeoutMs: z
@@ -50,7 +50,7 @@ const codeRunnerSettings = z.object({
   apiKey: z.string().optional(),
 });
 
-const searchSettings = z.object({
+export const searchSettings = z.object({
   enabled: z.boolean().default(SEARCH_DEFAULT_ENABLED),
   provider: z.enum(["duckduckgo", "serpapi"]).default(SEARCH_DEFAULT_PROVIDER),
   apiKey: z.string().optional(),

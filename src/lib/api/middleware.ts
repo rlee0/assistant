@@ -8,9 +8,7 @@ export type AuthenticatedRequest = NextRequest & { userId?: string };
  * Middleware to authenticate requests using Supabase
  * Returns user ID if authenticated, otherwise returns error response
  */
-export async function authenticateRequest(
-  request: NextRequest
-): Promise<{ userId: string } | NextResponse> {
+export async function authenticateRequest(): Promise<{ userId: string } | NextResponse> {
   try {
     const supabase = await createSupabaseServerClient({ allowCookieWrite: true });
     const {
