@@ -458,7 +458,7 @@ const ChatInput = memo<ChatInputProps>(
                 ref={textareaRef}
                 value={text}
                 onKeyDown={handleKeyDown}
-                placeholder="Type your message... (Enter to send, Shift+Enter for new line)"
+                placeholder="Type your message..."
               />
             </PromptInputBody>
 

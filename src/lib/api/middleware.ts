@@ -1,4 +1,4 @@
-import { APIError, ErrorCodes } from "@/lib/api/errors";
+import { APIError, ErrorCodes, handleAPIError } from "@/lib/api/errors";
 import { NextRequest, NextResponse } from "next/server";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
@@ -87,6 +87,5 @@ export function resultToResponse<T>(
     return onSuccess(result.value);
   }
 
-  const { handleAPIError } = require("@/lib/api/errors");
   return handleAPIError(result.error, { isDevelopment });
 }

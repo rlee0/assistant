@@ -28,15 +28,18 @@ Act as a Principal Software Engineer. Refactor the provided code to be productio
 
 Return the response in this exact structure:
 
-## 1. Refactoring Plan
+## 1. Issues Found
 
-_Brief summary of identified issues and the architectural solution._
+_Brief summary of identified issues._
 
-## 2. Refactored Code
+## 2. Solution Plan
 
-_The full, complete file content._
+_Detailed plan to address the issues._
 
-## 3. Changelog & Setup
+## 3. Changelog
 
-- List of changes (including breaking changes).
-- New dependencies (if any) and setup commands.
+- Succinct list of changes (including breaking changes).
+
+## 4. Suggested Next Steps
+
+- Recommendations for further improvements or reviews.
