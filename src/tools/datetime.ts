@@ -35,10 +35,14 @@ type DateTimeResult = {
  * @returns true if valid, false otherwise
  */
 function isValidTimezone(tz: string): boolean {
+  if (typeof tz !== "string" || tz.trim().length === 0) {
+    return false;
+  }
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });
     return true;
-  } catch {
+  } catch (error) {
+    // Silently return false for invalid timezone
     return false;
   }
 }
@@ -104,6 +108,16 @@ export const getDateTime = ({ format = "iso", timezone }: DateTimeToolOptions = 
         ),
     }),
     execute: async ({ format: requestFormat, timezone: requestTimezone }) => {
+      // Validate inputs
+      if (
+        requestFormat &&
+        !(["iso", "locale", "timestamp", "utc"] as const).includes(requestFormat)
+      ) {
+        throw new Error(
+          `Invalid format: '${requestFormat}'. Must be one of: iso, locale, timestamp, utc`
+        );
+      }
+
       const now = new Date();
       const useFormat = requestFormat ?? format;
       const useTimezone = requestTimezone ?? timezone;
