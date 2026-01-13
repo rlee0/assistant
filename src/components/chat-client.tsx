@@ -41,9 +41,14 @@ import {
   ModelSelectorLogoGroup,
   ModelSelectorName,
 } from "@/components/ai-elements/model-selector";
-import { fetchModels, type Model } from "@/lib/models";
-import { DEFAULT_MODEL } from "@/lib/constants";
-import { StopCircleIcon, PlusIcon } from "lucide-react";
+import {
+  fetchModels,
+  getModelProvider,
+  formatProviderName,
+  groupModelsByProvider,
+  type Model,
+} from "@/lib/models";
+import { PlusIcon } from "lucide-react";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
 
@@ -52,7 +57,7 @@ import { useSettingsSync } from "@/hooks/use-settings-sync";
 // ============================================================================
 
 /** Maximum width for chat container */
-const CHAT_CONTAINER_MAX_WIDTH = "max-w-3xl";
+const CHAT_CONTAINER_MAX_WIDTH = "max-w-3xl" as const;
 
 /** Default provider logo when provider is unknown */
 const DEFAULT_PROVIDER = "openai" as const;
@@ -64,15 +69,9 @@ const SCROLL_AREA_VIEWPORT_SELECTOR = "[data-radix-scroll-area-viewport]" as con
 // Types
 // ============================================================================
 
-interface ChatState {
-  text: string;
-  models: Model[];
-  selectorOpen: boolean;
-}
-
 interface SelectedModelInfo {
-  name: string;
-  provider: string;
+  readonly name: string;
+  readonly provider: string;
 }
 
 // ============================================================================
@@ -108,10 +107,10 @@ const ToolCallDisplay = memo<{
         ];
       case "output-denied":
         return ["Denied", "Tool execution was denied"];
-      default: {
-        const _exhaustive: never = state;
+      default:
+        // Exhaustive check: all states handled
+        state satisfies never;
         return ["Unknown", "Processing..."];
-      }
     }
   };
 
@@ -275,12 +274,15 @@ function useModelManagement(
   selectedModelInfo: SelectedModelInfo;
 } {
   const [models, setModels] = useState<Model[]>([]);
-  const hasValidatedRef = useRef(false);
-  const isMountedRef = useRef(true);
+  const onModelUpdateRef = useRef(onModelUpdate);
+
+  // Keep callback ref updated
+  useEffect(() => {
+    onModelUpdateRef.current = onModelUpdate;
+  }, [onModelUpdate]);
 
   useEffect(() => {
-    // Track if component is still mounted
-    isMountedRef.current = true;
+    let isMounted = true;
     const controller = new AbortController();
 
     const loadModels = async () => {
@@ -288,19 +290,16 @@ function useModelManagement(
         const list = await fetchModels();
 
         // Check both abort signal and mount status
-        if (controller.signal.aborted || !isMountedRef.current) return;
+        if (controller.signal.aborted || !isMounted) return;
 
         setModels(list);
 
-        // Validate selected model is still available (only once after fetch)
-        if (!hasValidatedRef.current && isMountedRef.current) {
-          hasValidatedRef.current = true;
-          if (list.length > 0 && !list.some((m) => m.id === currentModel)) {
-            onModelUpdate(list[0].id);
-          }
+        // Validate selected model is still available
+        if (isMounted && list.length > 0 && !list.some((m) => m.id === currentModel)) {
+          onModelUpdateRef.current(list[0].id);
         }
       } catch (err) {
-        if (controller.signal.aborted || !isMountedRef.current) return;
+        if (controller.signal.aborted || !isMounted) return;
 
         const message = err instanceof Error ? err.message : "Failed to fetch available models";
         console.error("[Chat] Model loading error:", {
@@ -314,15 +313,15 @@ function useModelManagement(
 
     return () => {
       controller.abort();
-      isMountedRef.current = false;
+      isMounted = false;
     };
-  }, []); // Empty dependency array: fetch only once on mount
+  }, [currentModel]);
 
   const selectedModelInfo = useMemo<SelectedModelInfo>(() => {
     const selected = models.find((m) => m.id === currentModel);
     return {
       name: selected?.name ?? currentModel,
-      provider: selected?.provider ?? DEFAULT_PROVIDER,
+      provider: selected ? getModelProvider(selected) : DEFAULT_PROVIDER,
     };
   }, [models, currentModel]);
 
@@ -333,26 +332,15 @@ function useModelManagement(
  * Memoizes grouped models by provider
  * Prevents unnecessary re-grouping on every render
  */
-function useGroupedModels(models: Model[]): Record<string, Model[]> {
-  return useMemo(() => {
-    return models.reduce<Record<string, Model[]>>((acc, model) => {
-      const provider = model.provider || "unknown";
-      if (!acc[provider]) {
-        acc[provider] = [];
-      }
-      acc[provider].push(model);
-      return acc;
-    }, {});
-  }, [models]);
+function useGroupedModels(models: ReadonlyArray<Model>) {
+  return useMemo(() => groupModelsByProvider(models), [models]);
 }
 
 /**
  * Handles keyboard shortcuts in textarea (Enter to submit, Shift+Enter for newline)
  * Returns stable callback reference to prevent re-renders
  */
-function useTextareaKeyboardShortcuts(
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>
-): (e: KeyboardEvent<HTMLTextAreaElement>) => void {
+function useTextareaKeyboardShortcuts(): (e: KeyboardEvent<HTMLTextAreaElement>) => void {
   return useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
       e.preventDefault();
@@ -368,14 +356,14 @@ function useTextareaKeyboardShortcuts(
  */
 function useAutoScroll(
   scrollAreaRef: React.RefObject<HTMLDivElement | null>,
-  messages: unknown[]
+  messages: ReadonlyArray<ReturnType<typeof useChat>["messages"][number]>
 ): void {
   useEffect(() => {
     const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
     if (scrollElement instanceof HTMLElement) {
       scrollElement.scrollTop = scrollElement.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, scrollAreaRef]);
 }
 
 /**
@@ -384,7 +372,7 @@ function useAutoScroll(
 function useAutoFocusTextarea(textareaRef: React.RefObject<HTMLTextAreaElement | null>): void {
   useEffect(() => {
     textareaRef.current?.focus();
-  }, []);
+  }, [textareaRef]);
 }
 
 // ============================================================================
@@ -434,11 +422,10 @@ interface ChatInputProps {
   onTextChange: (text: string) => void;
   onSubmit: (message: PromptInputMessage) => void;
   status: ReturnType<typeof useChat>["status"];
-  stop: ReturnType<typeof useChat>["stop"];
   selectedModelInfo: SelectedModelInfo;
   selectorOpen: boolean;
   onSelectorOpenChange: (open: boolean) => void;
-  models: Model[];
+  models: ReadonlyArray<Model>;
   onModelSelect: (modelId: string) => void;
   textareaRef: React.RefObject<HTMLTextAreaElement | null>;
 }
@@ -449,7 +436,6 @@ const ChatInput = memo<ChatInputProps>(
     onTextChange,
     onSubmit,
     status,
-    stop,
     selectedModelInfo,
     selectorOpen,
     onSelectorOpenChange,
@@ -457,7 +443,7 @@ const ChatInput = memo<ChatInputProps>(
     onModelSelect,
     textareaRef,
   }) => {
-    const handleKeyDown = useTextareaKeyboardShortcuts(textareaRef);
+    const handleKeyDown = useTextareaKeyboardShortcuts();
     const groupedModels = useGroupedModels(models);
 
     return (
@@ -512,7 +498,7 @@ const ChatInput = memo<ChatInputProps>(
               <ModelSelectorList>
                 <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
                 {Object.entries(groupedModels).map(([provider, providerModels]) => (
-                  <ModelSelectorGroup key={provider} heading={provider}>
+                  <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => (
                       <ModelSelectorItem
                         key={model.id}
@@ -521,9 +507,14 @@ const ChatInput = memo<ChatInputProps>(
                           onSelectorOpenChange(false);
                         }}>
                         <ModelSelectorLogoGroup>
-                          <ModelSelectorLogo provider={model.provider || DEFAULT_PROVIDER} />
+                          <ModelSelectorLogo provider={getModelProvider(model)} />
                         </ModelSelectorLogoGroup>
-                        <ModelSelectorName>{model.name}</ModelSelectorName>
+                        <div className="flex flex-1 items-baseline gap-2 overflow-hidden">
+                          <ModelSelectorName className="flex-none">{model.name}</ModelSelectorName>
+                          <span className="text-muted-foreground truncate text-xs">
+                            ({model.id})
+                          </span>
+                        </div>
                       </ModelSelectorItem>
                     ))}
                   </ModelSelectorGroup>
@@ -551,7 +542,7 @@ ChatInput.displayName = "ChatInput";
  * - Structured error logging
  */
 export function ChatClient() {
-  const { messages, sendMessage, status, error, stop, setMessages } = useChat({
+  const { messages, sendMessage, status, error, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       credentials: "include",
@@ -673,7 +664,6 @@ export function ChatClient() {
             onTextChange={setText}
             onSubmit={handlePromptSubmit}
             status={status}
-            stop={stop}
             selectedModelInfo={selectedModelInfo}
             selectorOpen={selectorOpen}
             onSelectorOpenChange={setSelectorOpen}
