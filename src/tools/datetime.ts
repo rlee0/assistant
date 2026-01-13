@@ -41,7 +41,7 @@ function isValidTimezone(tz: string): boolean {
   try {
     Intl.DateTimeFormat(undefined, { timeZone: tz });
     return true;
-  } catch (error) {
+  } catch {
     // Silently return false for invalid timezone
     return false;
   }

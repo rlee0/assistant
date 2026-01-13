@@ -1,12 +1,39 @@
 import { APIError, handleAPIError, ErrorCodes } from "@/lib/api/errors";
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { validateArray, validateObject, validateString } from "@/lib/api/validation";
 import { DEFAULT_MODEL } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { parseRequestBody } from "@/lib/api/middleware";
-import { convertToModelMessages, streamText, type UIMessage } from "ai";
+import { convertToModelMessages, streamText, type UIMessage, type Tool } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import { getDateTime } from "@/tools/datetime";
+import * as toolFactories from "@/tools";
+
+/**
+ * Determine if an entry from the tools module is a tool factory.
+ */
+type ToolFactory = () => Tool;
+
+/**
+ * Determine if an entry from the tools module is a tool factory.
+ */
+function isToolFactory(entry: [string, unknown]): entry is [string, ToolFactory] {
+  const [name, value] = entry;
+  return name !== "defaultToolSettings" && typeof value === "function";
+}
+
+/**
+ * Build a map of available tools by invoking all exported tool factories.
+ * Tools are instantiated once at module load to avoid per-request overhead.
+ */
+function buildTools(): Record<string, Tool> {
+  return Object.fromEntries(
+    Object.entries(toolFactories)
+      .filter(isToolFactory)
+      .map(([name, factory]) => [name, factory()])
+  );
+}
+
+const tools = buildTools();
 
 /**
  * Type-safe request validation
@@ -178,9 +205,7 @@ export async function POST(req: Request): Promise<Response> {
       model,
       messages: [{ role: "system", content: systemMessage }, ...modelMessages],
       temperature: 0.7,
-      tools: {
-        getDateTime: getDateTime(),
-      },
+      tools,
       // Allow multiple steps: tool call -> tool result -> final text response
       // Without this, it stops after the first step (tool call only)
       stopWhen: [],

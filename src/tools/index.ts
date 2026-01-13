@@ -6,15 +6,11 @@
  * 2. Export a tool factory function: `export const myTool = (options) => tool({...})`
  * 3. Add `export * from "./my-tool";` to the list below
  *
- * Tools are then available throughout the application via:
- * ```
- * import { getLocation, getDateTime, myTool } from "@/tools";
- * ```
  */
 
 // Re-export all tool factory functions
 export * from "./datetime";
-export * from "./location";
+export * from "./weather";
 
 /**
  * Get default settings for all tools
