@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { type UIMessage } from "ai";
 import { type InitialChatData } from "@/lib/supabase/loaders";
 import { type ChatCheckpoint, type ChatMessage, type ChatSession } from "@/types/chat";
+import { MAX_CHECKPOINTS } from "@/lib/chat-constants";
+import { nanoid } from "nanoid";
 
 export type ConversationStatus = "idle" | "loading" | "streaming" | "error";
 
@@ -30,6 +32,9 @@ type ChatState = {
   updateMessages: (id: string, messages: UIMessage[]) => void;
   updateTitle: (id: string, title: string) => void;
   setStatus: (id: string, status: ConversationStatus) => void;
+  addCheckpoint: (id: string, messageIndex: number) => void;
+  restoreCheckpoint: (id: string, checkpointId: string) => void;
+  removeCheckpoint: (id: string, checkpointId: string) => void;
   remove: (id: string) => void;
   reset: () => void;
 };
@@ -306,6 +311,88 @@ export const useChatStore = create<ChatState>((set) => ({
     }),
 
   setStatus: (id, status) => set((state) => ({ status: { ...state.status, [id]: status } })),
+
+  addCheckpoint: (id, messageIndex) =>
+    set((state) => {
+      const conversation = state.conversations[id];
+      if (!conversation) return state;
+
+      // Create new checkpoint
+      const checkpoint: ChatCheckpoint = {
+        id: nanoid(),
+        messageIndex,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Add checkpoint and remove oldest if exceeding limit
+      let checkpoints = [...conversation.checkpoints, checkpoint];
+      if (checkpoints.length > MAX_CHECKPOINTS) {
+        // Sort by timestamp (oldest first) and remove the first one
+        checkpoints = checkpoints
+          .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+          .slice(1);
+      }
+
+      const updatedConversation: Conversation = {
+        ...conversation,
+        checkpoints,
+      };
+
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
+      return {
+        conversations,
+      };
+    }),
+
+  restoreCheckpoint: (id, checkpointId) =>
+    set((state) => {
+      const conversation = state.conversations[id];
+      if (!conversation) return state;
+
+      // Find checkpoint
+      const checkpoint = conversation.checkpoints.find((cp) => cp.id === checkpointId);
+      if (!checkpoint) return state;
+
+      // Slice messages to checkpoint index (inclusive)
+      const restoredMessages = conversation.messages.slice(0, checkpoint.messageIndex + 1);
+
+      // Remove checkpoints after the restored one
+      const restoredCheckpoints = conversation.checkpoints.filter(
+        (cp) => new Date(cp.timestamp).getTime() <= new Date(checkpoint.timestamp).getTime()
+      );
+
+      const updatedConversation: Conversation = {
+        ...conversation,
+        messages: restoredMessages,
+        checkpoints: restoredCheckpoints,
+      };
+
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
+      return {
+        conversations,
+      };
+    }),
+
+  removeCheckpoint: (id, checkpointId) =>
+    set((state) => {
+      const conversation = state.conversations[id];
+      if (!conversation) return state;
+
+      const checkpoints = conversation.checkpoints.filter((cp) => cp.id !== checkpointId);
+
+      const updatedConversation: Conversation = {
+        ...conversation,
+        checkpoints,
+      };
+
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
+      return {
+        conversations,
+      };
+    }),
 
   remove: (id) =>
     set((state) => {

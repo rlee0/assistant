@@ -16,9 +16,14 @@ export type ChatMessage = ModelMessage & {
 };
 
 /**
- * A snapshot of messages at a point in time (checkpoint)
+ * A checkpoint that marks a point in conversation history
+ * Allows restoring to previous conversation states
  */
-export type ChatCheckpoint = ChatMessage[];
+export type ChatCheckpoint = {
+  id: string;
+  messageIndex: number;
+  timestamp: string;
+};
 
 /**
  * A persisted chat session

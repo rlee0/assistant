@@ -3,7 +3,7 @@ import { v5 as uuidv5 } from "uuid";
 import { logError } from "@/lib/logging";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { type ChatMessage } from "@/types/chat";
+import { type ChatMessage, type ChatCheckpoint } from "@/types/chat";
 import {
   validateString,
   validateBoolean,
@@ -20,6 +20,7 @@ interface UpdateChatRequest {
   title?: string;
   pinned?: boolean;
   messages?: ChatMessage[];
+  checkpoints?: ChatCheckpoint[];
 }
 
 const MESSAGE_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
@@ -33,7 +34,7 @@ function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
     throw new APIError("Request body must be a JSON object", 400);
   }
 
-  const { id, title, pinned, messages } = body as Record<string, unknown>;
+  const { id, title, pinned, messages, checkpoints } = body as Record<string, unknown>;
 
   if (!validateUUID(id)) {
     throw new APIError("Chat ID is required and must be a valid UUID", 400);
@@ -62,8 +63,20 @@ function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
     request.messages = messages as ChatMessage[];
   }
 
+  if (checkpoints !== undefined) {
+    if (!validateArray(checkpoints)) {
+      throw new APIError("Checkpoints must be an array", 400);
+    }
+    request.checkpoints = checkpoints as ChatCheckpoint[];
+  }
+
   // Check that at least one field is provided (besides id)
-  if (title === undefined && pinned === undefined && messages === undefined) {
+  if (
+    title === undefined &&
+    pinned === undefined &&
+    messages === undefined &&
+    checkpoints === undefined
+  ) {
     throw new APIError("At least one field to update is required", 400);
   }
 
@@ -86,7 +99,9 @@ export async function PATCH(request: NextRequest) {
       throw bodyResult.error;
     }
 
-    const { id, title, pinned, messages } = validateUpdateChatRequest(bodyResult.value);
+    const { id, title, pinned, messages, checkpoints } = validateUpdateChatRequest(
+      bodyResult.value
+    );
 
     // Verify chat belongs to user
     const { data: existingChat, error: fetchError } = await supabase
@@ -134,6 +149,25 @@ export async function PATCH(request: NextRequest) {
 
       if (messagesError) {
         logError("[Chat Update]", "Failed to update messages", messagesError, { chatId: id });
+      }
+    }
+
+    // Persist checkpoints if provided
+    if (checkpoints !== undefined && checkpoints.length > 0) {
+      const checkpointPayload = checkpoints.map((cp) => ({
+        id: cp.id,
+        chat_id: id,
+        message_index: cp.messageIndex,
+        timestamp: cp.timestamp,
+        created_at: cp.timestamp,
+      }));
+
+      const { error: checkpointsError } = await supabase
+        .from("checkpoints")
+        .upsert(checkpointPayload, { onConflict: "id" });
+
+      if (checkpointsError) {
+        logError("[Chat Update]", "Failed to update checkpoints", checkpointsError, { chatId: id });
       }
     }
 

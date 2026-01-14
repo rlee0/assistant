@@ -13,6 +13,7 @@ import {
   ConversationScrollButton,
 } from "@/components/ai-elements/conversation";
 import { AppSidebar } from "@/components/app-sidebar";
+import { Checkpoint, CheckpointIcon, CheckpointTrigger } from "@/components/ai-elements/checkpoint";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -100,7 +101,7 @@ import { useSettingsSync } from "@/hooks/use-settings-sync";
 import { logError, logWarn, logDebug } from "@/lib/logging";
 import { cn } from "@/lib/utils";
 import { type InitialChatData } from "@/lib/supabase/loaders";
-import { type ChatMessage, type ChatSession } from "@/types/chat";
+import { type ChatMessage, type ChatSession, type ChatCheckpoint } from "@/types/chat";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
@@ -471,12 +472,14 @@ interface ChatMessagesProps {
   readonly editText: string;
   readonly hydrated: boolean;
   readonly scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
+  readonly checkpoints: ChatCheckpoint[];
   readonly onEditMessage: (messageId: string, initialText: string) => void;
   readonly onCancelEdit: () => void;
   readonly onSaveEdit: (messageId: string, newText: string) => void;
   readonly onDeleteMessage: (messageId: string) => void;
   readonly onEditTextChange: (text: string) => void;
   readonly onRegenerateFromMessage: (messageId: string) => void;
+  readonly onRestoreCheckpoint: (checkpointId: string) => void;
 }
 
 const ChatMessages = memo<ChatMessagesProps>(
@@ -489,12 +492,14 @@ const ChatMessages = memo<ChatMessagesProps>(
     editText,
     hydrated,
     scrollToBottomRef,
+    checkpoints,
     onEditMessage,
     onCancelEdit,
     onSaveEdit,
     onDeleteMessage,
     onEditTextChange,
     onRegenerateFromMessage,
+    onRestoreCheckpoint,
   }) => {
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -526,6 +531,11 @@ const ChatMessages = memo<ChatMessagesProps>(
               ) : (
                 <>
                   {messages.map((message, messageIndex) => {
+                    // Check if there's a checkpoint at this message index
+                    const checkpointAtIndex = checkpoints.find(
+                      (cp) => cp.messageIndex === messageIndex
+                    );
+
                     const isEditing = message.id === editingMessageId;
                     const isAfterEditedMessage =
                       editingMessageId &&
@@ -543,177 +553,196 @@ const ChatMessages = memo<ChatMessagesProps>(
                     const hasTextToCopy = textParts.trim().length > 0;
 
                     return (
-                      <Message
-                        key={message.id}
-                        from={message.role}
-                        className={isAfterEditedMessage ? "opacity-50 transition-opacity" : ""}>
-                        <MessageContent>
-                          {isEditing && message.role === "user" ? (
-                            <PromptInput
-                              onSubmit={() => {
-                                if (editText.trim()) {
-                                  onSaveEdit(message.id, editText);
-                                }
-                              }}
-                              className={cn("w-full", EDIT_INPUT_MIN_WIDTH)}>
-                              <PromptInputBody>
-                                <PromptInputTextarea
-                                  ref={editTextareaRef}
-                                  value={editText}
-                                  onChange={(e) => onEditTextChange(e.target.value)}
-                                  placeholder={EDIT_PLACEHOLDER}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                                      e.preventDefault();
-                                      if (editText.trim()) {
-                                        onSaveEdit(message.id, editText);
+                      <div key={messageIndex} className="flex flex-col gap-0">
+                        {/* Checkpoint line appears on hover */}
+                        {checkpointAtIndex && (
+                          <Checkpoint
+                            messageIndex={messageIndex}
+                            totalMessages={messages.length}
+                            onRestore={() => onRestoreCheckpoint(checkpointAtIndex.id)}>
+                            <CheckpointIcon />
+                            <CheckpointTrigger
+                              messageIndex={messageIndex}
+                              totalMessages={messages.length}
+                              onRestore={() => onRestoreCheckpoint(checkpointAtIndex.id)}>
+                              Restore Checkpoint
+                            </CheckpointTrigger>
+                          </Checkpoint>
+                        )}
+
+                        <Message
+                          from={message.role}
+                          className={isAfterEditedMessage ? "opacity-50 transition-opacity" : ""}>
+                          <MessageContent>
+                            {isEditing && message.role === "user" ? (
+                              <PromptInput
+                                onSubmit={() => {
+                                  if (editText.trim()) {
+                                    onSaveEdit(message.id, editText);
+                                  }
+                                }}
+                                className={cn("w-full", EDIT_INPUT_MIN_WIDTH)}>
+                                <PromptInputBody>
+                                  <PromptInputTextarea
+                                    ref={editTextareaRef}
+                                    value={editText}
+                                    onChange={(e) => onEditTextChange(e.target.value)}
+                                    placeholder={EDIT_PLACEHOLDER}
+                                    onKeyDown={(e) => {
+                                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                        e.preventDefault();
+                                        if (editText.trim()) {
+                                          onSaveEdit(message.id, editText);
+                                        }
                                       }
-                                    }
-                                    if (e.key === "Escape") {
-                                      e.preventDefault();
-                                      onCancelEdit();
-                                    }
-                                  }}
-                                />
-                              </PromptInputBody>
-                              <PromptInputFooter>
-                                <PromptInputTools>
-                                  <PromptInputButton
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={onCancelEdit}>
-                                    <X className="size-4" />
-                                  </PromptInputButton>
-                                </PromptInputTools>
-                                <PromptInputSubmit disabled={!editText.trim()} status="ready" />
-                              </PromptInputFooter>
-                            </PromptInput>
-                          ) : (
-                            <>
-                              {parts.map((part, index) => (
-                                <MessagePartRenderer key={index} part={part} index={index} />
-                              ))}
-                              <SourcesRenderer parts={parts} />
-                            </>
+                                      if (e.key === "Escape") {
+                                        e.preventDefault();
+                                        onCancelEdit();
+                                      }
+                                    }}
+                                  />
+                                </PromptInputBody>
+                                <PromptInputFooter>
+                                  <PromptInputTools>
+                                    <PromptInputButton
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={onCancelEdit}>
+                                      <X className="size-4" />
+                                    </PromptInputButton>
+                                  </PromptInputTools>
+                                  <PromptInputSubmit disabled={!editText.trim()} status="ready" />
+                                </PromptInputFooter>
+                              </PromptInput>
+                            ) : (
+                              <>
+                                {parts.map((part, index) => (
+                                  <MessagePartRenderer key={index} part={part} index={index} />
+                                ))}
+                                <SourcesRenderer parts={parts} />
+                              </>
+                            )}
+                          </MessageContent>
+
+                          {!isEditing && message.role === "assistant" && (
+                            <MessageActions>
+                              <MessageAction
+                                onClick={async () => {
+                                  if (!hasTextToCopy) {
+                                    toast.error(TOAST_MESSAGES.COPY_ERROR);
+                                    return;
+                                  }
+
+                                  // Check clipboard API availability
+                                  if (!navigator.clipboard) {
+                                    logError(
+                                      "[Chat]",
+                                      "Clipboard API not available",
+                                      new Error("navigator.clipboard is undefined")
+                                    );
+                                    toast.error(TOAST_MESSAGES.COPY_ERROR);
+                                    return;
+                                  }
+
+                                  try {
+                                    await navigator.clipboard.writeText(textParts);
+                                    toast.success(TOAST_MESSAGES.COPY_SUCCESS);
+                                  } catch (error) {
+                                    logError("[Chat]", "Clipboard write failed", error, {
+                                      textLength: textParts.length,
+                                    });
+                                    toast.error(TOAST_MESSAGES.COPY_ERROR);
+                                  }
+                                }}
+                                label="Copy"
+                                tooltip="Copy response"
+                                disabled={!hasTextToCopy || status === "streaming"}>
+                                <Copy className="size-3" />
+                              </MessageAction>
+
+                              {/* Regenerate with confirmation */}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <MessageAction
+                                    label="Regenerate"
+                                    tooltip="Regenerate from here"
+                                    disabled={!(status === "ready" || status === "error")}>
+                                    <RefreshCcw className="size-3" />
+                                  </MessageAction>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>
+                                      Regenerate from this message?
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will delete all messages after this assistant message,
+                                      then regenerate the response for this message. This action
+                                      cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => {
+                                        // Slice conversation after the selected assistant message
+                                        onRegenerateFromMessage(message.id);
+                                      }}>
+                                      Regenerate
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </MessageActions>
                           )}
-                        </MessageContent>
 
-                        {!isEditing && message.role === "assistant" && (
-                          <MessageActions>
-                            <MessageAction
-                              onClick={async () => {
-                                if (!hasTextToCopy) {
-                                  toast.error(TOAST_MESSAGES.COPY_ERROR);
-                                  return;
-                                }
+                          {!isEditing && message.role === "user" && (
+                            <MessageActions className="ml-auto">
+                              <MessageAction
+                                onClick={() => {
+                                  onEditMessage(message.id, textParts);
+                                }}
+                                label="Edit"
+                                tooltip="Edit message"
+                                disabled={!(status === "ready" || status === "error")}>
+                                <Edit2 className="size-3" />
+                              </MessageAction>
 
-                                // Check clipboard API availability
-                                if (!navigator.clipboard) {
-                                  logError(
-                                    "[Chat]",
-                                    "Clipboard API not available",
-                                    new Error("navigator.clipboard is undefined")
-                                  );
-                                  toast.error(TOAST_MESSAGES.COPY_ERROR);
-                                  return;
-                                }
-
-                                try {
-                                  await navigator.clipboard.writeText(textParts);
-                                  toast.success(TOAST_MESSAGES.COPY_SUCCESS);
-                                } catch (error) {
-                                  logError("[Chat]", "Clipboard write failed", error, {
-                                    textLength: textParts.length,
-                                  });
-                                  toast.error(TOAST_MESSAGES.COPY_ERROR);
-                                }
-                              }}
-                              label="Copy"
-                              tooltip="Copy response"
-                              disabled={!hasTextToCopy || status === "streaming"}>
-                              <Copy className="size-3" />
-                            </MessageAction>
-
-                            {/* Regenerate with confirmation */}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <MessageAction
-                                  label="Regenerate"
-                                  tooltip="Regenerate from here"
-                                  disabled={!(status === "ready" || status === "error")}>
-                                  <RefreshCcw className="size-3" />
-                                </MessageAction>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Regenerate from this message?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will delete all messages after this assistant message, then
-                                    regenerate the response for this message. This action cannot be
-                                    undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => {
-                                      // Slice conversation after the selected assistant message
-                                      onRegenerateFromMessage(message.id);
-                                    }}>
-                                    Regenerate
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </MessageActions>
-                        )}
-
-                        {!isEditing && message.role === "user" && (
-                          <MessageActions className="ml-auto">
-                            <MessageAction
-                              onClick={() => {
-                                onEditMessage(message.id, textParts);
-                              }}
-                              label="Edit"
-                              tooltip="Edit message"
-                              disabled={!(status === "ready" || status === "error")}>
-                              <Edit2 className="size-3" />
-                            </MessageAction>
-
-                            {/* Delete with confirmation */}
-                            <AlertDialog>
-                              <AlertDialogTrigger asChild>
-                                <MessageAction
-                                  label="Delete"
-                                  tooltip="Delete message"
-                                  disabled={!(status === "ready" || status === "error")}>
-                                  <Trash2 className="size-3" />
-                                </MessageAction>
-                              </AlertDialogTrigger>
-                              <AlertDialogContent>
-                                <AlertDialogHeader>
-                                  <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-                                  <AlertDialogDescription>
-                                    This will delete this user message and all subsequent messages.
-                                    This action cannot be undone.
-                                  </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction
-                                    onClick={() => {
-                                      onDeleteMessage(message.id);
-                                      toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
-                                    }}>
-                                    Delete
-                                  </AlertDialogAction>
-                                </AlertDialogFooter>
-                              </AlertDialogContent>
-                            </AlertDialog>
-                          </MessageActions>
-                        )}
-                      </Message>
+                              {/* Delete with confirmation */}
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <MessageAction
+                                    label="Delete"
+                                    tooltip="Delete message"
+                                    disabled={!(status === "ready" || status === "error")}>
+                                    <Trash2 className="size-3" />
+                                  </MessageAction>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      This will delete this user message and all subsequent
+                                      messages. This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => {
+                                        onDeleteMessage(message.id);
+                                        toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+                                      }}>
+                                      Delete
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            </MessageActions>
+                          )}
+                        </Message>
+                      </div>
                     );
                   })}
 
@@ -973,6 +1002,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     updateMessages: updateConversationMessages,
     updateTitle: updateConversationTitle,
     setStatus: setConversationStatus,
+    addCheckpoint: storeAddCheckpoint,
+    restoreCheckpoint: storeRestoreCheckpoint,
     remove: removeConversation,
   } = useChatStore();
 
@@ -1136,6 +1167,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             id: conversationId,
             title: conversation.title,
             messages: messages.map(uiMessageToChatMessage),
+            checkpoints: conversation.checkpoints,
           }),
           signal: abortControllerRef.current.signal,
         });
@@ -1181,6 +1213,61 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     }
     statusChangeRef.current = status;
   }, [persistConversation, selectedId, status]);
+
+  // Create checkpoint after every message is added
+  useEffect(() => {
+    if (!selectedId || messages.length === 0) return;
+
+    const conversation = conversations[selectedId];
+    if (!conversation) return;
+
+    // Create checkpoint at the last message index
+    const lastMessageIndex = messages.length - 1;
+
+    // Only create checkpoint if one doesn't already exist at this index
+    const checkpointExists = conversation.checkpoints.some(
+      (cp) => cp.messageIndex === lastMessageIndex
+    );
+
+    if (!checkpointExists) {
+      storeAddCheckpoint(selectedId, lastMessageIndex);
+    }
+  }, [messages.length, selectedId, storeAddCheckpoint]);
+
+  const handleRestoreCheckpoint = useCallback(
+    (checkpointId: string): void => {
+      if (!selectedId) return;
+
+      const conversation = conversations[selectedId];
+      if (!conversation) return;
+
+      // Find the checkpoint to restore to
+      const checkpoint = conversation.checkpoints.find((cp) => cp.id === checkpointId);
+      if (!checkpoint) {
+        logWarn("[Chat]", "Checkpoint not found", { checkpointId });
+        return;
+      }
+
+      try {
+        // Restore to checkpoint in store
+        storeRestoreCheckpoint(selectedId, checkpointId);
+
+        // Restore messages to checkpoint index (inclusive)
+        const restoredMessages = messages.slice(0, checkpoint.messageIndex + 1);
+        setMessages(restoredMessages);
+
+        // Clear edit state
+        setEditingMessageId(null);
+        setEditText("");
+
+        toast.success("Conversation restored to checkpoint");
+      } catch (error) {
+        logError("[Chat]", "Restore checkpoint failed", error, { checkpointId });
+        toast.error("Failed to restore checkpoint");
+      }
+    },
+    [selectedId, conversations, messages, storeRestoreCheckpoint, setMessages]
+  );
 
   const handleSelectConversation = useCallback(
     (conversationId: string) => {
@@ -1538,12 +1625,14 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             editText={editText}
             hydrated={hydrated}
             scrollToBottomRef={scrollToBottomRef}
+            checkpoints={currentConversation?.checkpoints ?? []}
             onEditMessage={handleEditMessage}
             onCancelEdit={handleCancelEdit}
             onSaveEdit={handleSaveEdit}
             onDeleteMessage={handleDeleteMessage}
             onEditTextChange={setEditText}
             onRegenerateFromMessage={handleRegenerateFromMessage}
+            onRestoreCheckpoint={handleRestoreCheckpoint}
           />
 
           {/* Input */}
