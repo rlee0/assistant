@@ -102,16 +102,11 @@ import { logError, logWarn, logDebug } from "@/lib/logging";
 import { cn } from "@/lib/utils";
 import { type InitialChatData } from "@/lib/supabase/loaders";
 import { type ChatMessage, type ChatSession } from "@/types/chat";
-import {
-  ChatMessagesSkeleton,
-  ChatInputSkeleton,
-  ModelSelectorSkeleton,
-} from "@/components/skeletons/chat-skeleton";
+import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
+import { useStickToBottomContext } from "use-stick-to-bottom";
 import {
   CHAT_CONTAINER_MAX_WIDTH,
   DEFAULT_PROVIDER,
-  SCROLL_AREA_VIEWPORT_SELECTOR,
-  SCROLL_ANCHOR_THRESHOLD,
   CSS_CLASSES,
   MESSAGE_PART_TYPE,
   ATTACHMENT_ONLY_MESSAGE_TEXT,
@@ -522,9 +517,7 @@ const ChatMessages = memo<ChatMessagesProps>(
         <Conversation>
           <ConversationContent className="px-4">
             <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
-              {!hydrated ? (
-                <ChatMessagesSkeleton />
-              ) : messages.length === 0 ? (
+              {!hydrated ? null : messages.length === 0 ? (
                 <Empty>
                   <EmptyHeader>
                     <EmptyTitle>Start a Conversation</EmptyTitle>
@@ -759,7 +752,7 @@ ChatMessages.displayName = "ChatMessages";
 const ScrollToBottomCapture = memo<{
   scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
 }>(({ scrollToBottomRef }) => {
-  const { scrollToBottom } = require("use-stick-to-bottom").useStickToBottomContext();
+  const { scrollToBottom } = useStickToBottomContext();
 
   useEffect(() => {
     scrollToBottomRef.current = scrollToBottom;
@@ -1546,9 +1539,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           />
 
           {/* Input */}
-          {!hydrated ? (
-            <ChatInputSkeleton />
-          ) : (
+          {!hydrated ? null : (
             <ChatInput
               text={text}
               onTextChange={setText}
