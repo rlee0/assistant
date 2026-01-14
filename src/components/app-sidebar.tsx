@@ -116,11 +116,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <div className="flex gap-2 p-2">
-          <Button
-            onClick={handleNewChat}
-            className="w-full justify-start"
-            variant="outline"
-            disabled={creatingChat}>
+          <Button onClick={handleNewChat} className="w-full justify-start" disabled={creatingChat}>
             {creatingChat ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
@@ -130,7 +126,6 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
           </Button>
         </div>
       </SidebarHeader>
-      <SidebarSeparator />
       <SidebarContent>
         {!hydrated ? (
           <SidebarConversationsSkeleton />
