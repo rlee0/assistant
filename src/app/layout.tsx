@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { ErrorBoundary } from "@/components/error-boundary";
 import type { Metadata } from "next";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -31,6 +32,7 @@ export default function RootLayout({
         <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
           {children}
         </ErrorBoundary>
+        <Toaster position="bottom-right" richColors closeButton />
       </body>
     </html>
   );

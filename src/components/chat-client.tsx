@@ -4,6 +4,7 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
@@ -64,49 +65,30 @@ import {
   groupModelsByProvider,
   type Model,
 } from "@/lib/models";
-import { PlusIcon, Check, AlertCircle, Copy, RefreshCcw } from "lucide-react";
+import {
+  PlusIcon,
+  Check,
+  AlertCircle,
+  Copy,
+  RefreshCcw,
+  Edit2,
+  Trash2,
+  X,
+  Send,
+} from "lucide-react";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-/** Maximum width for chat container */
-const CHAT_CONTAINER_MAX_WIDTH = "max-w-3xl" as const;
-
-/** Default provider logo when provider is unknown */
-const DEFAULT_PROVIDER = "openai" as const;
-
-/** Radix UI scroll area viewport selector */
-const SCROLL_AREA_VIEWPORT_SELECTOR = "[data-radix-scroll-area-viewport]" as const;
-
-/** Message part type constants */
-const MESSAGE_PART_TYPE = {
-  TEXT: "text",
-  REASONING: "reasoning",
-  SOURCE_URL: "source-url",
-  FILE: "file",
-} as const;
-
-/** Fallback text when message has only attachments */
-const ATTACHMENT_ONLY_MESSAGE_TEXT = "Sent with attachments" as const;
-
-/** CSS classes */
-const CSS_CLASSES = {
-  image: "max-w-sm rounded-md h-auto",
-  messagesContainer: "flex-1 min-h-0",
-  messagesInner: "mx-auto py-8 space-y-6",
-  inputContainer: "sticky bottom-0 z-20 border-t bg-background p-4",
-  modelButton: "flex items-center gap-2",
-  modelName: "text-xs",
-  modelId: "text-muted-foreground truncate text-xs",
-  chatContainer: "flex h-svh max-h-svh flex-col",
-  header: "sticky top-0 z-20 border-b bg-background px-4 py-3 flex items-center gap-2",
-  headerTitle: "text-lg font-semibold",
-  sidebar: "flex h-full flex-col p-4",
-  newChatButton: "mb-4",
-} as const;
+import { logError, logWarn, logDebug } from "@/lib/logging";
+import {
+  CHAT_CONTAINER_MAX_WIDTH,
+  DEFAULT_PROVIDER,
+  SCROLL_AREA_VIEWPORT_SELECTOR,
+  SCROLL_ANCHOR_THRESHOLD,
+  CSS_CLASSES,
+  MESSAGE_PART_TYPE,
+  ATTACHMENT_ONLY_MESSAGE_TEXT,
+  TOAST_MESSAGES,
+} from "@/lib/chat-constants";
 
 // ============================================================================
 // Types
@@ -280,12 +262,7 @@ function useModelManagement(
       } catch (err) {
         if (controller.signal.aborted) return;
 
-        const message = err instanceof Error ? err.message : "Failed to fetch available models";
-        console.error("[Chat] Model loading error:", {
-          message,
-          error: err,
-          timestamp: new Date().toISOString(),
-        });
+        logError("[Chat]", "Model loading error", err);
       }
     };
 
@@ -308,16 +285,39 @@ function useModelManagement(
 }
 
 /**
- * Memoizes grouped models by provider
- * Prevents unnecessary re-grouping on every render
+ * Memoizes grouped models by provider.
+ * Prevents unnecessary re-grouping on every render.
+ *
+ * @param models - Array of available AI models
+ * @returns Models grouped by provider name
+ *
+ * @example
+ * ```ts
+ * const groupedModels = useGroupedModels(models);
+ * // { openai: [...], anthropic: [...] }
+ * ```
  */
-function useGroupedModels(models: ReadonlyArray<Model>) {
+function useGroupedModels(models: ReadonlyArray<Model>): ReturnType<typeof groupModelsByProvider> {
   return useMemo(() => groupModelsByProvider(models), [models]);
 }
 
 /**
- * Handles keyboard shortcuts in textarea (Enter to submit, Shift+Enter for newline)
- * Returns stable callback reference to prevent re-renders
+ * Handles keyboard shortcuts in textarea.
+ *
+ * @returns Stable callback reference for textarea keydown events
+ *
+ * @remarks
+ * - Enter (without modifiers): Submit form
+ * - Shift+Enter, Ctrl+Enter, Cmd+Enter: Insert newline
+ *
+ * The callback reference is stable across re-renders to prevent
+ * unnecessary re-renders of the textarea component.
+ *
+ * @example
+ * ```tsx
+ * const handleKeyDown = useTextareaKeyboardShortcuts();
+ * <textarea onKeyDown={handleKeyDown} />
+ * ```
  */
 function useTextareaKeyboardShortcuts(): (e: KeyboardEvent<HTMLTextAreaElement>) => void {
   return useCallback((e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -330,23 +330,68 @@ function useTextareaKeyboardShortcuts(): (e: KeyboardEvent<HTMLTextAreaElement>)
 }
 
 /**
- * Auto-scrolls to bottom when messages change
- * Uses observer pattern to detect scroll area changes
+ * Auto-scrolls to bottom when messages change, with scroll anchor preservation.
+ *
+ * @param scrollAreaRef - Ref to the scroll container element
+ * @param messages - Current message array from useChat
+ *
+ * @remarks
+ * - Only scrolls if user is already near the bottom (within SCROLL_ANCHOR_THRESHOLD)
+ * - Uses `scrollTo` with smooth behavior for better UX
+ * - Preserves scroll position when user has manually scrolled up
+ *
+ * @returns Cleanup function for scroll event listener
  */
 function useAutoScroll(
   scrollAreaRef: React.RefObject<HTMLDivElement | null>,
   messages: ReadonlyArray<ReturnType<typeof useChat>["messages"][number]>
 ): void {
+  const isAtBottomRef = useRef(true); // Start assuming user is at bottom
+
   useEffect(() => {
     const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
-    if (scrollElement instanceof HTMLElement) {
-      scrollElement.scrollTop = scrollElement.scrollHeight;
+    if (!(scrollElement instanceof HTMLElement)) return;
+
+    // Check if user is near bottom
+    const checkScrollPosition = () => {
+      const { scrollTop, scrollHeight, clientHeight } = scrollElement;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      isAtBottomRef.current = distanceFromBottom <= SCROLL_ANCHOR_THRESHOLD;
+    };
+
+    // Initial check
+    checkScrollPosition();
+
+    // Listen to scroll events
+    scrollElement.addEventListener("scroll", checkScrollPosition, { passive: true });
+
+    return () => {
+      scrollElement.removeEventListener("scroll", checkScrollPosition);
+    };
+  }, [scrollAreaRef]);
+
+  useEffect(() => {
+    const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
+    if (!(scrollElement instanceof HTMLElement)) return;
+
+    // Only auto-scroll if user is at bottom
+    if (isAtBottomRef.current) {
+      scrollElement.scrollTo({
+        top: scrollElement.scrollHeight,
+        behavior: "smooth",
+      });
     }
   }, [messages, scrollAreaRef]);
 }
 
 /**
- * Auto-focus textarea on mount
+ * Auto-focuses textarea on component mount.
+ *
+ * @param textareaRef - Ref to the textarea element
+ *
+ * @remarks
+ * Improves UX by allowing users to start typing immediately
+ * without clicking into the input field.
  */
 function useAutoFocusTextarea(textareaRef: React.RefObject<HTMLTextAreaElement | null>): void {
   useEffect(() => {
@@ -364,92 +409,208 @@ interface ChatMessagesProps {
   error: ReturnType<typeof useChat>["error"];
   regenerate: ReturnType<typeof useChat>["regenerate"];
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
+  editingMessageId: string | null;
+  onEditMessage: (messageId: string) => void;
+  onCancelEdit: () => void;
+  onSaveEdit: (messageId: string, newText: string) => void;
+  onDeleteMessage: (messageId: string) => void;
 }
 
 const ChatMessages = memo<ChatMessagesProps>(
-  ({ messages, status, error, regenerate, scrollAreaRef }) => (
-    <div className={CSS_CLASSES.messagesContainer}>
-      <ScrollArea ref={scrollAreaRef} className="h-full px-4">
-        <div className={`${CSS_CLASSES.messagesInner} ${CHAT_CONTAINER_MAX_WIDTH}`}>
-          {messages.length === 0 && (
-            <Empty>
-              <EmptyHeader>
-                <EmptyTitle>Start a Conversation</EmptyTitle>
-                <EmptyDescription>Type a message below to begin chatting.</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
-          )}
+  ({
+    messages,
+    status,
+    error,
+    regenerate,
+    scrollAreaRef,
+    editingMessageId,
+    onEditMessage,
+    onCancelEdit,
+    onSaveEdit,
+    onDeleteMessage,
+  }) => {
+    const [editText, setEditText] = useState("");
+    const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-          {messages.map((message) => {
-            // Extract text content for copy functionality
-            const textParts = message.parts
-              .filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
-              .map((part) => part.text)
-              .join("\n");
+    // Focus textarea when entering edit mode
+    useEffect(() => {
+      if (editingMessageId) {
+        editTextareaRef.current?.focus();
+      }
+    }, [editingMessageId]);
 
-            const isLastMessage = message === messages[messages.length - 1];
+    return (
+      <div className={CSS_CLASSES.messagesContainer}>
+        <ScrollArea ref={scrollAreaRef} className="h-full px-4">
+          <div className={`${CSS_CLASSES.messagesInner} ${CHAT_CONTAINER_MAX_WIDTH}`}>
+            {messages.length === 0 && (
+              <Empty>
+                <EmptyHeader>
+                  <EmptyTitle>Start a Conversation</EmptyTitle>
+                  <EmptyDescription>Type a message below to begin chatting.</EmptyDescription>
+                </EmptyHeader>
+              </Empty>
+            )}
 
-            return (
-              <Message key={message.id} from={message.role}>
+            {messages.map((message, messageIndex) => {
+              const isEditing = message.id === editingMessageId;
+              const isAfterEditedMessage =
+                editingMessageId &&
+                messageIndex > messages.findIndex((m) => m.id === editingMessageId);
+              const isLastMessage = messageIndex === messages.length - 1;
+
+              // Extract text content for copy and edit functionality
+              const textParts = message.parts
+                .filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
+                .map((part) => part.text)
+                .join("\n");
+
+              const hasTextToCopy = textParts.trim().length > 0;
+
+              return (
+                <Message
+                  key={message.id}
+                  from={message.role}
+                  className={isAfterEditedMessage ? "opacity-50 transition-opacity" : ""}>
+                  <MessageContent>
+                    {isEditing && message.role === "user" ? (
+                      <div className="flex flex-col gap-2">
+                        <textarea
+                          ref={editTextareaRef}
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          className="min-h-25 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                              onSaveEdit(message.id, editText);
+                            }
+                            if (e.key === "Escape") {
+                              onCancelEdit();
+                            }
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            onClick={() => onSaveEdit(message.id, editText)}
+                            disabled={!editText.trim()}>
+                            <Send className="mr-2 size-3" />
+                            Save & Submit
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={onCancelEdit}>
+                            <X className="mr-2 size-3" />
+                            Cancel
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        {message.parts.map((part, index) => (
+                          <MessagePartRenderer key={index} part={part} index={index} />
+                        ))}
+                        <SourcesRenderer parts={message.parts} />
+                      </>
+                    )}
+                  </MessageContent>
+
+                  {!isEditing && message.role === "assistant" && isLastMessage && (
+                    <MessageActions>
+                      <MessageAction
+                        onClick={async () => {
+                          if (!hasTextToCopy) {
+                            toast.error(TOAST_MESSAGES.COPY_ERROR);
+                            return;
+                          }
+
+                          // Check clipboard API availability
+                          if (!navigator.clipboard) {
+                            logError(
+                              "[Chat]",
+                              "Clipboard API not available",
+                              new Error("navigator.clipboard is undefined")
+                            );
+                            toast.error(TOAST_MESSAGES.COPY_ERROR);
+                            return;
+                          }
+
+                          try {
+                            await navigator.clipboard.writeText(textParts);
+                            toast.success(TOAST_MESSAGES.COPY_SUCCESS);
+                          } catch (error) {
+                            logError("[Chat]", "Clipboard write failed", error, {
+                              textLength: textParts.length,
+                            });
+                            toast.error(TOAST_MESSAGES.COPY_ERROR);
+                          }
+                        }}
+                        label="Copy"
+                        tooltip="Copy response"
+                        disabled={!hasTextToCopy || status === "streaming"}>
+                        <Copy className="size-3" />
+                      </MessageAction>
+                      <MessageAction
+                        onClick={() => {
+                          // Regenerate last message - no need to pass messageId
+                          regenerate();
+                        }}
+                        label="Regenerate"
+                        tooltip="Regenerate response"
+                        disabled={status === "streaming"}>
+                        <RefreshCcw className="size-3" />
+                      </MessageAction>
+                    </MessageActions>
+                  )}
+
+                  {!isEditing && message.role === "user" && (
+                    <MessageActions className="ml-auto">
+                      <MessageAction
+                        onClick={() => {
+                          setEditText(textParts);
+                          onEditMessage(message.id);
+                        }}
+                        label="Edit"
+                        tooltip="Edit message"
+                        disabled={status === "streaming"}>
+                        <Edit2 className="size-3" />
+                      </MessageAction>
+                      <MessageAction
+                        onClick={() => {
+                          if (confirm("Delete this message and all messages after it?")) {
+                            onDeleteMessage(message.id);
+                            toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+                          }
+                        }}
+                        label="Delete"
+                        tooltip="Delete message"
+                        disabled={status === "streaming"}>
+                        <Trash2 className="size-3" />
+                      </MessageAction>
+                    </MessageActions>
+                  )}
+                </Message>
+              );
+            })}
+
+            {status === "submitted" && (
+              <Message from="assistant">
                 <MessageContent>
-                  {message.parts.map((part, index) => (
-                    <MessagePartRenderer key={index} part={part} index={index} />
-                  ))}
-                  <SourcesRenderer parts={message.parts} />
+                  <Loader size={16} />
                 </MessageContent>
-
-                {message.role === "assistant" && isLastMessage && (
-                  <MessageActions>
-                    <MessageAction
-                      onClick={async () => {
-                        try {
-                          await navigator.clipboard.writeText(textParts);
-                          // TODO: Add toast notification for success
-                        } catch (error) {
-                          console.error("[Chat] Clipboard write failed:", {
-                            error: error instanceof Error ? error.message : String(error),
-                            timestamp: new Date().toISOString(),
-                          });
-                          // TODO: Add toast notification for error
-                        }
-                      }}
-                      label="Copy"
-                      tooltip="Copy response">
-                      <Copy className="size-3" />
-                    </MessageAction>
-                    <MessageAction
-                      onClick={() => {
-                        regenerate({ messageId: message.id });
-                      }}
-                      label="Regenerate"
-                      tooltip="Regenerate response">
-                      <RefreshCcw className="size-3" />
-                    </MessageAction>
-                  </MessageActions>
-                )}
               </Message>
-            );
-          })}
+            )}
 
-          {status === "submitted" && (
-            <Message from="assistant">
-              <MessageContent>
-                <Loader size={16} />
-              </MessageContent>
-            </Message>
-          )}
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="size-4" />
-              <AlertTitle>An error occurred</AlertTitle>
-              <AlertDescription>{error.message || "Please try again."}</AlertDescription>
-            </Alert>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  )
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="size-4" />
+                <AlertTitle>An error occurred</AlertTitle>
+                <AlertDescription>{error.message || "Please try again."}</AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    );
+  }
 );
 ChatMessages.displayName = "ChatMessages";
 
@@ -619,17 +780,16 @@ export function ChatClient() {
       credentials: "include",
     }),
     onError: (error) => {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      console.error("Chat transport error:", {
-        message,
+      logError("[Chat]", "Transport error", error, {
         type: error?.constructor?.name,
-        timestamp: new Date().toISOString(),
       });
     },
     onFinish: (result) => {
       if (result.isError) {
-        console.error("Message streaming error:", {
-          timestamp: new Date().toISOString(),
+        logError("[Chat]", "Message streaming error", new Error("Stream finished with error"), {
+          finishReason: result.finishReason,
+          isAbort: result.isAbort,
+          isDisconnect: result.isDisconnect,
         });
       }
     },
@@ -644,6 +804,7 @@ export function ChatClient() {
   // ----- Local State
   const [text, setText] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
 
   // ----- Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -670,17 +831,12 @@ export function ChatClient() {
       const hasAttachments = Boolean(message.files?.length);
 
       if (!(hasText || hasAttachments)) {
-        console.warn("[Chat] Message submission blocked: no content", {
-          timestamp: new Date().toISOString(),
-        });
+        logWarn("[Chat]", "Message submission blocked: no content");
         return;
       }
 
       if (status !== "ready") {
-        console.debug("[Chat] Message submission blocked: not ready", {
-          status,
-          timestamp: new Date().toISOString(),
-        });
+        logDebug("[Chat]", "Message submission blocked: not ready", { status });
         return;
       }
 
@@ -709,8 +865,65 @@ export function ChatClient() {
   const handleNewChat = useCallback((): void => {
     setMessages([]);
     setText("");
+    setEditingMessageId(null);
     textareaRef.current?.focus();
   }, [setMessages]);
+
+  const handleEditMessage = useCallback((messageId: string): void => {
+    setEditingMessageId(messageId);
+  }, []);
+
+  const handleCancelEdit = useCallback((): void => {
+    setEditingMessageId(null);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    (messageId: string, newText: string): void => {
+      if (!newText.trim()) {
+        toast.error("Message cannot be empty");
+        return;
+      }
+
+      // Find the index of the message being edited
+      const editIndex = messages.findIndex((m) => m.id === messageId);
+      if (editIndex === -1) return;
+
+      // Remove all messages from the edited message onwards
+      const newMessages = messages.slice(0, editIndex);
+      setMessages(newMessages);
+
+      // Clear edit state
+      setEditingMessageId(null);
+
+      // Re-send the edited message
+      sendMessage(
+        { text: newText },
+        {
+          body: {
+            model: currentModel,
+          },
+        }
+      );
+
+      toast.success("Message updated and re-submitted");
+    },
+    [messages, setMessages, sendMessage, currentModel]
+  );
+
+  const handleDeleteMessage = useCallback(
+    (messageId: string): void => {
+      // Find the index of the message to delete
+      const deleteIndex = messages.findIndex((m) => m.id === messageId);
+      if (deleteIndex === -1) return;
+
+      // Remove the message and all subsequent messages
+      const newMessages = messages.slice(0, deleteIndex);
+      setMessages(newMessages);
+
+      toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+    },
+    [messages, setMessages]
+  );
 
   return (
     <SidebarProvider>
@@ -741,6 +954,11 @@ export function ChatClient() {
             error={error}
             regenerate={regenerate}
             scrollAreaRef={scrollAreaRef}
+            editingMessageId={editingMessageId}
+            onEditMessage={handleEditMessage}
+            onCancelEdit={handleCancelEdit}
+            onSaveEdit={handleSaveEdit}
+            onDeleteMessage={handleDeleteMessage}
           />
 
           {/* Input */}
