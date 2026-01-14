@@ -515,7 +515,7 @@ const ChatMessages = memo<ChatMessagesProps>(
     return (
       <div className={CSS_CLASSES.messagesContainer} ref={messagesContainerRef}>
         <Conversation>
-          <ConversationContent className="px-4">
+          <ConversationContent>
             <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
               {!hydrated ? null : messages.length === 0 ? (
                 <Empty>
@@ -900,10 +900,10 @@ ChatInput.displayName = "ChatInput";
  */
 const ChatHeader = memo(({ conversationTitle }: { conversationTitle: string }) => {
   return (
-    <header className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-      <div className="flex items-center gap-2 px-4">
+    <header className="sticky top-0 z-10 flex shrink-0 items-center p-4 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <div className="flex items-center gap-2">
         <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" className="mr-2 h-4" />
+        <Separator orientation="vertical" />
         <Breadcrumb>
           <BreadcrumbList>
             <BreadcrumbItem>

@@ -14,6 +14,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { memo, useCallback } from "react";
 
@@ -114,7 +115,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <div className="flex gap-2 p-2">
+        <div className="flex gap-2">
           <Button onClick={handleNewChat} className="w-full justify-start" disabled={creatingChat}>
             {creatingChat ? (
               <Loader2 className="size-4 animate-spin" />
@@ -125,6 +126,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
           </Button>
         </div>
       </SidebarHeader>
+      <SidebarSeparator />
       <SidebarContent>
         {!hydrated ? (
           <SidebarConversationsSkeleton />
