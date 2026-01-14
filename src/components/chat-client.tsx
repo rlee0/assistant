@@ -885,6 +885,9 @@ const ChatInput = memo<ChatInputProps>(
               </ModelSelectorList>
             </ModelSelectorContent>
           </ModelSelector>
+          <div className="text-center text-xs text-muted-foreground p-2">
+            AI can make mistakes, so please verify its responses.
+          </div>
         </div>
       </div>
     );

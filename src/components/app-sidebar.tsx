@@ -159,22 +159,20 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
                           <span className="flex-1 truncate">{title}</span>
                           <ConversationStatusIndicator status={status} />
                         </SidebarMenuButton>
-                        <SidebarMenuAction asChild showOnHover>
-                          <button
-                            type="button"
-                            aria-label={`Delete ${title}`}
-                            onClick={(event) => {
-                              event.stopPropagation();
-                              handleDeleteConversation(id);
-                            }}
-                            disabled={isDeleting}
-                            className="cursor-pointer">
-                            {isDeleting ? (
-                              <Loader2 className="size-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-4" />
-                            )}
-                          </button>
+                        <SidebarMenuAction
+                          type="button"
+                          aria-label={`Delete ${title}`}
+                          showOnHover
+                          disabled={isDeleting}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteConversation(id);
+                          }}>
+                          {isDeleting ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-4" />
+                          )}
                         </SidebarMenuAction>
                       </SidebarMenuItem>
                     );
