@@ -553,7 +553,7 @@ const ChatMessages = memo<ChatMessagesProps>(
                     const hasTextToCopy = textParts.trim().length > 0;
 
                     return (
-                      <div key={messageIndex} className="flex flex-col gap-0">
+                      <div key={messageIndex} className="flex flex-col gap-2">
                         {/* Checkpoint line appears on hover */}
                         {checkpointAtIndex && (
                           <Checkpoint

@@ -80,17 +80,12 @@ export function CheckpointTrigger({
       <DelayedTooltip>
         <TooltipTrigger asChild>
           <AlertDialogTrigger asChild>
-            <Button
-              size={size}
-              type="button"
-              variant={variant}
-              className={cn("h-6", className)}
-              {...props}>
-              {children ?? <BookmarkIcon className="size-3" />}
+            <Button size={size} type="button" variant={variant} className={className} {...props}>
+              {children ?? <BookmarkIcon />}
             </Button>
           </AlertDialogTrigger>
         </TooltipTrigger>
-        <TooltipContent align="start" side="bottom" className="text-xs">
+        <TooltipContent align="start" side="top" className="text-xs">
           {tooltip}
         </TooltipContent>
       </DelayedTooltip>
