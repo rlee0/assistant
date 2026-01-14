@@ -32,7 +32,7 @@ export default function RootLayout({
         <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
           {children}
         </ErrorBoundary>
-        <Toaster position="bottom-right" richColors closeButton />
+        <Toaster position="top-center" />
       </body>
     </html>
   );

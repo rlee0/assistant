@@ -1214,25 +1214,29 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     statusChangeRef.current = status;
   }, [persistConversation, selectedId, status]);
 
-  // Create checkpoint after every message is added
+  // Create checkpoint before each user message (except the first one)
   useEffect(() => {
     if (!selectedId || messages.length === 0) return;
 
     const conversation = conversations[selectedId];
     if (!conversation) return;
 
-    // Create checkpoint at the last message index
-    const lastMessageIndex = messages.length - 1;
+    // Identify indices where checkpoints are needed (before user messages, except first)
+    const checkpointIndices = messages.reduce<number[]>((acc, message, index) => {
+      if (message.role === "user" && index > 0) {
+        acc.push(index);
+      }
+      return acc;
+    }, []);
 
-    // Only create checkpoint if one doesn't already exist at this index
-    const checkpointExists = conversation.checkpoints.some(
-      (cp) => cp.messageIndex === lastMessageIndex
-    );
-
-    if (!checkpointExists) {
-      storeAddCheckpoint(selectedId, lastMessageIndex);
-    }
-  }, [messages.length, selectedId, storeAddCheckpoint]);
+    // Create missing checkpoints
+    const existingIndices = new Set(conversation.checkpoints.map((cp) => cp.messageIndex));
+    checkpointIndices.forEach((index) => {
+      if (!existingIndices.has(index)) {
+        storeAddCheckpoint(selectedId, index);
+      }
+    });
+  }, [messages, selectedId, conversations, storeAddCheckpoint]);
 
   const handleRestoreCheckpoint = useCallback(
     (checkpointId: string): void => {
@@ -1252,8 +1256,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         // Restore to checkpoint in store
         storeRestoreCheckpoint(selectedId, checkpointId);
 
-        // Restore messages to checkpoint index (inclusive)
-        const restoredMessages = messages.slice(0, checkpoint.messageIndex + 1);
+        // Restore messages to before checkpoint index (excluding the user message at checkpoint)
+        const restoredMessages = messages.slice(0, checkpoint.messageIndex);
         setMessages(restoredMessages);
 
         // Clear edit state
