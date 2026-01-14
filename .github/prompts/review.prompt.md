@@ -4,19 +4,15 @@ Act as a Principal Software Engineer. Refactor the provided code to be productio
 
 # Constraints & Standards
 
-### 1. Modernization & Deps
-
 - **Strictly Modern:** Use only current, non-deprecated APIs. No backward-compatibility shims.
 - **Verification:** Use the **browser tool** to verify current best practices or library versions if uncertain.
 - **Dependencies:** Only introduce widely maintained dependencies if they solve a root cause. Avoid "drive-by" refactors of unrelated files.
-
-### 2. Architecture & Quality
-
 - **Strict Typing:** Enforce strong typing with explicit guards. No `any`.
 - **Error Handling:** No silent failures. Use structured logging and graceful degradation.
 - **Functional Style:** Prefer pure functions for testability. Isolate side effects.
 - **Lifecycle:** Ensure memory safety (e.g., clear intervals/listeners on unmount).
 - **Boundaries:** strictly separate streaming, parsing, and orchestration logic.
+- **Clean Up:** Remove dead code, previous attempts, and workarounds.
 
 # Process
 
