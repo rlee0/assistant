@@ -914,7 +914,7 @@ export const PromptInputActionMenuTrigger = ({
 
   return (
     <DropdownMenuTrigger asChild>
-      <PromptInputButton id={triggerId} className={className} {...props}>
+      <PromptInputButton id={triggerId} className={className} suppressHydrationWarning {...props}>
         {children ?? <PlusIcon className="size-4" />}
       </PromptInputButton>
     </DropdownMenuTrigger>

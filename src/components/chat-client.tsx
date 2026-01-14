@@ -1,14 +1,38 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
-import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
+import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
+import {
+  useState,
+  useRef,
+  useEffect,
+  useCallback,
+  useMemo,
+  memo,
+  type KeyboardEvent,
+  useId,
+} from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
+import {
+  Sidebar,
+  SidebarProvider,
+  SidebarInset,
+  SidebarTrigger,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarMenuAction,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -84,16 +108,25 @@ import {
   RefreshCcw,
   Edit2,
   Trash2,
+  Loader2,
   X,
   LogOut,
   Settings,
 } from "lucide-react";
 import { SettingsModal } from "@/components/settings-modal";
 import { useSettingsStore } from "@/store/settings-store";
+import {
+  useChatStore,
+  chatSessionToConversation,
+  type ConversationStatus,
+  type Conversation,
+} from "@/store/chat-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
 import { useLogout } from "@/hooks/use-logout";
 import { logError, logWarn, logDebug } from "@/lib/logging";
 import { cn } from "@/lib/utils";
+import { type InitialChatData } from "@/lib/supabase/loaders";
+import { type ChatMessage } from "@/types/chat";
 import {
   CHAT_CONTAINER_MAX_WIDTH,
   DEFAULT_PROVIDER,
@@ -115,6 +148,141 @@ interface SelectedModelInfo {
   readonly name: string;
   readonly provider: string;
 }
+
+type ChatClientProps = {
+  readonly initialData: InitialChatData;
+};
+
+type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
+
+function extractTextFromMessage(message: UseChatMessage): string {
+  return (
+    message.parts
+      ?.filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
+      .map((part) => part.text)
+      .join("\n")
+      .trim() ?? ""
+  );
+}
+
+function generateTitleFromText(text: string): string {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (!normalized) return "New chat";
+  const maxLength = 64;
+  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
+}
+
+function mapUseChatStatus(status: ReturnType<typeof useChat>["status"]): ConversationStatus {
+  if (status === "streaming") return "streaming";
+  if (status === "submitted") return "loading";
+  if (status === "error") return "error";
+  return "idle";
+}
+
+function uiMessageToChatMessage(message: UseChatMessage): ChatMessage {
+  const createdAt = (message as { createdAt?: string }).createdAt ?? new Date().toISOString();
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: extractTextFromMessage(message),
+    createdAt,
+  };
+}
+
+interface ConversationListProps {
+  order: string[];
+  conversations: Record<string, Conversation>;
+  statuses: Record<string, ConversationStatus>;
+  selectedId: string | null;
+  deleting: Record<string, boolean>;
+  onSelect: (id: string) => void;
+  onDelete: (id: string) => void;
+}
+
+function renderStatusBadge(status: ConversationStatus) {
+  if (status === "idle") return null;
+  if (status === "error") {
+    return (
+      <Badge variant="destructive" className="h-5 gap-1 px-2 text-[11px]">
+        <AlertCircle className="size-3" />
+        Error
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge variant="secondary" className="h-5 gap-1 px-2 text-[11px]">
+      <Loader2 className="size-3 animate-spin" />
+      {status === "streaming" ? "Streaming" : "Sending"}
+    </Badge>
+  );
+}
+
+const ConversationList = memo<ConversationListProps>(
+  ({ order, conversations, statuses, selectedId, deleting, onSelect, onDelete }) => {
+    if (order.length === 0) {
+      return (
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <p className="text-xs text-muted-foreground px-2 py-1">No conversations yet.</p>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      );
+    }
+
+    return (
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {order.map((id) => {
+                const conversation = conversations[id];
+                if (!conversation) return null;
+                const status = statuses[id] ?? "idle";
+                const title = conversation.title || "Untitled chat";
+
+                return (
+                  <SidebarMenuItem key={id} className="group/menu-item">
+                    <SidebarMenuButton
+                      isActive={id === selectedId}
+                      onClick={() => onSelect(id)}
+                      aria-label={`Open conversation ${title}`}>
+                      <span className="flex-1 truncate">{title}</span>
+                      {renderStatusBadge(status)}
+                    </SidebarMenuButton>
+                    <SidebarMenuAction asChild>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${title}`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onDelete(id);
+                        }}
+                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
+                        disabled={Boolean(deleting[id])}>
+                        {deleting[id] ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                      </button>
+                    </SidebarMenuAction>
+                  </SidebarMenuItem>
+                );
+              })}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+    );
+  }
+);
+ConversationList.displayName = "ConversationList";
 
 // ============================================================================
 // Sub-Components
@@ -349,24 +517,29 @@ function useTextareaKeyboardShortcuts(): (e: KeyboardEvent<HTMLTextAreaElement>)
 /**
  * Auto-scrolls to bottom when messages change, with scroll anchor preservation.
  *
- * @param scrollAreaRef - Ref to the scroll container element
+ * @param messagesContainerRef - Ref to the messages container div (not ScrollArea)
  * @param messages - Current message array from useChat
  *
  * @remarks
  * - Only scrolls if user is already near the bottom (within SCROLL_ANCHOR_THRESHOLD)
  * - Uses `scrollTo` with smooth behavior for better UX
  * - Preserves scroll position when user has manually scrolled up
- *
- * @returns Cleanup function for scroll event listener
+ * - Finds scroll viewport element within container to avoid Radix UI ref composition issues
  */
 function useAutoScroll(
-  scrollAreaRef: React.RefObject<HTMLDivElement | null>,
+  messagesContainerRef: React.RefObject<HTMLDivElement | null>,
   messages: ReadonlyArray<ReturnType<typeof useChat>["messages"][number]>
 ): void {
   const isAtBottomRef = useRef(true); // Start assuming user is at bottom
+  const scrollListenerRef = useRef<(() => void) | null>(null);
 
+  // Setup scroll listener once on mount (stable)
   useEffect(() => {
-    const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
+    const containerElement = messagesContainerRef.current;
+    if (!containerElement) return;
+
+    // Find the scroll viewport element within the container
+    const scrollElement = containerElement.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
     if (!(scrollElement instanceof HTMLElement)) return;
 
     // Check if user is near bottom
@@ -376,6 +549,9 @@ function useAutoScroll(
       isAtBottomRef.current = distanceFromBottom <= SCROLL_ANCHOR_THRESHOLD;
     };
 
+    // Store listener in ref for cleanup
+    scrollListenerRef.current = checkScrollPosition;
+
     // Initial check
     checkScrollPosition();
 
@@ -384,34 +560,46 @@ function useAutoScroll(
 
     return () => {
       scrollElement.removeEventListener("scroll", checkScrollPosition);
+      scrollListenerRef.current = null;
     };
-  }, [scrollAreaRef]);
+  }, []); // Empty deps - setup once on mount
 
+  // Scroll when messages change (only if user is at bottom)
   useEffect(() => {
-    const scrollElement = scrollAreaRef.current?.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
+    const containerElement = messagesContainerRef.current;
+    if (!containerElement) return;
+
+    // Find the scroll viewport element within the container
+    const scrollElement = containerElement.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
     if (!(scrollElement instanceof HTMLElement)) return;
 
-    // Only auto-scroll if user is at bottom
     if (isAtBottomRef.current) {
       scrollElement.scrollTo({
         top: scrollElement.scrollHeight,
         behavior: "smooth",
       });
     }
-  }, [messages, scrollAreaRef]);
+  }, [messages.length]); // Only depend on message count, not the entire messages array
 }
 
 /**
- * Auto-focuses textarea on component mount.
+ * Auto-focuses textarea on component mount (after hydration).
  *
  * @param textareaRef - Ref to the textarea element
  *
  * @remarks
- * Improves UX by allowing users to start typing immediately
- * without clicking into the input field.
+ * Improves UX by allowing users to start typing immediately.
+ * Uses a flag to skip focus on initial hydration render.
  */
 function useAutoFocusTextarea(textareaRef: React.RefObject<HTMLTextAreaElement | null>): void {
+  const isFirstRenderRef = useRef(true);
+
   useEffect(() => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return;
+    }
+    // Only focus after initial mount (skip hydration)
     textareaRef.current?.focus();
   }, [textareaRef]);
 }
@@ -424,7 +612,7 @@ interface ChatMessagesProps {
   messages: ReturnType<typeof useChat>["messages"];
   status: ReturnType<typeof useChat>["status"];
   error: ReturnType<typeof useChat>["error"];
-  scrollAreaRef: React.RefObject<HTMLDivElement | null>;
+  messagesContainerRef: React.RefObject<HTMLDivElement | null>;
   editingMessageId: string | null;
   editText: string;
   onEditMessage: (messageId: string, initialText: string) => void;
@@ -440,7 +628,7 @@ const ChatMessages = memo<ChatMessagesProps>(
     messages,
     status,
     error,
-    scrollAreaRef,
+    messagesContainerRef,
     editingMessageId,
     editText,
     onEditMessage,
@@ -466,8 +654,8 @@ const ChatMessages = memo<ChatMessagesProps>(
     }, [editingMessageId, editText]);
 
     return (
-      <div className={CSS_CLASSES.messagesContainer}>
-        <ScrollArea ref={scrollAreaRef} className="h-full px-4">
+      <div className={CSS_CLASSES.messagesContainer} ref={messagesContainerRef}>
+        <ScrollArea className="h-full px-4">
           <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
             {messages.length === 0 && (
               <Empty>
@@ -694,7 +882,7 @@ ChatMessages.displayName = "ChatMessages";
 interface ChatInputProps {
   text: string;
   onTextChange: (text: string) => void;
-  onSubmit: (message: PromptInputMessage) => void;
+  onSubmit: (message: PromptInputMessage) => void | Promise<void>;
   status: ReturnType<typeof useChat>["status"];
   selectedModelInfo: SelectedModelInfo;
   currentModel: string;
@@ -873,7 +1061,9 @@ ChatHeader.displayName = "ChatHeader";
  *
  * @see {@link https://sdk.vercel.ai/docs/ai-sdk-ui/chatbot AI SDK UI Documentation}
  */
-export function ChatClient() {
+export function ChatClient({ initialData }: ChatClientProps) {
+  const hydrationIdRef = useRef(useId()); // Stable ID for hydration key
+
   const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -901,24 +1091,243 @@ export function ChatClient() {
   const updateSettings = useSettingsStore((state) => state.update);
   const currentModel = settings.models.defaultModel;
 
+  const {
+    conversations,
+    order,
+    selectedId,
+    status: conversationStatuses,
+    hydrated,
+    hydrate,
+    select: selectConversationId,
+    upsert: upsertConversation,
+    updateMessages: updateConversationMessages,
+    updateTitle: updateConversationTitle,
+    setStatus: setConversationStatus,
+    remove: removeConversation,
+  } = useChatStore();
+
   // ----- Local State
   const [text, setText] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [creatingChat, setCreatingChat] = useState(false);
+  const [deleting, setDeleting] = useState<Record<string, boolean>>({});
 
   // ----- Refs
-  const scrollAreaRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const pendingCreateRef = useRef<Promise<string> | null>(null);
+  const statusChangeRef = useRef(status);
+  const lastSyncedConversationIdRef = useRef<string | null>(null);
 
   // ----- Hooks
   const { models, selectedModelInfo } = useModelManagement(currentModel, (modelId) => {
     updateSettings(["models", "defaultModel"], modelId);
   });
 
-  useAutoScroll(scrollAreaRef, messages);
+  useAutoScroll(messagesContainerRef, messages);
   useAutoFocusTextarea(textareaRef);
+
+  // Cleanup abort controller on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hydrated && initialData) {
+      hydrate(initialData);
+    }
+  }, [hydrate, hydrated, initialData]);
+
+  // Sync chat UI state when switching conversations without re-triggering store updates
+  useEffect(() => {
+    if (!selectedId) {
+      lastSyncedConversationIdRef.current = null;
+      setMessages([]);
+      return;
+    }
+
+    if (lastSyncedConversationIdRef.current === selectedId) {
+      return;
+    }
+
+    const conversation = conversations[selectedId];
+    if (conversation) {
+      lastSyncedConversationIdRef.current = selectedId;
+      setMessages(conversation.messages);
+    }
+  }, [conversations, selectedId, setMessages]);
+
+  useEffect(() => {
+    if (selectedId) {
+      updateConversationMessages(selectedId, messages);
+    }
+  }, [messages, selectedId, updateConversationMessages]);
+
+  useEffect(() => {
+    if (selectedId) {
+      setConversationStatus(selectedId, mapUseChatStatus(status));
+    }
+  }, [selectedId, setConversationStatus, status]);
+
+  const persistConversation = useCallback(
+    async (conversationId: string) => {
+      const conversation = conversations[conversationId];
+      if (!conversation) return;
+
+      // Abort previous persist requests to avoid stale updates
+      abortControllerRef.current?.abort();
+      abortControllerRef.current = new AbortController();
+
+      try {
+        const response = await fetch("/api/chat/update", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: conversationId,
+            title: conversation.title,
+            messages: messages.map(uiMessageToChatMessage),
+          }),
+          signal: abortControllerRef.current.signal,
+        });
+
+        if (!response.ok) {
+          const detail = await response.text().catch(() => "Unknown error");
+          logWarn("[Chat]", "Persist conversation failed", {
+            conversationId,
+            status: response.status,
+            detail,
+          });
+        }
+      } catch (err) {
+        // Ignore abort errors (component unmounted or new request started)
+        if (err instanceof Error && err.name === "AbortError") {
+          return;
+        }
+        logError("[Chat]", "Persist conversation error", err, { conversationId });
+      }
+    },
+    [conversations, messages]
+  );
+
+  useEffect(() => {
+    if (!selectedId) return;
+
+    const previous = statusChangeRef.current;
+    if ((previous === "streaming" || previous === "submitted") && status === "ready") {
+      void persistConversation(selectedId);
+    }
+    statusChangeRef.current = status;
+  }, [persistConversation, selectedId, status]);
+
+  const handleSelectConversation = useCallback(
+    (conversationId: string) => {
+      if (conversationId === selectedId) return;
+
+      selectConversationId(conversationId);
+      const conversation = conversations[conversationId];
+      if (conversation) {
+        setMessages(conversation.messages);
+      } else {
+        setMessages([]);
+      }
+      setText("");
+      setEditingMessageId(null);
+      setEditText("");
+    },
+    [conversations, selectConversationId, selectedId, setMessages]
+  );
+
+  const createConversation = useCallback(async (): Promise<string> => {
+    // Prevent concurrent create requests
+    if (pendingCreateRef.current) {
+      return pendingCreateRef.current;
+    }
+
+    const createPromise = (async () => {
+      setCreatingChat(true);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+          const response = await fetch("/api/chat/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: currentModel }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const detail = await response.text().catch(() => "Unknown error");
+            throw new Error(`Create failed: ${response.status} - ${detail}`);
+          }
+
+          const data = await response.json().catch((err) => {
+            throw new Error(
+              `Invalid response: ${err instanceof Error ? err.message : String(err)}`
+            );
+          });
+
+          const conversation = chatSessionToConversation(data.chat);
+          upsertConversation(conversation);
+          selectConversationId(conversation.id);
+          setMessages([]);
+          setText("");
+          setEditingMessageId(null);
+          setEditText("");
+          return conversation.id;
+        } catch (err) {
+          clearTimeout(timeoutId);
+          throw err;
+        }
+      } catch (error) {
+        // Ignore abort errors
+        if (error instanceof Error && error.name === "AbortError") {
+          logDebug("[Chat]", "Create conversation aborted");
+          throw error;
+        }
+
+        logWarn("[Chat]", "Falling back to local chat creation", { error });
+        const localId = crypto.randomUUID();
+        const now = new Date().toISOString();
+        upsertConversation({
+          id: localId,
+          title: "New chat",
+          pinned: false,
+          updatedAt: now,
+          model: currentModel,
+          suggestions: [],
+          messages: [],
+          checkpoints: [],
+        });
+        selectConversationId(localId);
+        setMessages([]);
+        setText("");
+        setEditingMessageId(null);
+        setEditText("");
+        return localId;
+      } finally {
+        setCreatingChat(false);
+        pendingCreateRef.current = null;
+      }
+    })();
+
+    pendingCreateRef.current = createPromise;
+    return createPromise;
+  }, [currentModel, selectConversationId, setMessages, upsertConversation]);
+
+  const ensureConversation = useCallback(async () => {
+    if (selectedId && conversations[selectedId]) return selectedId;
+    return createConversation();
+  }, [conversations, createConversation, selectedId]);
 
   // ----- Event Handlers
   const handleModelSelect = useCallback(
@@ -927,9 +1336,10 @@ export function ChatClient() {
     },
     [updateSettings]
   );
+
   const handlePromptSubmit = useCallback(
-    (message: PromptInputMessage) => {
-      const hasText = Boolean(message.text);
+    async (message: PromptInputMessage) => {
+      const hasText = Boolean(message.text?.trim());
       const hasAttachments = Boolean(message.files?.length);
 
       if (!(hasText || hasAttachments)) {
@@ -942,35 +1352,46 @@ export function ChatClient() {
         return;
       }
 
-      sendMessage(
-        {
-          text: message.text || ATTACHMENT_ONLY_MESSAGE_TEXT,
-          files: message.files,
-        },
-        {
-          body: {
-            model: currentModel,
-          },
+      try {
+        const conversationId = await ensureConversation();
+        const conversation = conversations[conversationId];
+
+        if (conversation && (!conversation.title || conversation.title === "New chat")) {
+          const generatedTitle = generateTitleFromText(message.text ?? "");
+          if (generatedTitle && generatedTitle !== conversation.title) {
+            updateConversationTitle(conversationId, generatedTitle);
+          }
         }
-      );
 
-      setText("");
+        sendMessage(
+          {
+            text: (message.text ?? "").trim() || ATTACHMENT_ONLY_MESSAGE_TEXT,
+            files: message.files,
+          },
+          {
+            body: {
+              model: currentModel,
+            },
+          }
+        );
 
-      // Focus textarea after submission (microtask ensures DOM is updated)
-      queueMicrotask(() => {
-        textareaRef.current?.focus();
-      });
+        setText("");
+
+        queueMicrotask(() => {
+          textareaRef.current?.focus();
+        });
+      } catch (error) {
+        logError("[Chat]", "Prompt submission failed", error);
+        toast.error("Failed to send message. Please try again.");
+      }
     },
-    [currentModel, status, sendMessage]
+    [conversations, currentModel, ensureConversation, sendMessage, status, updateConversationTitle]
   );
 
-  const handleNewChat = useCallback((): void => {
-    setMessages([]);
-    setText("");
-    setEditingMessageId(null);
-    setEditText("");
+  const handleNewChat = useCallback(async (): Promise<void> => {
+    await createConversation();
     textareaRef.current?.focus();
-  }, [setMessages]);
+  }, [createConversation]);
 
   const handleEditMessage = useCallback((messageId: string, initialText: string): void => {
     setEditText(initialText);
@@ -1040,6 +1461,60 @@ export function ChatClient() {
     [messages, setMessages]
   );
 
+  const handleDeleteConversation = useCallback(
+    async (conversationId: string) => {
+      setDeleting((prev) => ({ ...prev, [conversationId]: true }));
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+
+        try {
+          const response = await fetch("/api/chat/delete", {
+            method: "DELETE",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ id: conversationId }),
+            signal: controller.signal,
+          });
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const detail = await response.text().catch(() => "Unknown error");
+            throw new Error(detail || "Failed to delete conversation");
+          }
+
+          removeConversation(conversationId);
+
+          if (selectedId === conversationId) {
+            const fallback = order.find((id) => id !== conversationId) ?? null;
+            selectConversationId(fallback);
+            if (fallback && conversations[fallback]) {
+              setMessages(conversations[fallback].messages);
+            } else {
+              setMessages([]);
+            }
+          }
+
+          toast.success("Conversation deleted");
+        } catch (err) {
+          clearTimeout(timeoutId);
+          throw err;
+        }
+      } catch (err) {
+        // Ignore abort errors
+        if (err instanceof Error && err.name === "AbortError") {
+          logDebug("[Chat]", "Delete conversation aborted", { conversationId });
+          return;
+        }
+        logError("[Chat]", "Delete conversation failed", err, { conversationId });
+        toast.error("Failed to delete conversation");
+      } finally {
+        setDeleting((prev) => ({ ...prev, [conversationId]: false }));
+      }
+    },
+    [conversations, order, removeConversation, selectConversationId, selectedId, setMessages]
+  );
+
   const handleRegenerateFromMessage = useCallback(
     (messageId: string): void => {
       // Block while streaming/submitted
@@ -1081,12 +1556,29 @@ export function ChatClient() {
       <Sidebar>
         <div className={CSS_CLASSES.sidebar}>
           <div className={CSS_CLASSES.newChatButton}>
-            <Button onClick={handleNewChat} className="w-full" variant="outline">
-              <PlusIcon className="mr-2 size-4" />
+            <Button
+              onClick={() => void handleNewChat()}
+              className="w-full"
+              variant="outline"
+              disabled={creatingChat}>
+              {creatingChat ? (
+                <Loader2 className="mr-2 size-4 animate-spin" />
+              ) : (
+                <PlusIcon className="mr-2 size-4" />
+              )}
               New Chat
             </Button>
           </div>
-          {/* TODO: Add chat history list */}
+          <SidebarSeparator />
+          <ConversationList
+            order={order}
+            conversations={conversations}
+            statuses={conversationStatuses}
+            selectedId={selectedId}
+            deleting={deleting}
+            onSelect={handleSelectConversation}
+            onDelete={handleDeleteConversation}
+          />
         </div>
       </Sidebar>
 
@@ -1103,7 +1595,7 @@ export function ChatClient() {
             messages={messages}
             status={status}
             error={error}
-            scrollAreaRef={scrollAreaRef}
+            messagesContainerRef={messagesContainerRef}
             editingMessageId={editingMessageId}
             editText={editText}
             onEditMessage={handleEditMessage}

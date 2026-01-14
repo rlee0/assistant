@@ -3,6 +3,7 @@ import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { loadInitialChats } from "@/lib/supabase/loaders";
 import { redirect } from "next/navigation";
+import { logError } from "@/lib/logging";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export default async function Page() {
     } = await supabase.auth.getUser();
 
     if (error) {
-      console.error("[Page] Auth verification failed:", error.message);
+      logError("[Page]", "Auth verification failed", error);
       redirect("/login");
     }
 
@@ -23,12 +24,11 @@ export default async function Page() {
       redirect("/login");
     }
 
-    await loadInitialChats(user.id);
-    return <ChatClient />;
+    const initialChats = await loadInitialChats(user.id);
+    return <ChatClient initialData={initialChats} />;
   } catch (error) {
-    // Handle Supabase configuration errors
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[Page] Initialization failed:", message);
+    logError("[Page]", "Initialization failed", new Error(message));
 
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
