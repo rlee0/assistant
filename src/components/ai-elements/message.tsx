@@ -3,8 +3,8 @@
 import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { ChevronLeftIcon, ChevronRightIcon, PaperclipIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
+import { DelayedTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { FileUIPart, UIMessage } from "ai";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { createContext, memo, useContext, useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -82,14 +82,12 @@ export const MessageAction = ({
 
   if (tooltip) {
     return (
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>{button}</TooltipTrigger>
-          <TooltipContent>
-            <p>{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+      <DelayedTooltip>
+        <TooltipTrigger asChild>{button}</TooltipTrigger>
+        <TooltipContent>
+          <p>{tooltip}</p>
+        </TooltipContent>
+      </DelayedTooltip>
     );
   }
 
@@ -319,7 +317,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
         </>
       ) : (
         <>
-          <Tooltip>
+          <DelayedTooltip>
             <TooltipTrigger asChild>
               <div className="flex size-full shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                 <PaperclipIcon className="size-4" />
@@ -328,7 +326,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
             <TooltipContent>
               <p>{attachmentLabel}</p>
             </TooltipContent>
-          </Tooltip>
+          </DelayedTooltip>
           {onRemove && (
             <Button
               aria-label="Remove attachment"

@@ -139,7 +139,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
             <SidebarGroupLabel>Conversations</SidebarGroupLabel>
             <SidebarGroupContent>
               {conversationOrder.length === 0 ? (
-                <p className="text-xs text-muted-foreground px-2 py-4">No conversations yet.</p>
+                <p className="text-xs text-muted-foreground p-4">No conversations yet.</p>
               ) : (
                 <SidebarMenu>
                   {conversationOrder.map((id) => {
