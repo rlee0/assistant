@@ -77,7 +77,7 @@ import {
   LogOut,
   Settings,
 } from "lucide-react";
-import Link from "next/link";
+import { SettingsModal } from "@/components/settings-modal";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
 import { useLogout } from "@/hooks/use-logout";
@@ -758,7 +758,7 @@ ChatInput.displayName = "ChatInput";
 /**
  * Chat header with navigation and user menu
  */
-const ChatHeader = memo(() => {
+const ChatHeader = memo(({ onSettingsClick }: { onSettingsClick: () => void }) => {
   const { logout, isLoading } = useLogout();
 
   return (
@@ -766,11 +766,9 @@ const ChatHeader = memo(() => {
       <SidebarTrigger />
       <h1 className={CSS_CLASSES.headerTitle}>Chat</h1>
       <div className="ml-auto flex items-center gap-2">
-        <Link href="/settings">
-          <Button variant="ghost" size="sm" aria-label="Settings">
-            <Settings className="size-4" />
-          </Button>
-        </Link>
+        <Button variant="ghost" size="sm" onClick={onSettingsClick} aria-label="Settings">
+          <Settings className="size-4" />
+        </Button>
         <Button variant="ghost" size="sm" onClick={logout} disabled={isLoading} aria-label="Logout">
           <LogOut className="size-4" />
         </Button>
@@ -854,6 +852,7 @@ export function ChatClient() {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
+  const [settingsOpen, setSettingsOpen] = useState(false);
 
   // ----- Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -1004,7 +1003,10 @@ export function ChatClient() {
       <SidebarInset>
         <div className={CSS_CLASSES.chatContainer}>
           {/* Header */}
-          <ChatHeader />
+          <ChatHeader onSettingsClick={() => setSettingsOpen(true)} />
+
+          {/* Settings Modal */}
+          <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
 
           {/* Messages */}
           <ChatMessages

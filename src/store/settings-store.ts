@@ -1,7 +1,42 @@
 import { create } from "zustand";
 import { persist, devtools } from "zustand/middleware";
 import { settingsSchema, buildDefaultSettings, type Settings } from "@/lib/settings";
-import { ZodError } from "zod";
+import { logError } from "@/lib/logging";
+
+/**
+ * Deep merge utility for recursive object merging
+ * @private
+ */
+function deepMerge(
+  target: Record<string, unknown>,
+  source: Record<string, unknown>
+): Record<string, unknown> {
+  const result = { ...target };
+
+  for (const [key, value] of Object.entries(source)) {
+    // Only recurse if both values are plain objects (not arrays, null, etc.)
+    const targetValue = result[key];
+    if (
+      value !== undefined &&
+      value !== null &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      targetValue !== undefined &&
+      targetValue !== null &&
+      typeof targetValue === "object" &&
+      !Array.isArray(targetValue)
+    ) {
+      result[key] = deepMerge(
+        targetValue as Record<string, unknown>,
+        value as Record<string, unknown>
+      );
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
 
 /**
  * Path-based getter/setter with type safety
@@ -47,16 +82,25 @@ export const useSettingsStore = create<SettingsState>()(
               hydrated: true,
             }));
           } catch (error) {
-            // Validation failed - log error but don't crash
-            if (error instanceof ZodError) {
-              console.error(
-                "[Settings] Hydration validation failed. Using defaults.",
-                error.issues
+            // Validation failed - clear corrupted data and use defaults
+            logError(
+              "[SettingsStore]",
+              "Hydration validation failed, using defaults",
+              error as Error
+            );
+
+            // Clear corrupted localStorage data to prevent re-corruption on next load
+            try {
+              localStorage.removeItem("assistant-settings");
+            } catch (storageError) {
+              // localStorage may be disabled or unavailable - log but don't crash
+              logError(
+                "[SettingsStore]",
+                "Failed to clear corrupted settings from storage",
+                storageError as Error
               );
-            } else {
-              console.error("[Settings] Hydration error:", error);
             }
-            // Reset to defaults on validation failure
+
             set(() => ({
               settings: buildDefaultSettings(),
               hydrated: true,
@@ -75,7 +119,11 @@ export const useSettingsStore = create<SettingsState>()(
               for (let i = 0; i < path.length - 1; i += 1) {
                 const key = path[i];
                 if (!(key in current)) {
-                  console.warn(`[Settings] Path component not found: ${String(key)}`);
+                  logError(
+                    "[SettingsStore]",
+                    `Path component not found: ${String(key)}`,
+                    new Error("Invalid path for settings update")
+                  );
                   return state; // Return unchanged state
                 }
                 current = current[key] as Mutable;
@@ -89,11 +137,7 @@ export const useSettingsStore = create<SettingsState>()(
               const validated = settingsSchema.parse(clone);
               return { settings: validated };
             } catch (error) {
-              if (error instanceof ZodError) {
-                console.error("[Settings] Update validation failed:", error.issues);
-              } else {
-                console.error("[Settings] Update error:", error);
-              }
+              logError("[SettingsStore]", "Update validation failed", error as Error);
               return state; // Return unchanged on validation error
             }
           }),
@@ -101,15 +145,14 @@ export const useSettingsStore = create<SettingsState>()(
         updateBatch: (updates) =>
           set((state) => {
             try {
-              const merged = { ...state.settings, ...updates };
+              const merged = deepMerge(
+                state.settings as Record<string, unknown>,
+                updates as Record<string, unknown>
+              );
               const validated = settingsSchema.parse(merged);
               return { settings: validated };
             } catch (error) {
-              if (error instanceof ZodError) {
-                console.error("[Settings] Batch update validation failed:", error.issues);
-              } else {
-                console.error("[Settings] Batch update error:", error);
-              }
+              logError("[SettingsStore]", "Batch update validation failed", error as Error);
               return state; // Return unchanged on validation error
             }
           }),

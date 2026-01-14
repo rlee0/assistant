@@ -30,7 +30,6 @@ export const settingsSchema = z.object({
   account: z.object({
     email: z.string().email("Invalid email format").trim().toLowerCase(),
     displayName: z.string().min(2, "Display name must be at least 2 characters"),
-    password: z.string().min(8, "Password must be at least 8 characters").optional(),
   }),
   appearance: z.object({
     theme: themeSchema,
@@ -55,7 +54,6 @@ export function buildDefaultSettings(): Settings {
     account: {
       email: DEFAULT_USER_EMAIL,
       displayName: DEFAULT_USER_DISPLAY_NAME,
-      password: undefined,
     },
     appearance: {
       theme: DEFAULT_THEME,

@@ -24,22 +24,6 @@ Act as a Principal Software Engineer. Refactor the provided code to be productio
 2.  **Plan:** Outline the necessary changes.
 3.  **Execute:** Write the code.
 
-# Output Format
-
-Once the refactor is complete, respond in the chat with the following sections:
-
-## 1. Issues Found
-
-_Brief summary of identified issues._
-
-## 2. Change Log
-
-- Succinct list of changes (including breaking changes).
-
-## 3. Suggested Next Steps
-
-- Recommendations for further improvements or optional enhancements.
-
 # Final Notes
 
 - Never create markdown document reports, reviews, or summaries.
