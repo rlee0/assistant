@@ -516,7 +516,7 @@ const ChatMessages = memo<ChatMessagesProps>(
       <div className={CSS_CLASSES.messagesContainer} ref={messagesContainerRef}>
         <Conversation>
           <ConversationContent>
-            <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
+            <div className={cn("w-full", CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
               {!hydrated ? null : messages.length === 0 ? (
                 <Empty>
                   <EmptyHeader>
@@ -800,7 +800,7 @@ const ChatInput = memo<ChatInputProps>(
 
     return (
       <div className={CSS_CLASSES.inputContainer}>
-        <div className={cn("mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
+        <div className={cn("w-full mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
           <PromptInput onSubmit={onSubmit} className="mt-0" globalDrop multiple>
             <AttachmentHeaderInner />
 
