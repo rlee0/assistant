@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, MessageSquarePlus, Trash2 } from "lucide-react";
+import { Loader2, Plus, Trash2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,7 +14,6 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
-  SidebarSeparator,
 } from "@/components/ui/sidebar";
 import { memo, useCallback } from "react";
 
@@ -120,7 +119,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
             {creatingChat ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
-              <MessageSquarePlus className="size-4" />
+              <Plus className="size-4" />
             )}
             <span>New Chat</span>
           </Button>
