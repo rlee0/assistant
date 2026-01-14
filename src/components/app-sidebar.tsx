@@ -167,7 +167,8 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
                               event.stopPropagation();
                               handleDeleteConversation(id);
                             }}
-                            disabled={isDeleting}>
+                            disabled={isDeleting}
+                            className="cursor-pointer">
                             {isDeleting ? (
                               <Loader2 className="size-4 animate-spin" />
                             ) : (

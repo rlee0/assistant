@@ -65,10 +65,16 @@ export const MessageAction = ({
   label,
   variant = "ghost",
   size = "icon-sm",
+  className,
   ...props
 }: MessageActionProps) => {
   const button = (
-    <Button size={size} type="button" variant={variant} {...props}>
+    <Button
+      size={size}
+      type="button"
+      variant={variant}
+      className={cn("cursor-pointer", className)}
+      {...props}>
       {children}
       <span className="sr-only">{label || tooltip}</span>
     </Button>
