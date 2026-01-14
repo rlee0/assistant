@@ -7,7 +7,11 @@ import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
 import { API_ROUTES } from "@/lib/api/routes";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Conversation,
+  ConversationContent,
+  ConversationScrollButton,
+} from "@/components/ai-elements/conversation";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
   Breadcrumb,
@@ -439,186 +443,6 @@ function useTextareaKeyboardShortcuts(): (e: KeyboardEvent<HTMLTextAreaElement>)
 }
 
 /**
- * Retrieves the scroll viewport element from the messages container.
- *
- * @param containerElement - Parent container element
- * @returns The scroll viewport element, or null if not found
- * @throws Logs error if element is not found during expected initialization
- */
-function getScrollViewport(containerElement: HTMLElement): HTMLElement | null {
-  const scrollElement = containerElement.querySelector(SCROLL_AREA_VIEWPORT_SELECTOR);
-  if (scrollElement instanceof HTMLElement) {
-    return scrollElement;
-  }
-  logWarn("[useAutoScroll]", "Scroll viewport not found", {
-    selector: SCROLL_AREA_VIEWPORT_SELECTOR,
-  });
-  return null;
-}
-
-/**
- * Checks if the user has scrolled away from the bottom of the scroll area.
- *
- * @param scrollElement - The scroll viewport element
- * @returns Distance in pixels from the bottom
- */
-function getDistanceFromBottom(scrollElement: HTMLElement): number {
-  const { scrollTop, scrollHeight, clientHeight } = scrollElement;
-  return scrollHeight - scrollTop - clientHeight;
-}
-
-/**
- * Auto-scrolls to bottom when messages change, with scroll anchor preservation.
- *
- * Implements a smart auto-scroll that:
- * - Scrolls to bottom when new messages arrive (if user is at bottom)
- * - Continues scrolling during streaming responses via MutationObserver
- * - Respects user scroll position when they scroll up
- * - Uses debounced mutations to prevent scroll jank during rapid updates
- *
- * @param messagesContainerRef - Ref to the messages container div (parent of ScrollArea)
- * @param messages - Current message array from useChat
- * @param status - Current chat status (required to detect streaming state)
- *
- * @remarks
- * - Threshold: Only scrolls if within SCROLL_ANCHOR_THRESHOLD (100px) from bottom
- * - Uses `scrollTo` with smooth behavior for comfortable UX
- * - MutationObserver debounced at 50ms to batch rapid DOM updates
- * - Finds scroll viewport via Radix UI selector to handle component composition
- * - All listeners and observers are properly cleaned up on unmount
- *
- * @example
- * ```tsx
- * const messagesContainerRef = useRef<HTMLDivElement>(null);
- * const { messages, status } = useChat(...);
- *
- * useAutoScroll(messagesContainerRef, messages, status);
- *
- * return <div ref={messagesContainerRef}>...</div>;
- * ```
- */
-function useAutoScroll(
-  messagesContainerRef: React.RefObject<HTMLDivElement | null>,
-  messages: ReadonlyArray<ReturnType<typeof useChat>["messages"][number]>,
-  status: ReturnType<typeof useChat>["status"]
-): void {
-  const isAtBottomRef = useRef(true);
-  const scrollListenerRef = useRef<(() => void) | null>(null);
-  const mutationObserverRef = useRef<MutationObserver | null>(null);
-  const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-
-  // =========================================================================
-  // Setup scroll listener and mutation observer (once on mount)
-  // =========================================================================
-  useEffect(() => {
-    const containerElement = messagesContainerRef.current;
-    if (!containerElement) {
-      logWarn("[useAutoScroll]", "Container element not found", { ref: "messagesContainerRef" });
-      return;
-    }
-
-    const scrollElement = getScrollViewport(containerElement);
-    if (!scrollElement) {
-      return; // Already logged in getScrollViewport
-    }
-
-    // -----------------------------------------------------------------------
-    // Helper: Check current scroll position
-    // -----------------------------------------------------------------------
-    const checkScrollPosition = () => {
-      const distanceFromBottom = getDistanceFromBottom(scrollElement);
-      isAtBottomRef.current = distanceFromBottom <= SCROLL_ANCHOR_THRESHOLD;
-    };
-
-    // -----------------------------------------------------------------------
-    // Helper: Perform scroll animation
-    // -----------------------------------------------------------------------
-    const scrollToBottom = () => {
-      if (!isAtBottomRef.current) {
-        return; // User has scrolled away, respect their position
-      }
-
-      scrollElement.scrollTo({
-        top: scrollElement.scrollHeight,
-        behavior: "smooth",
-      });
-    };
-
-    // -----------------------------------------------------------------------
-    // Listener: Track when user manually scrolls
-    // -----------------------------------------------------------------------
-    scrollListenerRef.current = checkScrollPosition;
-    checkScrollPosition(); // Initial check
-    scrollElement.addEventListener("scroll", checkScrollPosition, { passive: true });
-
-    // -----------------------------------------------------------------------
-    // Observer: Detect content mutations during streaming
-    // -----------------------------------------------------------------------
-    const handleMutation = () => {
-      // Clear existing timeout to debounce rapid mutations
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-      }
-
-      // Debounce scroll updates (50ms window for batching)
-      scrollTimeoutRef.current = setTimeout(() => {
-        scrollToBottom();
-        scrollTimeoutRef.current = null;
-      }, 50);
-    };
-
-    const observer = new MutationObserver(handleMutation);
-
-    // Observe direct children only (not subtree) to avoid observing nested changes
-    observer.observe(scrollElement, {
-      childList: true,
-      subtree: true,
-      characterData: true,
-    });
-
-    mutationObserverRef.current = observer;
-
-    // -----------------------------------------------------------------------
-    // Cleanup
-    // -----------------------------------------------------------------------
-    return () => {
-      // Remove scroll listener
-      scrollElement.removeEventListener("scroll", checkScrollPosition);
-      scrollListenerRef.current = null;
-
-      // Disconnect observer
-      observer.disconnect();
-      mutationObserverRef.current = null;
-
-      // Clear pending scroll timeout
-      if (scrollTimeoutRef.current) {
-        clearTimeout(scrollTimeoutRef.current);
-        scrollTimeoutRef.current = null;
-      }
-    };
-  }, [messagesContainerRef]); // Re-setup if container ref changes (rare)
-
-  // =========================================================================
-  // Handle new messages (array length change)
-  // =========================================================================
-  useEffect(() => {
-    const containerElement = messagesContainerRef.current;
-    if (!containerElement) return;
-
-    const scrollElement = getScrollViewport(containerElement);
-    if (!scrollElement) return;
-
-    // When messages are added, scroll if user was at bottom
-    if (isAtBottomRef.current) {
-      scrollElement.scrollTo({
-        top: scrollElement.scrollHeight,
-        behavior: "smooth",
-      });
-    }
-  }, [messages.length, status, messagesContainerRef]);
-}
-
-/**
  * Auto-focuses textarea on component mount (after hydration).
  *
  * @param textareaRef - Ref to the textarea element
@@ -652,6 +476,7 @@ interface ChatMessagesProps {
   readonly editingMessageId: string | null;
   readonly editText: string;
   readonly hydrated: boolean;
+  readonly scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
   readonly onEditMessage: (messageId: string, initialText: string) => void;
   readonly onCancelEdit: () => void;
   readonly onSaveEdit: (messageId: string, newText: string) => void;
@@ -669,6 +494,7 @@ const ChatMessages = memo<ChatMessagesProps>(
     editingMessageId,
     editText,
     hydrated,
+    scrollToBottomRef,
     onEditMessage,
     onCancelEdit,
     onSaveEdit,
@@ -693,235 +519,258 @@ const ChatMessages = memo<ChatMessagesProps>(
 
     return (
       <div className={CSS_CLASSES.messagesContainer} ref={messagesContainerRef}>
-        <ScrollArea className="h-full px-4">
-          <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
-            {!hydrated ? (
-              <ChatMessagesSkeleton />
-            ) : messages.length === 0 ? (
-              <Empty>
-                <EmptyHeader>
-                  <EmptyTitle>Start a Conversation</EmptyTitle>
-                  <EmptyDescription>Type a message below to begin chatting.</EmptyDescription>
-                </EmptyHeader>
-              </Empty>
-            ) : (
-              <>
-                {messages.map((message, messageIndex) => {
-                  const isEditing = message.id === editingMessageId;
-                  const isAfterEditedMessage =
-                    editingMessageId &&
-                    messageIndex > messages.findIndex((m) => m.id === editingMessageId);
+        <Conversation>
+          <ConversationContent className="px-4">
+            <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
+              {!hydrated ? (
+                <ChatMessagesSkeleton />
+              ) : messages.length === 0 ? (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>Start a Conversation</EmptyTitle>
+                    <EmptyDescription>Type a message below to begin chatting.</EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : (
+                <>
+                  {messages.map((message, messageIndex) => {
+                    const isEditing = message.id === editingMessageId;
+                    const isAfterEditedMessage =
+                      editingMessageId &&
+                      messageIndex > messages.findIndex((m) => m.id === editingMessageId);
 
-                  // Validate message.parts is an array before accessing
-                  const parts = Array.isArray(message.parts) ? message.parts : [];
+                    // Validate message.parts is an array before accessing
+                    const parts = Array.isArray(message.parts) ? message.parts : [];
 
-                  // Extract text content for copy and edit functionality
-                  const textParts = parts
-                    .filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
-                    .map((part) => part.text)
-                    .join("\n");
+                    // Extract text content for copy and edit functionality
+                    const textParts = parts
+                      .filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
+                      .map((part) => part.text)
+                      .join("\n");
 
-                  const hasTextToCopy = textParts.trim().length > 0;
+                    const hasTextToCopy = textParts.trim().length > 0;
 
-                  return (
-                    <Message
-                      key={message.id}
-                      from={message.role}
-                      className={isAfterEditedMessage ? "opacity-50 transition-opacity" : ""}>
-                      <MessageContent>
-                        {isEditing && message.role === "user" ? (
-                          <PromptInput
-                            onSubmit={() => {
-                              if (editText.trim()) {
-                                onSaveEdit(message.id, editText);
-                              }
-                            }}
-                            className={cn("w-full", EDIT_INPUT_MIN_WIDTH)}>
-                            <PromptInputBody>
-                              <PromptInputTextarea
-                                ref={editTextareaRef}
-                                value={editText}
-                                onChange={(e) => onEditTextChange(e.target.value)}
-                                placeholder={EDIT_PLACEHOLDER}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                                    e.preventDefault();
-                                    if (editText.trim()) {
-                                      onSaveEdit(message.id, editText);
+                    return (
+                      <Message
+                        key={message.id}
+                        from={message.role}
+                        className={isAfterEditedMessage ? "opacity-50 transition-opacity" : ""}>
+                        <MessageContent>
+                          {isEditing && message.role === "user" ? (
+                            <PromptInput
+                              onSubmit={() => {
+                                if (editText.trim()) {
+                                  onSaveEdit(message.id, editText);
+                                }
+                              }}
+                              className={cn("w-full", EDIT_INPUT_MIN_WIDTH)}>
+                              <PromptInputBody>
+                                <PromptInputTextarea
+                                  ref={editTextareaRef}
+                                  value={editText}
+                                  onChange={(e) => onEditTextChange(e.target.value)}
+                                  placeholder={EDIT_PLACEHOLDER}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                      e.preventDefault();
+                                      if (editText.trim()) {
+                                        onSaveEdit(message.id, editText);
+                                      }
                                     }
-                                  }
-                                  if (e.key === "Escape") {
-                                    e.preventDefault();
-                                    onCancelEdit();
-                                  }
-                                }}
-                              />
-                            </PromptInputBody>
-                            <PromptInputFooter>
-                              <PromptInputTools>
-                                <PromptInputButton
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={onCancelEdit}>
-                                  <X className="size-4" />
-                                </PromptInputButton>
-                              </PromptInputTools>
-                              <PromptInputSubmit disabled={!editText.trim()} status="ready" />
-                            </PromptInputFooter>
-                          </PromptInput>
-                        ) : (
-                          <>
-                            {parts.map((part, index) => (
-                              <MessagePartRenderer key={index} part={part} index={index} />
-                            ))}
-                            <SourcesRenderer parts={parts} />
-                          </>
+                                    if (e.key === "Escape") {
+                                      e.preventDefault();
+                                      onCancelEdit();
+                                    }
+                                  }}
+                                />
+                              </PromptInputBody>
+                              <PromptInputFooter>
+                                <PromptInputTools>
+                                  <PromptInputButton
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={onCancelEdit}>
+                                    <X className="size-4" />
+                                  </PromptInputButton>
+                                </PromptInputTools>
+                                <PromptInputSubmit disabled={!editText.trim()} status="ready" />
+                              </PromptInputFooter>
+                            </PromptInput>
+                          ) : (
+                            <>
+                              {parts.map((part, index) => (
+                                <MessagePartRenderer key={index} part={part} index={index} />
+                              ))}
+                              <SourcesRenderer parts={parts} />
+                            </>
+                          )}
+                        </MessageContent>
+
+                        {!isEditing && message.role === "assistant" && (
+                          <MessageActions>
+                            <MessageAction
+                              onClick={async () => {
+                                if (!hasTextToCopy) {
+                                  toast.error(TOAST_MESSAGES.COPY_ERROR);
+                                  return;
+                                }
+
+                                // Check clipboard API availability
+                                if (!navigator.clipboard) {
+                                  logError(
+                                    "[Chat]",
+                                    "Clipboard API not available",
+                                    new Error("navigator.clipboard is undefined")
+                                  );
+                                  toast.error(TOAST_MESSAGES.COPY_ERROR);
+                                  return;
+                                }
+
+                                try {
+                                  await navigator.clipboard.writeText(textParts);
+                                  toast.success(TOAST_MESSAGES.COPY_SUCCESS);
+                                } catch (error) {
+                                  logError("[Chat]", "Clipboard write failed", error, {
+                                    textLength: textParts.length,
+                                  });
+                                  toast.error(TOAST_MESSAGES.COPY_ERROR);
+                                }
+                              }}
+                              label="Copy"
+                              tooltip="Copy response"
+                              disabled={!hasTextToCopy || status === "streaming"}>
+                              <Copy className="size-3" />
+                            </MessageAction>
+
+                            {/* Regenerate with confirmation */}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <MessageAction
+                                  label="Regenerate"
+                                  tooltip="Regenerate from here"
+                                  disabled={!(status === "ready" || status === "error")}>
+                                  <RefreshCcw className="size-3" />
+                                </MessageAction>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Regenerate from this message?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will delete all messages after this assistant message, then
+                                    regenerate the response for this message. This action cannot be
+                                    undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      // Slice conversation after the selected assistant message
+                                      onRegenerateFromMessage(message.id);
+                                    }}>
+                                    Regenerate
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </MessageActions>
                         )}
+
+                        {!isEditing && message.role === "user" && (
+                          <MessageActions className="ml-auto">
+                            <MessageAction
+                              onClick={() => {
+                                onEditMessage(message.id, textParts);
+                              }}
+                              label="Edit"
+                              tooltip="Edit message"
+                              disabled={!(status === "ready" || status === "error")}>
+                              <Edit2 className="size-3" />
+                            </MessageAction>
+
+                            {/* Delete with confirmation */}
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <MessageAction
+                                  label="Delete"
+                                  tooltip="Delete message"
+                                  disabled={!(status === "ready" || status === "error")}>
+                                  <Trash2 className="size-3" />
+                                </MessageAction>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will delete this user message and all subsequent messages.
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction
+                                    onClick={() => {
+                                      onDeleteMessage(message.id);
+                                      toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+                                    }}>
+                                    Delete
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                          </MessageActions>
+                        )}
+                      </Message>
+                    );
+                  })}
+
+                  {status === "submitted" && (
+                    <Message from="assistant">
+                      <MessageContent>
+                        <Loader size={16} />
                       </MessageContent>
-
-                      {!isEditing && message.role === "assistant" && (
-                        <MessageActions>
-                          <MessageAction
-                            onClick={async () => {
-                              if (!hasTextToCopy) {
-                                toast.error(TOAST_MESSAGES.COPY_ERROR);
-                                return;
-                              }
-
-                              // Check clipboard API availability
-                              if (!navigator.clipboard) {
-                                logError(
-                                  "[Chat]",
-                                  "Clipboard API not available",
-                                  new Error("navigator.clipboard is undefined")
-                                );
-                                toast.error(TOAST_MESSAGES.COPY_ERROR);
-                                return;
-                              }
-
-                              try {
-                                await navigator.clipboard.writeText(textParts);
-                                toast.success(TOAST_MESSAGES.COPY_SUCCESS);
-                              } catch (error) {
-                                logError("[Chat]", "Clipboard write failed", error, {
-                                  textLength: textParts.length,
-                                });
-                                toast.error(TOAST_MESSAGES.COPY_ERROR);
-                              }
-                            }}
-                            label="Copy"
-                            tooltip="Copy response"
-                            disabled={!hasTextToCopy || status === "streaming"}>
-                            <Copy className="size-3" />
-                          </MessageAction>
-
-                          {/* Regenerate with confirmation */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <MessageAction
-                                label="Regenerate"
-                                tooltip="Regenerate from here"
-                                disabled={!(status === "ready" || status === "error")}>
-                                <RefreshCcw className="size-3" />
-                              </MessageAction>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Regenerate from this message?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will delete all messages after this assistant message, then
-                                  regenerate the response for this message. This action cannot be
-                                  undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => {
-                                    // Slice conversation after the selected assistant message
-                                    onRegenerateFromMessage(message.id);
-                                  }}>
-                                  Regenerate
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </MessageActions>
-                      )}
-
-                      {!isEditing && message.role === "user" && (
-                        <MessageActions className="ml-auto">
-                          <MessageAction
-                            onClick={() => {
-                              onEditMessage(message.id, textParts);
-                            }}
-                            label="Edit"
-                            tooltip="Edit message"
-                            disabled={!(status === "ready" || status === "error")}>
-                            <Edit2 className="size-3" />
-                          </MessageAction>
-
-                          {/* Delete with confirmation */}
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <MessageAction
-                                label="Delete"
-                                tooltip="Delete message"
-                                disabled={!(status === "ready" || status === "error")}>
-                                <Trash2 className="size-3" />
-                              </MessageAction>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will delete this user message and all subsequent messages.
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => {
-                                    onDeleteMessage(message.id);
-                                    toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
-                                  }}>
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        </MessageActions>
-                      )}
                     </Message>
-                  );
-                })}
+                  )}
 
-                {status === "submitted" && (
-                  <Message from="assistant">
-                    <MessageContent>
-                      <Loader size={16} />
-                    </MessageContent>
-                  </Message>
-                )}
-
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="size-4" />
-                    <AlertTitle>An error occurred</AlertTitle>
-                    <AlertDescription>{error.message || "Please try again."}</AlertDescription>
-                  </Alert>
-                )}
-              </>
-            )}
-          </div>
-        </ScrollArea>
+                  {error && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="size-4" />
+                      <AlertTitle>An error occurred</AlertTitle>
+                      <AlertDescription>{error.message || "Please try again."}</AlertDescription>
+                    </Alert>
+                  )}
+                </>
+              )}
+            </div>
+          </ConversationContent>
+          <ConversationScrollButton />
+          <ScrollToBottomCapture scrollToBottomRef={scrollToBottomRef} />
+        </Conversation>
       </div>
     );
   }
 );
 ChatMessages.displayName = "ChatMessages";
+
+/**
+ * Captures the scrollToBottom function from Conversation context and stores it in a ref
+ */
+const ScrollToBottomCapture = memo<{
+  scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
+}>(({ scrollToBottomRef }) => {
+  const { scrollToBottom } = require("use-stick-to-bottom").useStickToBottomContext();
+
+  useEffect(() => {
+    scrollToBottomRef.current = scrollToBottom;
+    return () => {
+      scrollToBottomRef.current = null;
+    };
+  }, [scrollToBottom, scrollToBottomRef]);
+
+  return null;
+});
+ScrollToBottomCapture.displayName = "ScrollToBottomCapture";
 
 interface ChatInputProps {
   readonly text: string;
@@ -1178,6 +1027,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const pendingCreateRef = useRef<Promise<string> | null>(null);
   const statusChangeRef = useRef<ReturnType<typeof useChat>["status"]>(status);
   const loadedConversationIdRef = useRef<string | null>(null);
+  const scrollToBottomRef = useRef<(() => void) | null>(null);
 
   // ----- Hooks
   const { models, selectedModelInfo, modelsLoading } = useModelManagement(
@@ -1187,7 +1037,6 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     }
   );
 
-  useAutoScroll(messagesContainerRef, messages, status);
   useAutoFocusTextarea(textareaRef);
 
   // Cleanup abort controller on unmount
@@ -1257,6 +1106,14 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       setConversationStatus(selectedId, mapUseChatStatus(status));
     }
   }, [selectedId, setConversationStatus, status]);
+
+  // Step 6: Auto-scroll to bottom when messages change or streaming starts
+  useEffect(() => {
+    if (!selectedId || !scrollToBottomRef.current) return;
+
+    // Scroll when messages change or streaming starts
+    scrollToBottomRef.current();
+  }, [messages, selectedId, status]);
 
   const persistConversation = useCallback(
     async (conversationId: string): Promise<void> => {
@@ -1459,7 +1316,9 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
         setText("");
 
+        // Scroll to bottom after sending message
         queueMicrotask(() => {
+          scrollToBottomRef.current?.();
           textareaRef.current?.focus();
         });
       } catch (error) {
@@ -1664,7 +1523,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       />
       <SidebarInset>
         <ChatHeader conversationTitle={conversationTitle} />
-        <div className="flex flex-1 flex-col gap-4 p-y4 pt-0">
+        <div className="flex flex-1 flex-col gap-4 p-y4 pt-0 min-h-0">
           {/* Settings Modal */}
           <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
 
@@ -1677,6 +1536,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             editingMessageId={editingMessageId}
             editText={editText}
             hydrated={hydrated}
+            scrollToBottomRef={scrollToBottomRef}
             onEditMessage={handleEditMessage}
             onCancelEdit={handleCancelEdit}
             onSaveEdit={handleSaveEdit}

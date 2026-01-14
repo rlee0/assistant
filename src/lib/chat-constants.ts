@@ -24,7 +24,7 @@ export const SCROLL_ANCHOR_THRESHOLD = 100 as const;
 /** CSS class names for chat UI components */
 export const CSS_CLASSES = {
   image: "max-w-sm rounded-md h-auto",
-  messagesContainer: "flex-1 min-h-0",
+  messagesContainer: "flex flex-col flex-1 min-h-0",
   messagesInner: "mx-auto py-8 space-y-6",
   inputContainer: "sticky bottom-0 z-20 border-t bg-background p-4",
   modelButton: "flex items-center gap-2 min-w-max px-2",

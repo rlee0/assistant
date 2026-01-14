@@ -147,3 +147,15 @@
     --sidebar-ring: oklch(0.439 0 0);
   }
 }
+
+/**
+ * Fix use-stick-to-bottom viewport height calculation in flexbox.
+ * The library's inline height:100% computes to content height in flex contexts.
+ * Grid with 1fr properly constrains the child to the parent's available space.
+ * Apply grid to both the parent and child to prevent height growth.
+ */
+[role="log"],
+[role="log"] > div {
+  display: grid;
+  grid-template-rows: 1fr;
+}
