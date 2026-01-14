@@ -27,28 +27,56 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
   const [isLoading, setIsLoading] = useState(false);
   const isDisabled = isLoading || !supabase;
 
-  async function handleLogin(e: React.FormEvent) {
+  async function handleLogin(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
-    setError(null);
-    setIsLoading(true);
-    const { error: signInError } = await supabase!.auth.signInWithPassword({
-      email,
-      password,
-    });
-    setIsLoading(false);
-    if (signInError) setError(signInError.message);
-    else router.replace("/");
-  }
 
-  async function oauth(provider: "google" | "github") {
     if (!supabase) {
-      setError("Supabase is not configured.");
+      setError("Authentication service is unavailable.");
       return;
     }
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/` },
-    });
+
+    setError(null);
+    setIsLoading(true);
+
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setError(signInError.message);
+        return;
+      }
+
+      router.replace("/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unexpected error occurred";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function oauth(provider: "google" | "github"): Promise<void> {
+    if (!supabase) {
+      setError("Authentication service is unavailable.");
+      return;
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+      });
+
+      if (error) {
+        setError(error.message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "OAuth authentication failed";
+      setError(message);
+    }
   }
 
   return (

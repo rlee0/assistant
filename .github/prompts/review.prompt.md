@@ -26,22 +26,20 @@ Act as a Principal Software Engineer. Refactor the provided code to be productio
 
 # Output Format
 
-Respond initially with this exact structure:
+Once the refactor is complete, respond in the chat with the following sections:
 
 ## 1. Issues Found
 
-_Summary of identified issues._
+_Brief summary of identified issues._
 
-## 2. Plan
-
-_Detailed plan to address the issues._
-
-After the changes are made, respond with the following structure:
-
-## 3. Change Log
+## 2. Change Log
 
 - Succinct list of changes (including breaking changes).
 
-## 4. Suggested Next Steps
+## 3. Suggested Next Steps
 
 - Recommendations for further improvements or optional enhancements.
+
+# Final Notes
+
+- Never create markdown document reports, reviews, or summaries.

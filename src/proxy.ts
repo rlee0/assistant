@@ -2,43 +2,62 @@ import { type NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 /**
- * Proxy for authentication and authorization checks
- *
- * This proxy:
- * - Refreshes Supabase auth session from cookies
- * - Redirects unauthenticated users to signup
- * - Protects private routes (currently root page /)
- * - Allows auth routes (/(auth)) for all users
+ * Public routes that don't require authentication
  */
-export async function proxy(request: NextRequest) {
-  const pathname = request.nextUrl.pathname;
+const PUBLIC_ROUTES = new Set(["/login", "/signup", "/api/auth/callback"]);
 
-  // Allow auth routes for everyone (including unauthenticated users)
-  if (pathname.startsWith("/(auth)") || pathname.startsWith("/api/")) {
+/**
+ * Check if a route is public and doesn't require authentication
+ */
+function isPublicRoute(pathname: string): boolean {
+  return PUBLIC_ROUTES.has(pathname);
+}
+
+/**
+ * Middleware for authentication and authorization
+ *
+ * Responsibilities:
+ * - Validates and refreshes Supabase auth sessions
+ * - Redirects unauthenticated users to login
+ * - Protects private routes
+ * - Allows public routes (auth pages, callbacks)
+ *
+ * @param request - The incoming request
+ * @returns NextResponse to continue or redirect
+ */
+export async function proxy(request: NextRequest): Promise<NextResponse> {
+  const { pathname } = request.nextUrl;
+
+  // Allow public routes without authentication
+  if (isPublicRoute(pathname)) {
     return NextResponse.next();
   }
 
-  // For protected routes, check authentication
+  // Check authentication for protected routes
   try {
     const supabase = await createSupabaseServerClient();
     const {
       data: { user },
+      error,
     } = await supabase.auth.getUser();
 
-    // Redirect unauthenticated users to signup
-    if (!user && pathname !== "/") {
-      return NextResponse.redirect(new URL("/(auth)/signup", request.url));
+    // Handle auth errors
+    if (error) {
+      console.error("[Middleware] Auth verification failed:", error.message);
+      return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    if (!user && pathname === "/") {
-      return NextResponse.redirect(new URL("/(auth)/signup", request.url));
+    // Redirect unauthenticated users
+    if (!user) {
+      return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    // User is authenticated, proceed
+    // User authenticated, proceed with request
     return NextResponse.next();
   } catch (error) {
-    // Supabase not configured, allow request to proceed (page will show config error)
-    console.error("[Proxy] Auth check failed:", error);
+    // Log configuration errors but allow request (page will handle)
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Middleware] Auth check failed:", message);
     return NextResponse.next();
   }
 }

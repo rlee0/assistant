@@ -7,33 +7,39 @@ import { redirect } from "next/navigation";
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
-  let supabase;
   try {
-    supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser();
+
+    if (error) {
+      console.error("[Page] Auth verification failed:", error.message);
+      redirect("/login");
+    }
+
+    if (!user) {
+      redirect("/login");
+    }
+
+    await loadInitialChats(user.id);
+    return <ChatClient />;
   } catch (error) {
-    console.error(error);
+    // Handle Supabase configuration errors
+    const message = error instanceof Error ? error.message : "Unknown error";
+    console.error("[Page] Initialization failed:", message);
+
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4">
         <p className="text-sm text-red-600">
-          Supabase auth is not configured. Set NEXT_PUBLIC_SUPABASE_URL and
+          Authentication service is not configured. Set NEXT_PUBLIC_SUPABASE_URL and
           NEXT_PUBLIC_SUPABASE_ANON_KEY to continue.
         </p>
-        <Link href="/signup" className="text-sm text-blue-600 underline underline-offset-4">
-          Go to sign up
+        <Link href="/login" className="text-sm text-blue-600 underline underline-offset-4">
+          Go to login
         </Link>
       </div>
     );
   }
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect("/signup");
-  }
-
-  await loadInitialChats(user.id);
-
-  return <ChatClient />;
 }

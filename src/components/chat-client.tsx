@@ -65,10 +65,24 @@ import {
   groupModelsByProvider,
   type Model,
 } from "@/lib/models";
-import { PlusIcon, Check, AlertCircle, Copy, RefreshCcw, Edit2, Trash2, X } from "lucide-react";
+import {
+  PlusIcon,
+  Check,
+  AlertCircle,
+  Copy,
+  RefreshCcw,
+  Edit2,
+  Trash2,
+  X,
+  LogOut,
+  Settings,
+} from "lucide-react";
+import Link from "next/link";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
+import { useLogout } from "@/hooks/use-logout";
 import { logError, logWarn, logDebug } from "@/lib/logging";
+import { cn } from "@/lib/utils";
 import {
   CHAT_CONTAINER_MAX_WIDTH,
   DEFAULT_PROVIDER,
@@ -77,6 +91,8 @@ import {
   CSS_CLASSES,
   MESSAGE_PART_TYPE,
   ATTACHMENT_ONLY_MESSAGE_TEXT,
+  EDIT_INPUT_MIN_WIDTH,
+  EDIT_PLACEHOLDER,
   TOAST_MESSAGES,
 } from "@/lib/chat-constants";
 
@@ -400,10 +416,12 @@ interface ChatMessagesProps {
   regenerate: ReturnType<typeof useChat>["regenerate"];
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
   editingMessageId: string | null;
-  onEditMessage: (messageId: string) => void;
+  editText: string;
+  onEditMessage: (messageId: string, initialText: string) => void;
   onCancelEdit: () => void;
   onSaveEdit: (messageId: string, newText: string) => void;
   onDeleteMessage: (messageId: string) => void;
+  onEditTextChange: (text: string) => void;
 }
 
 const ChatMessages = memo<ChatMessagesProps>(
@@ -414,28 +432,32 @@ const ChatMessages = memo<ChatMessagesProps>(
     regenerate,
     scrollAreaRef,
     editingMessageId,
+    editText,
     onEditMessage,
     onCancelEdit,
     onSaveEdit,
     onDeleteMessage,
+    onEditTextChange,
   }) => {
-    const [editText, setEditText] = useState("");
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
     // Focus textarea and set cursor to end when entering edit mode
     useEffect(() => {
       if (editingMessageId && editTextareaRef.current) {
         const textarea = editTextareaRef.current;
-        textarea.focus();
-        // Set cursor to end of text
-        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        // Use queueMicrotask to ensure DOM update after state change
+        queueMicrotask(() => {
+          textarea.focus();
+          // Set cursor to end of text
+          textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+        });
       }
-    }, [editingMessageId]);
+    }, [editingMessageId, editText]);
 
     return (
       <div className={CSS_CLASSES.messagesContainer}>
         <ScrollArea ref={scrollAreaRef} className="h-full px-4">
-          <div className={`${CSS_CLASSES.messagesInner} ${CHAT_CONTAINER_MAX_WIDTH}`}>
+          <div className={cn(CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
             {messages.length === 0 && (
               <Empty>
                 <EmptyHeader>
@@ -473,13 +495,13 @@ const ChatMessages = memo<ChatMessagesProps>(
                             onSaveEdit(message.id, editText);
                           }
                         }}
-                        className="w-full min-w-96">
+                        className={cn("w-full", EDIT_INPUT_MIN_WIDTH)}>
                         <PromptInputBody>
                           <PromptInputTextarea
                             ref={editTextareaRef}
                             value={editText}
-                            onChange={(e) => setEditText(e.target.value)}
-                            placeholder="Edit your message..."
+                            onChange={(e) => onEditTextChange(e.target.value)}
+                            placeholder={EDIT_PLACEHOLDER}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
                                 e.preventDefault();
@@ -569,8 +591,7 @@ const ChatMessages = memo<ChatMessagesProps>(
                     <MessageActions className="ml-auto">
                       <MessageAction
                         onClick={() => {
-                          setEditText(textParts);
-                          onEditMessage(message.id);
+                          onEditMessage(message.id, textParts);
                         }}
                         label="Edit"
                         tooltip="Edit message"
@@ -579,10 +600,8 @@ const ChatMessages = memo<ChatMessagesProps>(
                       </MessageAction>
                       <MessageAction
                         onClick={() => {
-                          if (confirm("Delete this message and all messages after it?")) {
-                            onDeleteMessage(message.id);
-                            toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
-                          }
+                          onDeleteMessage(message.id);
+                          toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
                         }}
                         label="Delete"
                         tooltip="Delete message"
@@ -651,7 +670,7 @@ const ChatInput = memo<ChatInputProps>(
 
     return (
       <div className={CSS_CLASSES.inputContainer}>
-        <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
+        <div className={cn("mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
           <PromptInput onSubmit={onSubmit} className="mt-0" globalDrop multiple>
             <AttachmentHeaderInner />
 
@@ -737,6 +756,31 @@ const ChatInput = memo<ChatInputProps>(
 ChatInput.displayName = "ChatInput";
 
 /**
+ * Chat header with navigation and user menu
+ */
+const ChatHeader = memo(() => {
+  const { logout, isLoading } = useLogout();
+
+  return (
+    <header className={CSS_CLASSES.header}>
+      <SidebarTrigger />
+      <h1 className={CSS_CLASSES.headerTitle}>Chat</h1>
+      <div className="ml-auto flex items-center gap-2">
+        <Link href="/settings">
+          <Button variant="ghost" size="sm" aria-label="Settings">
+            <Settings className="size-4" />
+          </Button>
+        </Link>
+        <Button variant="ghost" size="sm" onClick={logout} disabled={isLoading} aria-label="Logout">
+          <LogOut className="size-4" />
+        </Button>
+      </div>
+    </header>
+  );
+});
+ChatHeader.displayName = "ChatHeader";
+
+/**
  * Main chat interface component using AI SDK UI.
  *
  * @remarks
@@ -809,6 +853,7 @@ export function ChatClient() {
   const [text, setText] = useState("");
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editText, setEditText] = useState("");
 
   // ----- Refs
   const scrollAreaRef = useRef<HTMLDivElement>(null);
@@ -870,46 +915,58 @@ export function ChatClient() {
     setMessages([]);
     setText("");
     setEditingMessageId(null);
+    setEditText("");
     textareaRef.current?.focus();
   }, [setMessages]);
 
-  const handleEditMessage = useCallback((messageId: string): void => {
+  const handleEditMessage = useCallback((messageId: string, initialText: string): void => {
+    setEditText(initialText);
     setEditingMessageId(messageId);
   }, []);
 
   const handleCancelEdit = useCallback((): void => {
     setEditingMessageId(null);
+    setEditText("");
   }, []);
 
   const handleSaveEdit = useCallback(
     (messageId: string, newText: string): void => {
       if (!newText.trim()) {
-        toast.error("Message cannot be empty");
+        toast.error(TOAST_MESSAGES.MESSAGE_EMPTY);
         return;
       }
 
       // Find the index of the message being edited
       const editIndex = messages.findIndex((m) => m.id === messageId);
-      if (editIndex === -1) return;
+      if (editIndex === -1) {
+        logWarn("[Chat]", "Edit failed: message not found", { messageId });
+        return;
+      }
 
-      // Remove all messages from the edited message onwards
-      const newMessages = messages.slice(0, editIndex);
-      setMessages(newMessages);
+      try {
+        // Remove all messages from the edited message onwards
+        const newMessages = messages.slice(0, editIndex);
+        setMessages(newMessages);
 
-      // Clear edit state
-      setEditingMessageId(null);
+        // Clear edit state
+        setEditingMessageId(null);
+        setEditText("");
 
-      // Re-send the edited message
-      sendMessage(
-        { text: newText },
-        {
-          body: {
-            model: currentModel,
-          },
-        }
-      );
+        // Re-send the edited message
+        sendMessage(
+          { text: newText },
+          {
+            body: {
+              model: currentModel,
+            },
+          }
+        );
 
-      toast.success("Message updated and re-submitted");
+        toast.success(TOAST_MESSAGES.MESSAGE_UPDATED);
+      } catch (error) {
+        logError("[Chat]", "Edit save failed", error);
+        toast.error("Failed to update message");
+      }
     },
     [messages, setMessages, sendMessage, currentModel]
   );
@@ -918,13 +975,14 @@ export function ChatClient() {
     (messageId: string): void => {
       // Find the index of the message to delete
       const deleteIndex = messages.findIndex((m) => m.id === messageId);
-      if (deleteIndex === -1) return;
+      if (deleteIndex === -1) {
+        logWarn("[Chat]", "Delete failed: message not found", { messageId });
+        return;
+      }
 
       // Remove the message and all subsequent messages
       const newMessages = messages.slice(0, deleteIndex);
       setMessages(newMessages);
-
-      toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
     },
     [messages, setMessages]
   );
@@ -946,10 +1004,7 @@ export function ChatClient() {
       <SidebarInset>
         <div className={CSS_CLASSES.chatContainer}>
           {/* Header */}
-          <header className={CSS_CLASSES.header}>
-            <SidebarTrigger />
-            <h1 className={CSS_CLASSES.headerTitle}>Chat</h1>
-          </header>
+          <ChatHeader />
 
           {/* Messages */}
           <ChatMessages
@@ -959,10 +1014,12 @@ export function ChatClient() {
             regenerate={regenerate}
             scrollAreaRef={scrollAreaRef}
             editingMessageId={editingMessageId}
+            editText={editText}
             onEditMessage={handleEditMessage}
             onCancelEdit={handleCancelEdit}
             onSaveEdit={handleSaveEdit}
             onDeleteMessage={handleDeleteMessage}
+            onEditTextChange={setEditText}
           />
 
           {/* Input */}

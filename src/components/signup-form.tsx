@@ -29,14 +29,36 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
   const isDisabled = isLoading || !supabase;
 
   function validateForm(): string | null {
-    if (!name.trim()) return "Full name is required.";
-    if (password.length < 8) return "Password must be at least 8 characters long.";
-    if (password !== confirmPassword) return "Passwords do not match.";
+    const trimmedName = name.trim();
+    const trimmedEmail = email.trim();
+
+    if (!trimmedName) {
+      return "Full name is required.";
+    }
+
+    if (!trimmedEmail) {
+      return "Email is required.";
+    }
+
+    if (password.length < 8) {
+      return "Password must be at least 8 characters long.";
+    }
+
+    if (password !== confirmPassword) {
+      return "Passwords do not match.";
+    }
+
     return null;
   }
 
-  async function handleSignup(e: React.FormEvent) {
+  async function handleSignup(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
+
+    if (!supabase) {
+      setError("Authentication service is unavailable.");
+      return;
+    }
+
     setError(null);
 
     const validationError = validateForm();
@@ -46,30 +68,51 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     }
 
     setIsLoading(true);
-    const { error: signUpError } = await supabase!.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          full_name: name,
-        },
-      },
-    });
-    setIsLoading(false);
 
-    if (signUpError) setError(signUpError.message);
-    else router.replace("/");
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            full_name: name.trim(),
+          },
+        },
+      });
+
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
+
+      router.replace("/");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "An unexpected error occurred";
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
   }
 
-  async function oauth(provider: "google" | "github") {
+  async function oauth(provider: "google" | "github"): Promise<void> {
     if (!supabase) {
-      setError("Supabase is not configured.");
+      setError("Authentication service is unavailable.");
       return;
     }
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/` },
-    });
+
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/api/auth/callback` },
+      });
+
+      if (error) {
+        setError(error.message);
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "OAuth authentication failed";
+      setError(message);
+    }
   }
 
   return (

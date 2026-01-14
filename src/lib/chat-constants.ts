@@ -59,6 +59,12 @@ export const MESSAGE_PART_TYPE = {
 /** Fallback text when message has only attachments */
 export const ATTACHMENT_ONLY_MESSAGE_TEXT = "Sent with attachments" as const;
 
+/** Minimum width for edit input (384px) */
+export const EDIT_INPUT_MIN_WIDTH = "min-w-96" as const;
+
+/** Placeholder text for edit textarea */
+export const EDIT_PLACEHOLDER = "Edit your message..." as const;
+
 // ============================================================================
 // Toast Messages
 // ============================================================================
@@ -68,4 +74,6 @@ export const TOAST_MESSAGES = {
   COPY_SUCCESS: "Response copied to clipboard",
   COPY_ERROR: "Failed to copy response",
   MESSAGE_DELETED: "Message deleted",
+  MESSAGE_UPDATED: "Message updated and re-submitted",
+  MESSAGE_EMPTY: "Message cannot be empty",
 } as const;

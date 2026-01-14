@@ -2,7 +2,7 @@
 
 import { LoginForm } from "@/components/login-form";
 
-export default function SignupPage() {
+export default function LoginPage() {
   return (
     <div className="flex min-h-screen items-center justify-center bg-zinc-50">
       <LoginForm className="w-full max-w-md" />
