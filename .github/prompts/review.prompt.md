@@ -26,15 +26,17 @@ Act as a Principal Software Engineer. Refactor the provided code to be productio
 
 # Output Format
 
-Return the response in this exact structure:
+Respond initially with this exact structure:
 
 ## 1. Issues Found
 
-_Brief summary of identified issues._
+_Summary of identified issues._
 
 ## 2. Plan
 
 _Detailed plan to address the issues._
+
+After the changes are made, respond with the following structure:
 
 ## 3. Change Log
 
