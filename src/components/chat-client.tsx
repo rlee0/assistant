@@ -9,6 +9,17 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import {
+  AlertDialog,
+  AlertDialogTrigger,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogCancel,
+  AlertDialogAction,
+} from "@/components/ui/alert-dialog";
 import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
 import {
   Message,
@@ -413,7 +424,6 @@ interface ChatMessagesProps {
   messages: ReturnType<typeof useChat>["messages"];
   status: ReturnType<typeof useChat>["status"];
   error: ReturnType<typeof useChat>["error"];
-  regenerate: ReturnType<typeof useChat>["regenerate"];
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
   editingMessageId: string | null;
   editText: string;
@@ -422,6 +432,7 @@ interface ChatMessagesProps {
   onSaveEdit: (messageId: string, newText: string) => void;
   onDeleteMessage: (messageId: string) => void;
   onEditTextChange: (text: string) => void;
+  onRegenerateFromMessage: (messageId: string) => void;
 }
 
 const ChatMessages = memo<ChatMessagesProps>(
@@ -429,7 +440,6 @@ const ChatMessages = memo<ChatMessagesProps>(
     messages,
     status,
     error,
-    regenerate,
     scrollAreaRef,
     editingMessageId,
     editText,
@@ -438,6 +448,7 @@ const ChatMessages = memo<ChatMessagesProps>(
     onSaveEdit,
     onDeleteMessage,
     onEditTextChange,
+    onRegenerateFromMessage,
   }) => {
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -472,7 +483,7 @@ const ChatMessages = memo<ChatMessagesProps>(
               const isAfterEditedMessage =
                 editingMessageId &&
                 messageIndex > messages.findIndex((m) => m.id === editingMessageId);
-              const isLastMessage = messageIndex === messages.length - 1;
+              // const isLastMessage = messageIndex === messages.length - 1;
 
               // Extract text content for copy and edit functionality
               const textParts = message.parts
@@ -539,7 +550,7 @@ const ChatMessages = memo<ChatMessagesProps>(
                     )}
                   </MessageContent>
 
-                  {!isEditing && message.role === "assistant" && isLastMessage && (
+                  {!isEditing && message.role === "assistant" && (
                     <MessageActions>
                       <MessageAction
                         onClick={async () => {
@@ -574,16 +585,38 @@ const ChatMessages = memo<ChatMessagesProps>(
                         disabled={!hasTextToCopy || status === "streaming"}>
                         <Copy className="size-3" />
                       </MessageAction>
-                      <MessageAction
-                        onClick={() => {
-                          // Regenerate last message - no need to pass messageId
-                          regenerate();
-                        }}
-                        label="Regenerate"
-                        tooltip="Regenerate response"
-                        disabled={status === "streaming"}>
-                        <RefreshCcw className="size-3" />
-                      </MessageAction>
+
+                      {/* Regenerate with confirmation */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <MessageAction
+                            label="Regenerate"
+                            tooltip="Regenerate from here"
+                            disabled={!(status === "ready" || status === "error")}>
+                            <RefreshCcw className="size-3" />
+                          </MessageAction>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Regenerate from this message?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will delete all messages after this assistant message, then
+                              regenerate the response for this message. This action cannot be
+                              undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => {
+                                // Slice conversation after the selected assistant message
+                                onRegenerateFromMessage(message.id);
+                              }}>
+                              Regenerate
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </MessageActions>
                   )}
 
@@ -595,19 +628,40 @@ const ChatMessages = memo<ChatMessagesProps>(
                         }}
                         label="Edit"
                         tooltip="Edit message"
-                        disabled={status === "streaming"}>
+                        disabled={!(status === "ready" || status === "error")}>
                         <Edit2 className="size-3" />
                       </MessageAction>
-                      <MessageAction
-                        onClick={() => {
-                          onDeleteMessage(message.id);
-                          toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
-                        }}
-                        label="Delete"
-                        tooltip="Delete message"
-                        disabled={status === "streaming"}>
-                        <Trash2 className="size-3" />
-                      </MessageAction>
+
+                      {/* Delete with confirmation */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <MessageAction
+                            label="Delete"
+                            tooltip="Delete message"
+                            disabled={!(status === "ready" || status === "error")}>
+                            <Trash2 className="size-3" />
+                          </MessageAction>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              This will delete this user message and all subsequent messages. This
+                              action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => {
+                                onDeleteMessage(message.id);
+                                toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+                              }}>
+                              Delete
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
                     </MessageActions>
                   )}
                 </Message>
@@ -986,6 +1040,42 @@ export function ChatClient() {
     [messages, setMessages]
   );
 
+  const handleRegenerateFromMessage = useCallback(
+    (messageId: string): void => {
+      // Block while streaming/submitted
+      if (!(status === "ready" || status === "error")) {
+        logDebug("[Chat]", "Regenerate blocked: status", { status });
+        return;
+      }
+
+      const targetIndex = messages.findIndex((m) => m.id === messageId);
+      if (targetIndex === -1) {
+        logWarn("[Chat]", "Regenerate failed: message not found", { messageId });
+        return;
+      }
+
+      const targetMessage = messages[targetIndex];
+      if (targetMessage.role !== "assistant") {
+        logWarn("[Chat]", "Regenerate requires an assistant message", { messageId });
+        toast.error("Select an assistant message to regenerate.");
+        return;
+      }
+
+      try {
+        // Keep the selected assistant message as the last message; remove subsequent messages
+        const newMessages = messages.slice(0, targetIndex + 1);
+        setMessages(newMessages);
+
+        // Regenerate the last assistant message
+        regenerate();
+      } catch (error) {
+        logError("[Chat]", "Regenerate failed", error, { messageId, targetIndex });
+        toast.error("Failed to regenerate message.");
+      }
+    },
+    [messages, setMessages, regenerate, status]
+  );
+
   return (
     <SidebarProvider>
       <Sidebar>
@@ -1013,7 +1103,6 @@ export function ChatClient() {
             messages={messages}
             status={status}
             error={error}
-            regenerate={regenerate}
             scrollAreaRef={scrollAreaRef}
             editingMessageId={editingMessageId}
             editText={editText}
@@ -1022,6 +1111,7 @@ export function ChatClient() {
             onSaveEdit={handleSaveEdit}
             onDeleteMessage={handleDeleteMessage}
             onEditTextChange={setEditText}
+            onRegenerateFromMessage={handleRegenerateFromMessage}
           />
 
           {/* Input */}
