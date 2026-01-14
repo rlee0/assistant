@@ -1,0 +1,186 @@
+"use client";
+
+import { Loader2, MessageSquarePlus, Trash2 } from "lucide-react";
+import {
+  Sidebar,
+  SidebarContent,
+  SidebarFooter,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarHeader,
+  SidebarMenu,
+  SidebarMenuAction,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarRail,
+  SidebarSeparator,
+} from "@/components/ui/sidebar";
+import { memo, useCallback } from "react";
+
+import { Button } from "@/components/ui/button";
+import { NavUser } from "@/components/nav-user";
+import { useRouter } from "next/navigation";
+
+/**
+ * Conversation status types
+ */
+type ConversationStatus = "idle" | "loading" | "streaming" | "error";
+
+/**
+ * Conversation data structure
+ */
+interface Conversation {
+  readonly id: string;
+  readonly title: string;
+  readonly updatedAt: string;
+}
+
+/**
+ * User profile data
+ */
+interface UserProfile {
+  readonly name: string;
+  readonly email: string;
+  readonly avatar?: string;
+}
+
+interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+  readonly user: UserProfile;
+  readonly conversations: Readonly<Record<string, Conversation>>;
+  readonly conversationOrder: ReadonlyArray<string>;
+  readonly selectedId: string | null;
+  readonly conversationStatuses: Readonly<Record<string, ConversationStatus>>;
+  readonly deleting: Readonly<Record<string, boolean>>;
+  readonly creatingChat: boolean;
+  readonly onNewChat: () => void;
+  readonly onSelectConversation: (id: string) => void;
+  readonly onDeleteConversation: (id: string) => void;
+  readonly onSettingsClick: () => void;
+}
+
+/**
+ * Conversation status indicator component
+ */
+const ConversationStatusIndicator = memo<{ status: ConversationStatus }>(
+  function ConversationStatusIndicator({ status }) {
+    if (status !== "streaming") return null;
+
+    return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+  }
+);
+
+/**
+ * Main application sidebar component
+ * Displays conversation list, new chat button, and user menu
+ */
+export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
+  user,
+  conversations,
+  conversationOrder,
+  selectedId,
+  conversationStatuses,
+  deleting,
+  creatingChat,
+  onNewChat,
+  onSelectConversation,
+  onDeleteConversation,
+  onSettingsClick,
+  ...props
+}) {
+  const router = useRouter();
+
+  const handleNewChat = useCallback(() => {
+    onNewChat();
+  }, [onNewChat]);
+
+  const handleSelectConversation = useCallback(
+    (id: string) => {
+      router.push(`/chat/${id}`);
+      onSelectConversation(id);
+    },
+    [router, onSelectConversation]
+  );
+
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      onDeleteConversation(id);
+    },
+    [onDeleteConversation]
+  );
+
+  return (
+    <Sidebar collapsible="icon" {...props}>
+      <SidebarHeader>
+        <div className="flex gap-2 p-2">
+          <Button
+            onClick={handleNewChat}
+            className="w-full justify-start"
+            variant="outline"
+            disabled={creatingChat}>
+            {creatingChat ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <MessageSquarePlus className="size-4" />
+            )}
+            <span>New Chat</span>
+          </Button>
+        </div>
+      </SidebarHeader>
+      <SidebarSeparator />
+      <SidebarContent>
+        <SidebarGroup>
+          <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+          <SidebarGroupContent>
+            {conversationOrder.length === 0 ? (
+              <p className="text-xs text-muted-foreground px-2 py-4">No conversations yet.</p>
+            ) : (
+              <SidebarMenu>
+                {conversationOrder.map((id) => {
+                  const conversation = conversations[id];
+                  if (!conversation) return null;
+                  const status = conversationStatuses[id] ?? "idle";
+                  const title = conversation.title || "Untitled chat";
+                  const isActive = id === selectedId;
+                  const isDeleting = deleting[id] ?? false;
+
+                  return (
+                    <SidebarMenuItem key={id}>
+                      <SidebarMenuButton
+                        isActive={isActive}
+                        onClick={() => handleSelectConversation(id)}
+                        tooltip={title}>
+                        <span className="flex-1 truncate">{title}</span>
+                        <ConversationStatusIndicator status={status} />
+                      </SidebarMenuButton>
+                      <SidebarMenuAction asChild showOnHover>
+                        <button
+                          type="button"
+                          aria-label={`Delete ${title}`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            handleDeleteConversation(id);
+                          }}
+                          disabled={isDeleting}>
+                          {isDeleting ? (
+                            <Loader2 className="size-4 animate-spin" />
+                          ) : (
+                            <Trash2 className="size-4" />
+                          )}
+                        </button>
+                      </SidebarMenuAction>
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            )}
+          </SidebarGroupContent>
+        </SidebarGroup>
+      </SidebarContent>
+      <SidebarFooter>
+        <NavUser user={user} onSettingsClick={onSettingsClick} />
+      </SidebarFooter>
+      <SidebarRail />
+    </Sidebar>
+  );
+});

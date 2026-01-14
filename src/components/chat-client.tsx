@@ -3,25 +3,20 @@
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
+import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { AppSidebar } from "@/components/app-sidebar";
 import {
-  Sidebar,
-  SidebarProvider,
-  SidebarInset,
-  SidebarTrigger,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupLabel,
-  SidebarGroupContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarMenuAction,
-  SidebarSeparator,
-} from "@/components/ui/sidebar";
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbList,
+  BreadcrumbPage,
+} from "@/components/ui/breadcrumb";
+import { Separator } from "@/components/ui/separator";
+import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -143,6 +138,7 @@ interface SelectedModelInfo {
 
 type ChatClientProps = {
   readonly initialData: InitialChatData;
+  readonly conversationId?: string;
 };
 
 type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
@@ -181,100 +177,6 @@ function uiMessageToChatMessage(message: UseChatMessage): ChatMessage {
     createdAt,
   };
 }
-
-interface ConversationListProps {
-  order: string[];
-  conversations: Record<string, Conversation>;
-  statuses: Record<string, ConversationStatus>;
-  selectedId: string | null;
-  deleting: Record<string, boolean>;
-  onSelect: (id: string) => void;
-  onDelete: (id: string) => void;
-}
-
-function renderStatusBadge(status: ConversationStatus) {
-  if (status === "idle") return null;
-  if (status === "error") {
-    return (
-      <Badge variant="destructive" className="h-5 gap-1 px-2 text-[11px]">
-        <AlertCircle className="size-3" />
-        Error
-      </Badge>
-    );
-  }
-
-  return (
-    <Badge variant="secondary" className="h-5 gap-1 px-2 text-[11px]">
-      <Loader2 className="size-3 animate-spin" />
-      {status === "streaming" ? "Streaming" : "Sending"}
-    </Badge>
-  );
-}
-
-const ConversationList = memo<ConversationListProps>(
-  ({ order, conversations, statuses, selectedId, deleting, onSelect, onDelete }) => {
-    if (order.length === 0) {
-      return (
-        <SidebarContent>
-          <SidebarGroup>
-            <SidebarGroupLabel>Conversations</SidebarGroupLabel>
-            <SidebarGroupContent>
-              <p className="text-xs text-muted-foreground px-2 py-1">No conversations yet.</p>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        </SidebarContent>
-      );
-    }
-
-    return (
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Conversations</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {order.map((id) => {
-                const conversation = conversations[id];
-                if (!conversation) return null;
-                const status = statuses[id] ?? "idle";
-                const title = conversation.title || "Untitled chat";
-
-                return (
-                  <SidebarMenuItem key={id} className="group/menu-item">
-                    <SidebarMenuButton
-                      isActive={id === selectedId}
-                      onClick={() => onSelect(id)}
-                      aria-label={`Open conversation ${title}`}>
-                      <span className="flex-1 truncate">{title}</span>
-                      {renderStatusBadge(status)}
-                    </SidebarMenuButton>
-                    <SidebarMenuAction asChild>
-                      <button
-                        type="button"
-                        aria-label={`Delete ${title}`}
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onDelete(id);
-                        }}
-                        className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
-                        disabled={Boolean(deleting[id])}>
-                        {deleting[id] ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Trash2 className="size-4" />
-                        )}
-                      </button>
-                    </SidebarMenuAction>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
-    );
-  }
-);
-ConversationList.displayName = "ConversationList";
 
 // ============================================================================
 // Sub-Components
@@ -998,22 +900,21 @@ const ChatInput = memo<ChatInputProps>(
 ChatInput.displayName = "ChatInput";
 
 /**
- * Chat header with navigation and user menu
+ * Chat header with breadcrumb navigation
  */
-const ChatHeader = memo(({ onSettingsClick }: { onSettingsClick: () => void }) => {
-  const { logout, isLoading } = useLogout();
-
+const ChatHeader = memo(({ conversationTitle }: { conversationTitle: string }) => {
   return (
-    <header className={CSS_CLASSES.header}>
-      <SidebarTrigger />
-      <h1 className={CSS_CLASSES.headerTitle}>Chat</h1>
-      <div className="ml-auto flex items-center gap-2">
-        <Button variant="ghost" size="sm" onClick={onSettingsClick} aria-label="Settings">
-          <Settings className="size-4" />
-        </Button>
-        <Button variant="ghost" size="sm" onClick={logout} disabled={isLoading} aria-label="Logout">
-          <LogOut className="size-4" />
-        </Button>
+    <header className="flex h-16 shrink-0 items-center gap-2 transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+      <div className="flex items-center gap-2 px-4">
+        <SidebarTrigger className="-ml-1" />
+        <Separator orientation="vertical" className="mr-2 h-4" />
+        <Breadcrumb>
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbPage>{conversationTitle || "Chat"}</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
       </div>
     </header>
   );
@@ -1061,7 +962,9 @@ ChatHeader.displayName = "ChatHeader";
  *
  * @see {@link https://sdk.vercel.ai/docs/ai-sdk-ui/chatbot AI SDK UI Documentation}
  */
-export function ChatClient({ initialData }: ChatClientProps) {
+export function ChatClient({ initialData, conversationId }: ChatClientProps) {
+  const router = useRouter();
+
   const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -1092,7 +995,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
   const {
     conversations,
     order,
-    selectedId,
+    selectedId: storeSelectedId,
     status: conversationStatuses,
     hydrated,
     hydrate,
@@ -1103,6 +1006,9 @@ export function ChatClient({ initialData }: ChatClientProps) {
     setStatus: setConversationStatus,
     remove: removeConversation,
   } = useChatStore();
+
+  // Use route conversationId if provided, otherwise use store selectedId
+  const selectedId = conversationId ?? storeSelectedId;
 
   // ----- Local State
   const [text, setText] = useState("");
@@ -1142,24 +1048,36 @@ export function ChatClient({ initialData }: ChatClientProps) {
     }
   }, [hydrate, hydrated, initialData]);
 
+  // Sync route conversationId with store selection when route changes
+  useEffect(() => {
+    if (!conversationId || conversationId === storeSelectedId) {
+      return;
+    }
+    selectConversationId(conversationId);
+  }, [conversationId, storeSelectedId, selectConversationId]);
+
   // Sync chat UI state when switching conversations without re-triggering store updates
   useEffect(() => {
-    if (!selectedId) {
+    const currentId = conversationId || storeSelectedId;
+
+    if (!currentId) {
       lastSyncedConversationIdRef.current = null;
       setMessages([]);
       return;
     }
 
-    if (lastSyncedConversationIdRef.current === selectedId) {
+    if (lastSyncedConversationIdRef.current === currentId) {
       return;
     }
 
-    const conversation = conversations[selectedId];
+    const conversation = conversations[currentId];
     if (conversation) {
-      lastSyncedConversationIdRef.current = selectedId;
+      lastSyncedConversationIdRef.current = currentId;
       setMessages(conversation.messages);
+    } else {
+      setMessages([]);
     }
-  }, [conversations, selectedId, setMessages]);
+  }, [conversations, conversationId, storeSelectedId, setMessages]);
 
   useEffect(() => {
     if (selectedId) {
@@ -1277,6 +1195,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
           const conversation = chatSessionToConversation(data.chat);
           upsertConversation(conversation);
           selectConversationId(conversation.id);
+          router.push(`/chat/${conversation.id}`);
           setMessages([]);
           setText("");
           setEditingMessageId(null);
@@ -1307,6 +1226,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
           checkpoints: [],
         });
         selectConversationId(localId);
+        router.push(`/chat/${localId}`);
         setMessages([]);
         setText("");
         setEditingMessageId(null);
@@ -1320,7 +1240,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
 
     pendingCreateRef.current = createPromise;
     return createPromise;
-  }, [currentModel, selectConversationId, setMessages, upsertConversation]);
+  }, [currentModel, selectConversationId, setMessages, upsertConversation, router]);
 
   const ensureConversation = useCallback(async () => {
     if (selectedId && conversations[selectedId]) return selectedId;
@@ -1457,8 +1377,8 @@ export function ChatClient({ initialData }: ChatClientProps) {
   );
 
   const handleDeleteConversation = useCallback(
-    async (conversationId: string) => {
-      setDeleting((prev) => ({ ...prev, [conversationId]: true }));
+    async (conversationIdToDelete: string) => {
+      setDeleting((prev) => ({ ...prev, [conversationIdToDelete]: true }));
       try {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
@@ -1467,7 +1387,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
           const response = await fetch("/api/chat/delete", {
             method: "DELETE",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: conversationId }),
+            body: JSON.stringify({ id: conversationIdToDelete }),
             signal: controller.signal,
           });
 
@@ -1478,14 +1398,20 @@ export function ChatClient({ initialData }: ChatClientProps) {
             throw new Error(detail || "Failed to delete conversation");
           }
 
-          removeConversation(conversationId);
+          removeConversation(conversationIdToDelete);
 
-          if (selectedId === conversationId) {
-            const fallback = order.find((id) => id !== conversationId) ?? null;
+          // Navigate away if deleting the current route's conversation
+          if (conversationIdToDelete === conversationId) {
+            const fallback = order.find((id) => id !== conversationIdToDelete) ?? null;
             selectConversationId(fallback);
-            if (fallback && conversations[fallback]) {
-              setMessages(conversations[fallback].messages);
+            if (fallback) {
+              router.push(`/chat/${fallback}`);
+              const conversation = conversations[fallback];
+              if (conversation) {
+                setMessages(conversation.messages);
+              }
             } else {
+              router.push("/");
               setMessages([]);
             }
           }
@@ -1498,16 +1424,24 @@ export function ChatClient({ initialData }: ChatClientProps) {
       } catch (err) {
         // Ignore abort errors
         if (err instanceof Error && err.name === "AbortError") {
-          logDebug("[Chat]", "Delete conversation aborted", { conversationId });
+          logDebug("[Chat]", "Delete conversation aborted", { conversationIdToDelete });
           return;
         }
-        logError("[Chat]", "Delete conversation failed", err, { conversationId });
+        logError("[Chat]", "Delete conversation failed", err, { conversationIdToDelete });
         toast.error("Failed to delete conversation");
       } finally {
-        setDeleting((prev) => ({ ...prev, [conversationId]: false }));
+        setDeleting((prev) => ({ ...prev, [conversationIdToDelete]: false }));
       }
     },
-    [conversations, order, removeConversation, selectConversationId, selectedId, setMessages]
+    [
+      conversations,
+      order,
+      removeConversation,
+      selectConversationId,
+      conversationId,
+      setMessages,
+      router,
+    ]
   );
 
   const handleRegenerateFromMessage = useCallback(
@@ -1546,42 +1480,33 @@ export function ChatClient({ initialData }: ChatClientProps) {
     [messages, setMessages, regenerate, status]
   );
 
+  const currentConversation = selectedId ? conversations[selectedId] : null;
+  const conversationTitle = currentConversation?.title || "New Chat";
+
+  // Get user info from settings or use default
+  const user = {
+    name: settings.account.displayName,
+    email: settings.account.email,
+  };
+
   return (
     <SidebarProvider>
-      <Sidebar>
-        <div className={CSS_CLASSES.sidebar}>
-          <div className={CSS_CLASSES.newChatButton}>
-            <Button
-              onClick={() => void handleNewChat()}
-              className="w-full"
-              variant="outline"
-              disabled={creatingChat}>
-              {creatingChat ? (
-                <Loader2 className="mr-2 size-4 animate-spin" />
-              ) : (
-                <PlusIcon className="mr-2 size-4" />
-              )}
-              New Chat
-            </Button>
-          </div>
-          <SidebarSeparator />
-          <ConversationList
-            order={order}
-            conversations={conversations}
-            statuses={conversationStatuses}
-            selectedId={selectedId}
-            deleting={deleting}
-            onSelect={handleSelectConversation}
-            onDelete={handleDeleteConversation}
-          />
-        </div>
-      </Sidebar>
-
+      <AppSidebar
+        user={user}
+        conversations={conversations}
+        conversationOrder={order}
+        selectedId={selectedId}
+        conversationStatuses={conversationStatuses}
+        deleting={deleting}
+        creatingChat={creatingChat}
+        onNewChat={handleNewChat}
+        onSelectConversation={handleSelectConversation}
+        onDeleteConversation={handleDeleteConversation}
+        onSettingsClick={() => setSettingsOpen(true)}
+      />
       <SidebarInset>
-        <div className={CSS_CLASSES.chatContainer}>
-          {/* Header */}
-          <ChatHeader onSettingsClick={() => setSettingsOpen(true)} />
-
+        <ChatHeader conversationTitle={conversationTitle} />
+        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
           {/* Settings Modal */}
           <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
 
