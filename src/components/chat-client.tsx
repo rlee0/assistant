@@ -65,17 +65,7 @@ import {
   groupModelsByProvider,
   type Model,
 } from "@/lib/models";
-import {
-  PlusIcon,
-  Check,
-  AlertCircle,
-  Copy,
-  RefreshCcw,
-  Edit2,
-  Trash2,
-  X,
-  Send,
-} from "lucide-react";
+import { PlusIcon, Check, AlertCircle, Copy, RefreshCcw, Edit2, Trash2, X } from "lucide-react";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
 import { logError, logWarn, logDebug } from "@/lib/logging";
@@ -432,10 +422,13 @@ const ChatMessages = memo<ChatMessagesProps>(
     const [editText, setEditText] = useState("");
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
-    // Focus textarea when entering edit mode
+    // Focus textarea and set cursor to end when entering edit mode
     useEffect(() => {
-      if (editingMessageId) {
-        editTextareaRef.current?.focus();
+      if (editingMessageId && editTextareaRef.current) {
+        const textarea = editTextareaRef.current;
+        textarea.focus();
+        // Set cursor to end of text
+        textarea.setSelectionRange(textarea.value.length, textarea.value.length);
       }
     }, [editingMessageId]);
 
@@ -474,35 +467,46 @@ const ChatMessages = memo<ChatMessagesProps>(
                   className={isAfterEditedMessage ? "opacity-50 transition-opacity" : ""}>
                   <MessageContent>
                     {isEditing && message.role === "user" ? (
-                      <div className="flex flex-col gap-2">
-                        <textarea
-                          ref={editTextareaRef}
-                          value={editText}
-                          onChange={(e) => setEditText(e.target.value)}
-                          className="min-h-25 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                              onSaveEdit(message.id, editText);
-                            }
-                            if (e.key === "Escape") {
-                              onCancelEdit();
-                            }
-                          }}
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={() => onSaveEdit(message.id, editText)}
-                            disabled={!editText.trim()}>
-                            <Send className="mr-2 size-3" />
-                            Save & Submit
-                          </Button>
-                          <Button size="sm" variant="outline" onClick={onCancelEdit}>
-                            <X className="mr-2 size-3" />
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
+                      <PromptInput
+                        onSubmit={() => {
+                          if (editText.trim()) {
+                            onSaveEdit(message.id, editText);
+                          }
+                        }}
+                        className="w-full min-w-96">
+                        <PromptInputBody>
+                          <PromptInputTextarea
+                            ref={editTextareaRef}
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            placeholder="Edit your message..."
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                                e.preventDefault();
+                                if (editText.trim()) {
+                                  onSaveEdit(message.id, editText);
+                                }
+                              }
+                              if (e.key === "Escape") {
+                                e.preventDefault();
+                                onCancelEdit();
+                              }
+                            }}
+                          />
+                        </PromptInputBody>
+                        <PromptInputFooter>
+                          <PromptInputTools>
+                            <PromptInputButton
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={onCancelEdit}>
+                              <X className="size-4" />
+                            </PromptInputButton>
+                          </PromptInputTools>
+                          <PromptInputSubmit disabled={!editText.trim()} status="ready" />
+                        </PromptInputFooter>
+                      </PromptInput>
                     ) : (
                       <>
                         {message.parts.map((part, index) => (
