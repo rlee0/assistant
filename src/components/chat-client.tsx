@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isToolUIPart, getToolName, type DynamicToolUIPart } from "ai";
+import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
 import ReactMarkdown from "react-markdown";
@@ -9,6 +9,13 @@ import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Message, MessageContent, MessageActions } from "@/components/ai-elements/message";
+import {
+  Tool,
+  ToolHeader,
+  ToolContent,
+  ToolInput,
+  ToolOutput,
+} from "@/components/ai-elements/tool";
 import { Spinner } from "@/components/ui/spinner";
 import {
   PromptInput,
@@ -48,7 +55,7 @@ import {
   groupModelsByProvider,
   type Model,
 } from "@/lib/models";
-import { PlusIcon } from "lucide-react";
+import { PlusIcon, Check } from "lucide-react";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
 
@@ -65,6 +72,34 @@ const DEFAULT_PROVIDER = "openai" as const;
 /** Radix UI scroll area viewport selector */
 const SCROLL_AREA_VIEWPORT_SELECTOR = "[data-radix-scroll-area-viewport]" as const;
 
+/** CSS classes */
+const CSS_CLASSES = {
+  toolDisplay: "rounded-md bg-muted p-3 text-xs",
+  toolHeader: "flex items-center justify-between",
+  toolContent: "mt-1 text-muted-foreground font-mono whitespace-pre-wrap",
+  emptyState: "text-center text-muted-foreground py-12",
+  errorContainer: "rounded-md bg-destructive/10 p-4 text-destructive",
+  errorTitle: "font-semibold",
+  errorMessage: "text-sm mt-1",
+  prose: "prose prose-sm dark:prose-invert max-w-none",
+  reasoning: "rounded-md bg-muted p-3 text-xs text-muted-foreground",
+  reasoningTitle: "font-semibold mb-1",
+  reasoningContent: "font-mono whitespace-pre-wrap text-[10px]",
+  image: "max-w-sm rounded-md h-auto",
+  sourceLink: "text-blue-500 hover:underline text-sm",
+  messagesContainer: "flex-1 min-h-0",
+  messagesInner: "mx-auto py-8 space-y-6",
+  inputContainer: "sticky bottom-0 z-20 border-t bg-background p-4",
+  modelButton: "flex items-center gap-2",
+  modelName: "text-xs",
+  modelId: "text-muted-foreground truncate text-xs",
+  chatContainer: "flex h-svh max-h-svh flex-col",
+  header: "sticky top-0 z-20 border-b bg-background px-4 py-3 flex items-center gap-2",
+  headerTitle: "text-lg font-semibold",
+  sidebar: "flex h-full flex-col p-4",
+  newChatButton: "mb-4",
+} as const;
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -79,60 +114,10 @@ interface SelectedModelInfo {
 // ============================================================================
 
 /**
- * Renders a tool call with its current state
- */
-const ToolCallDisplay = memo<{
-  part: DynamicToolUIPart;
-  toolName: string;
-}>(({ part, toolName }) => {
-  const getStateInfo = (state: DynamicToolUIPart["state"]): [string, string] => {
-    switch (state) {
-      case "output-available":
-        return [
-          "Complete",
-          typeof part.output === "string" ? part.output : JSON.stringify(part.output, null, 2),
-        ];
-      case "output-error":
-        return ["Error", part.errorText || "Unknown error occurred"];
-      case "input-streaming":
-        return ["Processing", part.input ? JSON.stringify(part.input, null, 2) : "Streaming..."];
-      case "input-available":
-        return ["Ready", JSON.stringify(part.input, null, 2)];
-      case "approval-requested":
-        return ["Awaiting Approval", JSON.stringify(part.input, null, 2)];
-      case "approval-responded":
-        return [
-          part.approval?.approved ? "Approved" : "Denied",
-          JSON.stringify(part.input, null, 2),
-        ];
-      case "output-denied":
-        return ["Denied", "Tool execution was denied"];
-      default:
-        // Exhaustive check: all states handled
-        state satisfies never;
-        return ["Unknown", "Processing..."];
-    }
-  };
-
-  const [stateLabel, content] = getStateInfo(part.state);
-
-  return (
-    <div className="rounded-md bg-muted p-3 text-xs">
-      <div className="flex items-center justify-between">
-        <span className="font-semibold">Tool: {toolName}</span>
-        <span className="text-muted-foreground text-[10px]">{stateLabel}</span>
-      </div>
-      <div className="mt-1 text-muted-foreground font-mono whitespace-pre-wrap">{content}</div>
-    </div>
-  );
-});
-ToolCallDisplay.displayName = "ToolCallDisplay";
-
-/**
  * Renders an empty state when no messages exist
  */
 const EmptyState = memo(() => (
-  <div className="text-center text-muted-foreground py-12">
+  <div className={CSS_CLASSES.emptyState}>
     <p>Start a conversation by typing a message below.</p>
   </div>
 ));
@@ -175,12 +160,9 @@ AttachmentHeaderInner.displayName = "AttachmentHeaderInner";
  * Renders an error message with accessible ARIA attributes
  */
 const ErrorDisplay = memo<{ error: Error }>(({ error }) => (
-  <div
-    className="rounded-md bg-destructive/10 p-4 text-destructive"
-    role="alert"
-    aria-live="assertive">
-    <p className="font-semibold">An error occurred</p>
-    <p className="text-sm mt-1">{error.message || "Please try again."}</p>
+  <div className={CSS_CLASSES.errorContainer} role="alert" aria-live="assertive">
+    <p className={CSS_CLASSES.errorTitle}>An error occurred</p>
+    <p className={CSS_CLASSES.errorMessage}>{error.message || "Please try again."}</p>
   </div>
 ));
 ErrorDisplay.displayName = "ErrorDisplay";
@@ -195,7 +177,7 @@ const MessagePartRenderer = memo<{
   // Text content
   if (part.type === "text") {
     return (
-      <div key={index} className="prose prose-sm dark:prose-invert max-w-none">
+      <div key={index} className={CSS_CLASSES.prose}>
         <ReactMarkdown>{part.text}</ReactMarkdown>
       </div>
     );
@@ -204,9 +186,9 @@ const MessagePartRenderer = memo<{
   // Reasoning/thinking content
   if (part.type === "reasoning") {
     return (
-      <div key={index} className="rounded-md bg-muted p-3 text-xs text-muted-foreground">
-        <div className="font-semibold mb-1">Reasoning</div>
-        <div className="font-mono whitespace-pre-wrap text-[10px]">{part.text}</div>
+      <div key={index} className={CSS_CLASSES.reasoning}>
+        <div className={CSS_CLASSES.reasoningTitle}>Reasoning</div>
+        <div className={CSS_CLASSES.reasoningContent}>{part.text}</div>
       </div>
     );
   }
@@ -214,7 +196,17 @@ const MessagePartRenderer = memo<{
   // Tool calls with proper type checking using AI SDK type guards
   if (isToolUIPart(part)) {
     const toolName = getToolName(part);
-    return <ToolCallDisplay key={index} part={part as DynamicToolUIPart} toolName={toolName} />;
+    const shouldDefaultOpen = part.state === "output-available" || part.state === "output-error";
+
+    return (
+      <Tool key={index} defaultOpen={shouldDefaultOpen}>
+        <ToolHeader type={part.type} state={part.state} title={toolName} />
+        <ToolContent>
+          <ToolInput input={part.input} />
+          <ToolOutput output={part.output} errorText={part.errorText} />
+        </ToolContent>
+      </Tool>
+    );
   }
 
   // Image files
@@ -226,7 +218,7 @@ const MessagePartRenderer = memo<{
         alt={part.filename || "Uploaded image"}
         width={384}
         height={384}
-        className="max-w-sm rounded-md h-auto"
+        className={CSS_CLASSES.image}
         unoptimized={part.url.startsWith("data:")}
       />
     );
@@ -240,7 +232,7 @@ const MessagePartRenderer = memo<{
         href={part.url}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-blue-500 hover:underline text-sm">
+        className={CSS_CLASSES.sourceLink}>
         {part.title || part.url}
       </a>
     );
@@ -260,8 +252,8 @@ MessagePartRenderer.displayName = "MessagePartRenderer";
  * Fetches models once on mount and validates current selection against available models
  *
  * Features:
- * - Handles AbortController cleanup to prevent memory leaks
- * - Validates model on every mount (but applies update only once)
+ * - Atomic cleanup using AbortController to prevent memory leaks and race conditions
+ * - Validates model only once to prevent infinite loops
  * - Gracefully handles errors without throwing
  *
  * @throws Does not throw; gracefully handles errors with fallback
@@ -275,6 +267,7 @@ function useModelManagement(
 } {
   const [models, setModels] = useState<Model[]>([]);
   const onModelUpdateRef = useRef(onModelUpdate);
+  const hasValidatedRef = useRef(false);
 
   // Keep callback ref updated
   useEffect(() => {
@@ -282,29 +275,34 @@ function useModelManagement(
   }, [onModelUpdate]);
 
   useEffect(() => {
-    let isMounted = true;
     const controller = new AbortController();
 
     const loadModels = async () => {
       try {
         const list = await fetchModels();
 
-        // Check both abort signal and mount status
-        if (controller.signal.aborted || !isMounted) return;
+        // Single atomic check for abort
+        if (controller.signal.aborted) return;
 
         setModels(list);
 
-        // Validate selected model is still available
-        if (isMounted && list.length > 0 && !list.some((m) => m.id === currentModel)) {
+        // Validate selected model is available (only once)
+        if (
+          !hasValidatedRef.current &&
+          list.length > 0 &&
+          !list.some((m) => m.id === currentModel)
+        ) {
+          hasValidatedRef.current = true;
           onModelUpdateRef.current(list[0].id);
         }
       } catch (err) {
-        if (controller.signal.aborted || !isMounted) return;
+        if (controller.signal.aborted) return;
 
         const message = err instanceof Error ? err.message : "Failed to fetch available models";
         console.error("[Chat] Model loading error:", {
           message,
-          isDevelopment: process.env.NODE_ENV === "development",
+          error: err,
+          timestamp: new Date().toISOString(),
         });
       }
     };
@@ -313,7 +311,6 @@ function useModelManagement(
 
     return () => {
       controller.abort();
-      isMounted = false;
     };
   }, [currentModel]);
 
@@ -387,9 +384,9 @@ interface ChatMessagesProps {
 }
 
 const ChatMessages = memo<ChatMessagesProps>(({ messages, status, error, scrollAreaRef }) => (
-  <div className="flex-1 min-h-0">
+  <div className={CSS_CLASSES.messagesContainer}>
     <ScrollArea ref={scrollAreaRef} className="h-full px-4">
-      <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH} py-8 space-y-6`}>
+      <div className={`${CSS_CLASSES.messagesInner} ${CHAT_CONTAINER_MAX_WIDTH}`}>
         {messages.length === 0 && <EmptyState />}
 
         {messages.map((message) => (
@@ -423,6 +420,7 @@ interface ChatInputProps {
   onSubmit: (message: PromptInputMessage) => void;
   status: ReturnType<typeof useChat>["status"];
   selectedModelInfo: SelectedModelInfo;
+  currentModel: string;
   selectorOpen: boolean;
   onSelectorOpenChange: (open: boolean) => void;
   models: ReadonlyArray<Model>;
@@ -437,6 +435,7 @@ const ChatInput = memo<ChatInputProps>(
     onSubmit,
     status,
     selectedModelInfo,
+    currentModel,
     selectorOpen,
     onSelectorOpenChange,
     models,
@@ -447,7 +446,7 @@ const ChatInput = memo<ChatInputProps>(
     const groupedModels = useGroupedModels(models);
 
     return (
-      <div className="sticky bottom-0 z-20 border-t bg-background p-4">
+      <div className={CSS_CLASSES.inputContainer}>
         <div className={`mx-auto ${CHAT_CONTAINER_MAX_WIDTH}`}>
           <PromptInput onSubmit={onSubmit} className="mt-0" globalDrop multiple>
             <AttachmentHeaderInner />
@@ -479,12 +478,12 @@ const ChatInput = memo<ChatInputProps>(
                 <PromptInputButton
                   variant="ghost"
                   onClick={() => onSelectorOpenChange(true)}
-                  className="flex items-center gap-2"
+                  className={CSS_CLASSES.modelButton}
                   aria-label="Select model">
                   <ModelSelectorLogoGroup>
                     <ModelSelectorLogo provider={selectedModelInfo.provider} />
                   </ModelSelectorLogoGroup>
-                  <span className="text-xs">{selectedModelInfo.name}</span>
+                  <span className={CSS_CLASSES.modelName}>{selectedModelInfo.name}</span>
                 </PromptInputButton>
               </PromptInputTools>
 
@@ -499,24 +498,28 @@ const ChatInput = memo<ChatInputProps>(
                 <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
                 {Object.entries(groupedModels).map(([provider, providerModels]) => (
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
-                    {providerModels.map((model) => (
-                      <ModelSelectorItem
-                        key={model.id}
-                        onSelect={() => {
-                          onModelSelect(model.id);
-                          onSelectorOpenChange(false);
-                        }}>
-                        <ModelSelectorLogoGroup>
-                          <ModelSelectorLogo provider={getModelProvider(model)} />
-                        </ModelSelectorLogoGroup>
-                        <div className="flex flex-1 items-baseline gap-2 overflow-hidden">
-                          <ModelSelectorName className="flex-none">{model.name}</ModelSelectorName>
-                          <span className="text-muted-foreground truncate text-xs">
-                            ({model.id})
-                          </span>
-                        </div>
-                      </ModelSelectorItem>
-                    ))}
+                    {providerModels.map((model) => {
+                      const isSelected = model.id === currentModel;
+                      return (
+                        <ModelSelectorItem
+                          key={model.id}
+                          onSelect={() => {
+                            onModelSelect(model.id);
+                            onSelectorOpenChange(false);
+                          }}>
+                          <ModelSelectorLogoGroup>
+                            <ModelSelectorLogo provider={getModelProvider(model)} />
+                          </ModelSelectorLogoGroup>
+                          <div className="flex flex-1 items-baseline gap-2 overflow-hidden">
+                            <ModelSelectorName className="flex-none">
+                              {model.name}
+                            </ModelSelectorName>
+                            <span className={CSS_CLASSES.modelId}>({model.id})</span>
+                          </div>
+                          {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}
+                        </ModelSelectorItem>
+                      );
+                    })}
                   </ModelSelectorGroup>
                 ))}
               </ModelSelectorList>
@@ -587,18 +590,31 @@ export function ChatClient() {
   useAutoFocusTextarea(textareaRef);
 
   // ----- Event Handlers
+  const handleModelSelect = useCallback(
+    (modelId: string) => {
+      updateSettings(["models", "defaultModel"], modelId);
+    },
+    [updateSettings]
+  );
+  const rafIdRef = useRef<number | null>(null);
+
   const handlePromptSubmit = useCallback(
     (message: PromptInputMessage) => {
       const hasText = Boolean(message.text);
       const hasAttachments = Boolean(message.files?.length);
 
       if (!(hasText || hasAttachments)) {
-        console.warn("Message submission blocked: no content");
+        console.warn("[Chat] Message submission blocked: no content", {
+          timestamp: new Date().toISOString(),
+        });
         return;
       }
 
       if (status !== "ready") {
-        console.debug("Message submission blocked: not ready", { status });
+        console.debug("[Chat] Message submission blocked: not ready", {
+          status,
+          timestamp: new Date().toISOString(),
+        });
         return;
       }
 
@@ -615,12 +631,28 @@ export function ChatClient() {
       );
 
       setText("");
-      requestAnimationFrame(() => {
+
+      // Cancel previous RAF if exists
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+
+      rafIdRef.current = requestAnimationFrame(() => {
         textareaRef.current?.focus();
+        rafIdRef.current = null;
       });
     },
     [currentModel, status, sendMessage]
   );
+
+  // Cleanup RAF on unmount
+  useEffect(() => {
+    return () => {
+      if (rafIdRef.current !== null) {
+        cancelAnimationFrame(rafIdRef.current);
+      }
+    };
+  }, []);
 
   const handleNewChat = useCallback(() => {
     setMessages([]);
@@ -631,8 +663,8 @@ export function ChatClient() {
   return (
     <SidebarProvider>
       <Sidebar>
-        <div className="flex h-full flex-col p-4">
-          <div className="mb-4">
+        <div className={CSS_CLASSES.sidebar}>
+          <div className={CSS_CLASSES.newChatButton}>
             <Button onClick={handleNewChat} className="w-full" variant="outline">
               <PlusIcon className="mr-2 size-4" />
               New Chat
@@ -643,11 +675,11 @@ export function ChatClient() {
       </Sidebar>
 
       <SidebarInset>
-        <div className="flex h-svh max-h-svh flex-col">
+        <div className={CSS_CLASSES.chatContainer}>
           {/* Header */}
-          <header className="sticky top-0 z-20 border-b bg-background px-4 py-3 flex items-center gap-2">
+          <header className={CSS_CLASSES.header}>
             <SidebarTrigger />
-            <h1 className="text-lg font-semibold">Chat</h1>
+            <h1 className={CSS_CLASSES.headerTitle}>Chat</h1>
           </header>
 
           {/* Messages */}
@@ -665,12 +697,11 @@ export function ChatClient() {
             onSubmit={handlePromptSubmit}
             status={status}
             selectedModelInfo={selectedModelInfo}
+            currentModel={currentModel}
             selectorOpen={selectorOpen}
             onSelectorOpenChange={setSelectorOpen}
             models={models}
-            onModelSelect={(modelId) => {
-              updateSettings(["models", "defaultModel"], modelId);
-            }}
+            onModelSelect={handleModelSelect}
             textareaRef={textareaRef}
           />
         </div>

@@ -58,6 +58,7 @@ import {
   type PropsWithChildren,
   type ReactNode,
   type RefObject,
+  useId,
   useCallback,
   useContext,
   useEffect,
@@ -908,13 +909,17 @@ export const PromptInputActionMenuTrigger = ({
   className,
   children,
   ...props
-}: PromptInputActionMenuTriggerProps) => (
-  <DropdownMenuTrigger asChild>
-    <PromptInputButton className={className} {...props}>
-      {children ?? <PlusIcon className="size-4" />}
-    </PromptInputButton>
-  </DropdownMenuTrigger>
-);
+}: PromptInputActionMenuTriggerProps) => {
+  const triggerId = useId();
+
+  return (
+    <DropdownMenuTrigger asChild>
+      <PromptInputButton id={triggerId} className={className} {...props}>
+        {children ?? <PlusIcon className="size-4" />}
+      </PromptInputButton>
+    </DropdownMenuTrigger>
+  );
+};
 
 export type PromptInputActionMenuContentProps = ComponentProps<typeof DropdownMenuContent>;
 export const PromptInputActionMenuContent = ({
@@ -1124,16 +1129,21 @@ export type PromptInputSelectTriggerProps = ComponentProps<typeof SelectTrigger>
 export const PromptInputSelectTrigger = ({
   className,
   ...props
-}: PromptInputSelectTriggerProps) => (
-  <SelectTrigger
-    className={cn(
-      "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
-      "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
-      className
-    )}
-    {...props}
-  />
-);
+}: PromptInputSelectTriggerProps) => {
+  const selectTriggerId = useId();
+
+  return (
+    <SelectTrigger
+      id={selectTriggerId}
+      className={cn(
+        "border-none bg-transparent font-medium text-muted-foreground shadow-none transition-colors",
+        "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
+        className
+      )}
+      {...props}
+    />
+  );
+};
 
 export type PromptInputSelectContentProps = ComponentProps<typeof SelectContent>;
 
@@ -1166,9 +1176,11 @@ export const PromptInputHoverCard = ({
 
 export type PromptInputHoverCardTriggerProps = ComponentProps<typeof HoverCardTrigger>;
 
-export const PromptInputHoverCardTrigger = (props: PromptInputHoverCardTriggerProps) => (
-  <HoverCardTrigger {...props} />
-);
+export const PromptInputHoverCardTrigger = (props: PromptInputHoverCardTriggerProps) =>
+  (() => {
+    const hoverTriggerId = useId();
+    return <HoverCardTrigger id={hoverTriggerId} {...props} />;
+  })();
 
 export type PromptInputHoverCardContentProps = ComponentProps<typeof HoverCardContent>;
 

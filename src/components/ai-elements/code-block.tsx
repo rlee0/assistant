@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CheckIcon, CopyIcon } from "lucide-react";
-import { SYNTAX_HIGHLIGHT_LIGHT_THEME, SYNTAX_HIGHLIGHT_DARK_THEME } from "@/lib/constants";
 import {
   type ComponentProps,
   createContext,
@@ -55,17 +54,19 @@ export async function highlightCode(
   language: BundledLanguage,
   showLineNumbers = false
 ) {
-  const transformers: ShikiTransformer[] = showLineNumbers ? [lineNumberTransformer] : [];
+  const transformers: ShikiTransformer[] = showLineNumbers
+    ? [lineNumberTransformer]
+    : [];
 
   return await Promise.all([
     codeToHtml(code, {
       lang: language,
-      theme: SYNTAX_HIGHLIGHT_LIGHT_THEME,
+      theme: "one-light",
       transformers,
     }),
     codeToHtml(code, {
       lang: language,
-      theme: SYNTAX_HIGHLIGHT_DARK_THEME,
+      theme: "one-dark-pro",
       transformers,
     }),
   ]);
@@ -104,7 +105,8 @@ export const CodeBlock = ({
           "group relative w-full overflow-hidden rounded-md border bg-background text-foreground",
           className
         )}
-        {...props}>
+        {...props}
+      >
         <div className="relative">
           <div
             className="overflow-auto dark:hidden [&>pre]:m-0 [&>pre]:bg-background! [&>pre]:p-4 [&>pre]:text-foreground! [&>pre]:text-sm [&_code]:font-mono [&_code]:text-sm"
@@ -117,7 +119,9 @@ export const CodeBlock = ({
             dangerouslySetInnerHTML={{ __html: darkHtml }}
           />
           {children && (
-            <div className="absolute top-2 right-2 flex items-center gap-2">{children}</div>
+            <div className="absolute top-2 right-2 flex items-center gap-2">
+              {children}
+            </div>
           )}
         </div>
       </div>
@@ -166,7 +170,8 @@ export const CodeBlockCopyButton = ({
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"
-      {...props}>
+      {...props}
+    >
       {children ?? <Icon size={14} />}
     </Button>
   );
