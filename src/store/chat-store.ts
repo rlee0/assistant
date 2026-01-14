@@ -259,20 +259,26 @@ export const useChatStore = create<ChatState>((set) => ({
 
       const now = new Date().toISOString();
       const lastMessage = messages[messages.length - 1];
-      const isUserMessage = lastMessage?.role === "user";
+      const isNewUserMessage =
+        lastMessage?.role === "user" && messages.length > conversation.messages.length;
 
       const updatedConversation: Conversation = {
         ...conversation,
         messages,
         updatedAt: now,
-        lastUserMessageAt: isUserMessage ? now : conversation.lastUserMessageAt,
+        lastUserMessageAt: isNewUserMessage ? now : conversation.lastUserMessageAt,
       };
 
       const conversations = { ...state.conversations, [id]: updatedConversation };
 
+      // Only resort order when a new user message is added
+      const order = isNewUserMessage
+        ? sortOrderByLastUserMessage(state.order, conversations)
+        : state.order;
+
       return {
         conversations,
-        order: sortOrderByLastUserMessage(state.order, conversations),
+        order,
       };
     }),
 
@@ -294,7 +300,8 @@ export const useChatStore = create<ChatState>((set) => ({
 
       return {
         conversations,
-        order: sortOrderByLastUserMessage(state.order, conversations),
+        // Don't resort order when only updating title
+        order: state.order,
       };
     }),
 

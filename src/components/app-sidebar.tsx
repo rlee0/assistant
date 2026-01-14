@@ -20,6 +20,7 @@ import { memo, useCallback } from "react";
 
 import { Button } from "@/components/ui/button";
 import { NavUser } from "@/components/nav-user";
+import { SidebarConversationsSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { useRouter } from "next/navigation";
 
 /**
@@ -53,6 +54,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   readonly conversationStatuses: Readonly<Record<string, ConversationStatus>>;
   readonly deleting: Readonly<Record<string, boolean>>;
   readonly creatingChat: boolean;
+  readonly hydrated: boolean;
   readonly onNewChat: () => void;
   readonly onSelectConversation: (id: string) => void;
   readonly onDeleteConversation: (id: string) => void;
@@ -82,6 +84,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   conversationStatuses,
   deleting,
   creatingChat,
+  hydrated,
   onNewChat,
   onSelectConversation,
   onDeleteConversation,
@@ -129,53 +132,57 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Conversations</SidebarGroupLabel>
-          <SidebarGroupContent>
-            {conversationOrder.length === 0 ? (
-              <p className="text-xs text-muted-foreground px-2 py-4">No conversations yet.</p>
-            ) : (
-              <SidebarMenu>
-                {conversationOrder.map((id) => {
-                  const conversation = conversations[id];
-                  if (!conversation) return null;
-                  const status = conversationStatuses[id] ?? "idle";
-                  const title = conversation.title || "Untitled chat";
-                  const isActive = id === selectedId;
-                  const isDeleting = deleting[id] ?? false;
+        {!hydrated ? (
+          <SidebarConversationsSkeleton />
+        ) : (
+          <SidebarGroup>
+            <SidebarGroupLabel>Conversations</SidebarGroupLabel>
+            <SidebarGroupContent>
+              {conversationOrder.length === 0 ? (
+                <p className="text-xs text-muted-foreground px-2 py-4">No conversations yet.</p>
+              ) : (
+                <SidebarMenu>
+                  {conversationOrder.map((id) => {
+                    const conversation = conversations[id];
+                    if (!conversation) return null;
+                    const status = conversationStatuses[id] ?? "idle";
+                    const title = conversation.title || "Untitled chat";
+                    const isActive = id === selectedId;
+                    const isDeleting = deleting[id] ?? false;
 
-                  return (
-                    <SidebarMenuItem key={id}>
-                      <SidebarMenuButton
-                        isActive={isActive}
-                        onClick={() => handleSelectConversation(id)}
-                        tooltip={title}>
-                        <span className="flex-1 truncate">{title}</span>
-                        <ConversationStatusIndicator status={status} />
-                      </SidebarMenuButton>
-                      <SidebarMenuAction asChild showOnHover>
-                        <button
-                          type="button"
-                          aria-label={`Delete ${title}`}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteConversation(id);
-                          }}
-                          disabled={isDeleting}>
-                          {isDeleting ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="size-4" />
-                          )}
-                        </button>
-                      </SidebarMenuAction>
-                    </SidebarMenuItem>
-                  );
-                })}
-              </SidebarMenu>
-            )}
-          </SidebarGroupContent>
-        </SidebarGroup>
+                    return (
+                      <SidebarMenuItem key={id}>
+                        <SidebarMenuButton
+                          isActive={isActive}
+                          onClick={() => handleSelectConversation(id)}
+                          tooltip={title}>
+                          <span className="flex-1 truncate">{title}</span>
+                          <ConversationStatusIndicator status={status} />
+                        </SidebarMenuButton>
+                        <SidebarMenuAction asChild showOnHover>
+                          <button
+                            type="button"
+                            aria-label={`Delete ${title}`}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              handleDeleteConversation(id);
+                            }}
+                            disabled={isDeleting}>
+                            {isDeleting ? (
+                              <Loader2 className="size-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="size-4" />
+                            )}
+                          </button>
+                        </SidebarMenuAction>
+                      </SidebarMenuItem>
+                    );
+                  })}
+                </SidebarMenu>
+              )}
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={user} onSettingsClick={onSettingsClick} />
