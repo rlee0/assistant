@@ -32,14 +32,14 @@ Return the response in this exact structure:
 
 _Brief summary of identified issues._
 
-## 2. Solution Plan
+## 2. Plan
 
 _Detailed plan to address the issues._
 
-## 3. Changelog
+## 3. Change Log
 
 - Succinct list of changes (including breaking changes).
 
 ## 4. Suggested Next Steps
 
-- Recommendations for further improvements or reviews.
+- Recommendations for further improvements or optional enhancements.

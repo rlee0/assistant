@@ -211,7 +211,7 @@ assistant/
 ### Additional Tools
 
 - **Shiki** - Syntax highlighting
-- **react-markdown** - Markdown rendering
+- **Streamdown** - Streaming markdown rendering (via AI SDK Elements)
 - **date-fns** - Date utilities
 - **lucide-react** - Icons
 

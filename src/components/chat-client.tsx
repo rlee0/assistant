@@ -4,11 +4,18 @@ import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
-import ReactMarkdown from "react-markdown";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sidebar, SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
-import { Message, MessageContent, MessageActions } from "@/components/ai-elements/message";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import {
+  Message,
+  MessageContent,
+  MessageActions,
+  MessageResponse,
+  MessageAction,
+} from "@/components/ai-elements/message";
 import {
   Tool,
   ToolHeader,
@@ -16,7 +23,9 @@ import {
   ToolInput,
   ToolOutput,
 } from "@/components/ai-elements/tool";
-import { Spinner } from "@/components/ui/spinner";
+import { Loader } from "@/components/ai-elements/loader";
+import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
+import { Sources, SourcesTrigger, SourcesContent, Source } from "@/components/ai-elements/sources";
 import {
   PromptInput,
   PromptInputHeader,
@@ -55,7 +64,7 @@ import {
   groupModelsByProvider,
   type Model,
 } from "@/lib/models";
-import { PlusIcon, Check } from "lucide-react";
+import { PlusIcon, Check, AlertCircle, Copy, RefreshCcw } from "lucide-react";
 import { useSettingsStore } from "@/store/settings-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
 
@@ -72,21 +81,20 @@ const DEFAULT_PROVIDER = "openai" as const;
 /** Radix UI scroll area viewport selector */
 const SCROLL_AREA_VIEWPORT_SELECTOR = "[data-radix-scroll-area-viewport]" as const;
 
+/** Message part type constants */
+const MESSAGE_PART_TYPE = {
+  TEXT: "text",
+  REASONING: "reasoning",
+  SOURCE_URL: "source-url",
+  FILE: "file",
+} as const;
+
+/** Fallback text when message has only attachments */
+const ATTACHMENT_ONLY_MESSAGE_TEXT = "Sent with attachments" as const;
+
 /** CSS classes */
 const CSS_CLASSES = {
-  toolDisplay: "rounded-md bg-muted p-3 text-xs",
-  toolHeader: "flex items-center justify-between",
-  toolContent: "mt-1 text-muted-foreground font-mono whitespace-pre-wrap",
-  emptyState: "text-center text-muted-foreground py-12",
-  errorContainer: "rounded-md bg-destructive/10 p-4 text-destructive",
-  errorTitle: "font-semibold",
-  errorMessage: "text-sm mt-1",
-  prose: "prose prose-sm dark:prose-invert max-w-none",
-  reasoning: "rounded-md bg-muted p-3 text-xs text-muted-foreground",
-  reasoningTitle: "font-semibold mb-1",
-  reasoningContent: "font-mono whitespace-pre-wrap text-[10px]",
   image: "max-w-sm rounded-md h-auto",
-  sourceLink: "text-blue-500 hover:underline text-sm",
   messagesContainer: "flex-1 min-h-0",
   messagesInner: "mx-auto py-8 space-y-6",
   inputContainer: "sticky bottom-0 z-20 border-t bg-background p-4",
@@ -114,32 +122,12 @@ interface SelectedModelInfo {
 // ============================================================================
 
 /**
- * Renders an empty state when no messages exist
- */
-const EmptyState = memo(() => (
-  <div className={CSS_CLASSES.emptyState}>
-    <p>Start a conversation by typing a message below.</p>
-  </div>
-));
-EmptyState.displayName = "EmptyState";
-
-/**
- * Renders a loading state with spinner
- */
-const LoadingState = memo(() => (
-  <Message from="assistant">
-    <MessageContent>
-      <Spinner className="size-4" />
-    </MessageContent>
-  </Message>
-));
-LoadingState.displayName = "LoadingState";
-
-/**
  * Internal component that uses PromptInput attachment hook.
  * Must be rendered within PromptInput context.
+ *
+ * Note: Not memoized as it's a trivial component with minimal render cost.
  */
-const AttachmentHeaderInner = memo(() => {
+function AttachmentHeaderInner() {
   const attachments = usePromptInputAttachments();
 
   if (!attachments.files.length) {
@@ -153,19 +141,7 @@ const AttachmentHeaderInner = memo(() => {
       </PromptInputAttachments>
     </PromptInputHeader>
   );
-});
-AttachmentHeaderInner.displayName = "AttachmentHeaderInner";
-
-/**
- * Renders an error message with accessible ARIA attributes
- */
-const ErrorDisplay = memo<{ error: Error }>(({ error }) => (
-  <div className={CSS_CLASSES.errorContainer} role="alert" aria-live="assertive">
-    <p className={CSS_CLASSES.errorTitle}>An error occurred</p>
-    <p className={CSS_CLASSES.errorMessage}>{error.message || "Please try again."}</p>
-  </div>
-));
-ErrorDisplay.displayName = "ErrorDisplay";
+}
 
 /**
  * Renders a message part based on its type with exhaustive type checking
@@ -175,21 +151,17 @@ const MessagePartRenderer = memo<{
   index: number;
 }>(({ part, index }) => {
   // Text content
-  if (part.type === "text") {
-    return (
-      <div key={index} className={CSS_CLASSES.prose}>
-        <ReactMarkdown>{part.text}</ReactMarkdown>
-      </div>
-    );
+  if (part.type === MESSAGE_PART_TYPE.TEXT) {
+    return <MessageResponse key={index}>{part.text}</MessageResponse>;
   }
 
   // Reasoning/thinking content
-  if (part.type === "reasoning") {
+  if (part.type === MESSAGE_PART_TYPE.REASONING) {
     return (
-      <div key={index} className={CSS_CLASSES.reasoning}>
-        <div className={CSS_CLASSES.reasoningTitle}>Reasoning</div>
-        <div className={CSS_CLASSES.reasoningContent}>{part.text}</div>
-      </div>
+      <Reasoning key={index} defaultOpen={true}>
+        <ReasoningTrigger />
+        <ReasoningContent>{part.text}</ReasoningContent>
+      </Reasoning>
     );
   }
 
@@ -209,8 +181,8 @@ const MessagePartRenderer = memo<{
     );
   }
 
-  // Image files
-  if (part.type === "file" && part.mediaType?.startsWith("image/")) {
+  // Image files with runtime validation
+  if (part.type === MESSAGE_PART_TYPE.FILE && part.mediaType?.startsWith("image/")) {
     return (
       <Image
         key={index}
@@ -224,24 +196,34 @@ const MessagePartRenderer = memo<{
     );
   }
 
-  // Source URLs from web search
-  if (part.type === "source-url") {
-    return (
-      <a
-        key={index}
-        href={part.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={CSS_CLASSES.sourceLink}>
-        {part.title || part.url}
-      </a>
-    );
-  }
-
+  // Source URLs are handled by SourcesRenderer, not individually
   // Unsupported or unknown part types
   return null;
 });
 MessagePartRenderer.displayName = "MessagePartRenderer";
+
+/**
+ * Groups and renders source-url parts using the Sources component
+ */
+const SourcesRenderer = memo<{
+  parts: ReturnType<typeof useChat>["messages"][number]["parts"];
+}>(({ parts }) => {
+  const sources = parts.filter((part) => part.type === MESSAGE_PART_TYPE.SOURCE_URL);
+
+  if (sources.length === 0) return null;
+
+  return (
+    <Sources>
+      <SourcesTrigger count={sources.length} />
+      <SourcesContent>
+        {sources.map((source, index) => (
+          <Source key={index} href={source.url} title={source.title ?? source.url} />
+        ))}
+      </SourcesContent>
+    </Sources>
+  );
+});
+SourcesRenderer.displayName = "SourcesRenderer";
 
 // ============================================================================
 // Hooks
@@ -380,38 +362,95 @@ interface ChatMessagesProps {
   messages: ReturnType<typeof useChat>["messages"];
   status: ReturnType<typeof useChat>["status"];
   error: ReturnType<typeof useChat>["error"];
+  regenerate: ReturnType<typeof useChat>["regenerate"];
   scrollAreaRef: React.RefObject<HTMLDivElement | null>;
 }
 
-const ChatMessages = memo<ChatMessagesProps>(({ messages, status, error, scrollAreaRef }) => (
-  <div className={CSS_CLASSES.messagesContainer}>
-    <ScrollArea ref={scrollAreaRef} className="h-full px-4">
-      <div className={`${CSS_CLASSES.messagesInner} ${CHAT_CONTAINER_MAX_WIDTH}`}>
-        {messages.length === 0 && <EmptyState />}
+const ChatMessages = memo<ChatMessagesProps>(
+  ({ messages, status, error, regenerate, scrollAreaRef }) => (
+    <div className={CSS_CLASSES.messagesContainer}>
+      <ScrollArea ref={scrollAreaRef} className="h-full px-4">
+        <div className={`${CSS_CLASSES.messagesInner} ${CHAT_CONTAINER_MAX_WIDTH}`}>
+          {messages.length === 0 && (
+            <Empty>
+              <EmptyHeader>
+                <EmptyTitle>Start a Conversation</EmptyTitle>
+                <EmptyDescription>Type a message below to begin chatting.</EmptyDescription>
+              </EmptyHeader>
+            </Empty>
+          )}
 
-        {messages.map((message) => (
-          <Message key={message.id} from={message.role}>
-            <MessageContent>
-              {message.parts.map((part, index) => (
-                <MessagePartRenderer key={index} part={part} index={index} />
-              ))}
-            </MessageContent>
+          {messages.map((message) => {
+            // Extract text content for copy functionality
+            const textParts = message.parts
+              .filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
+              .map((part) => part.text)
+              .join("\n");
 
-            {message.role === "assistant" && (
-              <MessageActions>
-                {/* Future: Add copy, regenerate, and other actions */}
-              </MessageActions>
-            )}
-          </Message>
-        ))}
+            const isLastMessage = message === messages[messages.length - 1];
 
-        {status === "submitted" && <LoadingState />}
+            return (
+              <Message key={message.id} from={message.role}>
+                <MessageContent>
+                  {message.parts.map((part, index) => (
+                    <MessagePartRenderer key={index} part={part} index={index} />
+                  ))}
+                  <SourcesRenderer parts={message.parts} />
+                </MessageContent>
 
-        {error && <ErrorDisplay error={error} />}
-      </div>
-    </ScrollArea>
-  </div>
-));
+                {message.role === "assistant" && isLastMessage && (
+                  <MessageActions>
+                    <MessageAction
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(textParts);
+                          // TODO: Add toast notification for success
+                        } catch (error) {
+                          console.error("[Chat] Clipboard write failed:", {
+                            error: error instanceof Error ? error.message : String(error),
+                            timestamp: new Date().toISOString(),
+                          });
+                          // TODO: Add toast notification for error
+                        }
+                      }}
+                      label="Copy"
+                      tooltip="Copy response">
+                      <Copy className="size-3" />
+                    </MessageAction>
+                    <MessageAction
+                      onClick={() => {
+                        regenerate({ messageId: message.id });
+                      }}
+                      label="Regenerate"
+                      tooltip="Regenerate response">
+                      <RefreshCcw className="size-3" />
+                    </MessageAction>
+                  </MessageActions>
+                )}
+              </Message>
+            );
+          })}
+
+          {status === "submitted" && (
+            <Message from="assistant">
+              <MessageContent>
+                <Loader size={16} />
+              </MessageContent>
+            </Message>
+          )}
+
+          {error && (
+            <Alert variant="destructive">
+              <AlertCircle className="size-4" />
+              <AlertTitle>An error occurred</AlertTitle>
+              <AlertDescription>{error.message || "Please try again."}</AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </ScrollArea>
+    </div>
+  )
+);
 ChatMessages.displayName = "ChatMessages";
 
 interface ChatInputProps {
@@ -533,19 +572,48 @@ const ChatInput = memo<ChatInputProps>(
 ChatInput.displayName = "ChatInput";
 
 /**
- * Main chat interface component using AI SDK UI
+ * Main chat interface component using AI SDK UI.
  *
- * Features:
- * - Real-time streaming responses with error recovery
- * - Tool calling support with exhaustive state handling
- * - File attachments (images) with validation
- * - Keyboard shortcuts (Enter to send, Shift+Enter for new line)
- * - Auto-scrolling to latest messages
- * - Model selection with fallback validation
- * - Structured error logging
+ * @remarks
+ * This component provides a production-ready chat interface with comprehensive
+ * error handling, type safety, and performance optimizations. It follows AI SDK
+ * best practices and React 19 patterns.
+ *
+ * @features
+ * - **Streaming**: Real-time streaming responses with error recovery
+ * - **Tool Calling**: Exhaustive state handling for tool invocations
+ * - **Attachments**: Image file support with media type validation
+ * - **Keyboard Shortcuts**: Enter to send, Shift+Enter for new line
+ * - **Auto-scroll**: Automatic scrolling to latest messages
+ * - **Model Selection**: Dynamic model selection with fallback validation
+ * - **Error Handling**: Structured logging and graceful error recovery
+ * - **Accessibility**: ARIA labels and keyboard navigation support
+ *
+ * @architecture
+ * - Uses AI SDK's useChat hook for state management
+ * - Implements atomic cleanup patterns with AbortController
+ * - Follows separation of concerns (rendering, logic, state)
+ * - Memoizes expensive computations to prevent unnecessary re-renders
+ *
+ * @performance
+ * - Memoized sub-components minimize re-renders
+ * - Efficient message part rendering with type guards
+ * - Optimized auto-scroll using IntersectionObserver pattern
+ * - RAF-free focus management using microtasks
+ *
+ * @example
+ * ```tsx
+ * import { ChatClient } from '@/components/chat-client';
+ *
+ * export default function Page() {
+ *   return <ChatClient />;
+ * }
+ * ```
+ *
+ * @see {@link https://sdk.vercel.ai/docs/ai-sdk-ui/chatbot AI SDK UI Documentation}
  */
 export function ChatClient() {
-  const { messages, sendMessage, status, error, setMessages } = useChat({
+  const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       credentials: "include",
@@ -591,13 +659,11 @@ export function ChatClient() {
 
   // ----- Event Handlers
   const handleModelSelect = useCallback(
-    (modelId: string) => {
+    (modelId: string): void => {
       updateSettings(["models", "defaultModel"], modelId);
     },
     [updateSettings]
   );
-  const rafIdRef = useRef<number | null>(null);
-
   const handlePromptSubmit = useCallback(
     (message: PromptInputMessage) => {
       const hasText = Boolean(message.text);
@@ -620,7 +686,7 @@ export function ChatClient() {
 
       sendMessage(
         {
-          text: message.text || "Sent with attachments",
+          text: message.text || ATTACHMENT_ONLY_MESSAGE_TEXT,
           files: message.files,
         },
         {
@@ -632,29 +698,15 @@ export function ChatClient() {
 
       setText("");
 
-      // Cancel previous RAF if exists
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
-
-      rafIdRef.current = requestAnimationFrame(() => {
+      // Focus textarea after submission (microtask ensures DOM is updated)
+      queueMicrotask(() => {
         textareaRef.current?.focus();
-        rafIdRef.current = null;
       });
     },
     [currentModel, status, sendMessage]
   );
 
-  // Cleanup RAF on unmount
-  useEffect(() => {
-    return () => {
-      if (rafIdRef.current !== null) {
-        cancelAnimationFrame(rafIdRef.current);
-      }
-    };
-  }, []);
-
-  const handleNewChat = useCallback(() => {
+  const handleNewChat = useCallback((): void => {
     setMessages([]);
     setText("");
     textareaRef.current?.focus();
@@ -687,6 +739,7 @@ export function ChatClient() {
             messages={messages}
             status={status}
             error={error}
+            regenerate={regenerate}
             scrollAreaRef={scrollAreaRef}
           />
 
