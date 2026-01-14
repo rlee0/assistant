@@ -10,6 +10,7 @@ export type Conversation = {
   title: string;
   pinned: boolean;
   updatedAt: string;
+  lastUserMessageAt: string;
   model: string;
   context?: string;
   suggestions: string[];
@@ -33,8 +34,40 @@ type ChatState = {
   reset: () => void;
 };
 
-function moveIdToFront(order: string[], id: string): string[] {
-  return [id, ...order.filter((entry) => entry !== id)];
+function getLastUserMessageMs(conversation: Conversation | undefined): number {
+  if (!conversation) return 0;
+  const timestamp = Date.parse(conversation.lastUserMessageAt);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function sortOrderByLastUserMessage(
+  order: string[],
+  conversations: Record<string, Conversation>
+): string[] {
+  const originalIndex = new Map(order.map((id, index) => [id, index]));
+
+  return normalizeOrder(order)
+    .filter((id) => id in conversations)
+    .sort((a, b) => {
+      const diff = getLastUserMessageMs(conversations[b]) - getLastUserMessageMs(conversations[a]);
+      if (diff !== 0) return diff;
+      return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
+    });
+}
+
+function areMessagesEqual(a: UIMessage[] | undefined, b: UIMessage[]): boolean {
+  if (!a || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i += 1) {
+    const left = a[i];
+    const right = b[i];
+
+    if (left.id !== right.id || left.role !== right.role) return false;
+
+    const leftParts = JSON.stringify(left.parts ?? []);
+    const rightParts = JSON.stringify(right.parts ?? []);
+    if (leftParts !== rightParts) return false;
+  }
+  return true;
 }
 
 /**
@@ -60,14 +93,25 @@ export function chatMessageToUIMessage(message: ChatMessage): UIMessage {
   };
 }
 
+function getLastUserMessageTimestamp(messages: ChatMessage[]): string {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i].role === "user") {
+      return messages[i].createdAt ?? new Date().toISOString();
+    }
+  }
+  return new Date().toISOString();
+}
+
 export function chatSessionToConversation(session: ChatSession): Conversation {
   const messages = session.messages.map(chatMessageToUIMessage);
+  const lastUserMessageAt = getLastUserMessageTimestamp(session.messages);
 
   return {
     id: session.id,
     title: session.title,
     pinned: session.pinned,
     updatedAt: session.updatedAt ?? new Date().toISOString(),
+    lastUserMessageAt,
     model: session.model,
     context: session.context,
     suggestions: session.suggestions ?? [],
@@ -102,10 +146,11 @@ export const useChatStore = create<ChatState>((set) => ({
         });
       }
 
-      const order = normalizeOrder(
+      const order = sortOrderByLastUserMessage(
         (Array.isArray(data.order) ? data.order : Object.keys(conversations)).filter(
           (id): id is string => typeof id === "string" && id in conversations
-        )
+        ),
+        conversations
       );
       const selectedId =
         typeof data.selectedId === "string" && data.selectedId in conversations
@@ -129,13 +174,24 @@ export const useChatStore = create<ChatState>((set) => ({
 
   upsert: (conversation) =>
     set((state) => {
-      const updatedConversations = {
-        ...state.conversations,
-        [conversation.id]: conversation,
+      const previous = state.conversations[conversation.id];
+      const now = new Date().toISOString();
+      const updatedConversation: Conversation = {
+        ...previous,
+        ...conversation,
+        updatedAt: conversation.updatedAt ?? previous?.updatedAt ?? now,
+        lastUserMessageAt: conversation.lastUserMessageAt ?? previous?.lastUserMessageAt ?? now,
       };
-      const order = moveIdToFront(state.order, conversation.id);
+
+      const conversations = {
+        ...state.conversations,
+        [conversation.id]: updatedConversation,
+      };
+
+      const order = sortOrderByLastUserMessage([...state.order, conversation.id], conversations);
+
       return {
-        conversations: updatedConversations,
+        conversations,
         order,
         status: { ...state.status, [conversation.id]: state.status[conversation.id] ?? "idle" },
       };
@@ -146,15 +202,27 @@ export const useChatStore = create<ChatState>((set) => ({
       const conversation = state.conversations[id];
       if (!conversation) return state;
 
+      // Skip updates when messages are unchanged to avoid resorting on selection.
+      if (areMessagesEqual(conversation.messages, messages)) {
+        return state;
+      }
+
+      const now = new Date().toISOString();
+      const lastMessage = messages[messages.length - 1];
+      const isUserMessage = lastMessage?.role === "user";
+
       const updatedConversation: Conversation = {
         ...conversation,
         messages,
-        updatedAt: new Date().toISOString(),
+        updatedAt: now,
+        lastUserMessageAt: isUserMessage ? now : conversation.lastUserMessageAt,
       };
 
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
       return {
-        conversations: { ...state.conversations, [id]: updatedConversation },
-        order: moveIdToFront(state.order, id),
+        conversations,
+        order: sortOrderByLastUserMessage(state.order, conversations),
       };
     }),
 
@@ -163,14 +231,20 @@ export const useChatStore = create<ChatState>((set) => ({
       const conversation = state.conversations[id];
       if (!conversation) return state;
 
+      const updatedConversation: Conversation = {
+        ...conversation,
+        title,
+        updatedAt: new Date().toISOString(),
+      };
+
+      const conversations = {
+        ...state.conversations,
+        [id]: updatedConversation,
+      };
+
       return {
-        conversations: {
-          ...state.conversations,
-          [id]: {
-            ...conversation,
-            title,
-          },
-        },
+        conversations,
+        order: sortOrderByLastUserMessage(state.order, conversations),
       };
     }),
 

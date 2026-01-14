@@ -110,7 +110,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   );
 
   return (
-    <Sidebar collapsible="icon" {...props}>
+    <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <div className="flex gap-2 p-2">
           <Button

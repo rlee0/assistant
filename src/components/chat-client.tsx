@@ -6,7 +6,6 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardE
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -18,7 +17,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
-import { Badge } from "@/components/ui/badge";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -86,33 +84,19 @@ import {
   groupModelsByProvider,
   type Model,
 } from "@/lib/models";
-import {
-  PlusIcon,
-  Check,
-  AlertCircle,
-  Copy,
-  RefreshCcw,
-  Edit2,
-  Trash2,
-  Loader2,
-  X,
-  LogOut,
-  Settings,
-} from "lucide-react";
+import { Check, AlertCircle, Copy, RefreshCcw, Edit2, Trash2, X } from "lucide-react";
 import { SettingsModal } from "@/components/settings-modal";
 import { useSettingsStore } from "@/store/settings-store";
 import {
   useChatStore,
   chatSessionToConversation,
   type ConversationStatus,
-  type Conversation,
 } from "@/store/chat-store";
 import { useSettingsSync } from "@/hooks/use-settings-sync";
-import { useLogout } from "@/hooks/use-logout";
 import { logError, logWarn, logDebug } from "@/lib/logging";
 import { cn } from "@/lib/utils";
 import { type InitialChatData } from "@/lib/supabase/loaders";
-import { type ChatMessage } from "@/types/chat";
+import { type ChatMessage, type ChatSession } from "@/types/chat";
 import {
   CHAT_CONTAINER_MAX_WIDTH,
   DEFAULT_PROVIDER,
@@ -168,14 +152,40 @@ function mapUseChatStatus(status: ReturnType<typeof useChat>["status"]): Convers
 }
 
 function uiMessageToChatMessage(message: UseChatMessage): ChatMessage {
-  const createdAt = (message as { createdAt?: string }).createdAt ?? new Date().toISOString();
+  // Extract createdAt from message with type safety, defaulting to current time
+  const createdAt =
+    typeof message === "object" && message !== null && "createdAt" in message
+      ? (message as Record<string, unknown>).createdAt
+      : null;
+
+  const timestamp = typeof createdAt === "string" ? createdAt : new Date().toISOString();
 
   return {
     id: message.id,
     role: message.role,
     content: extractTextFromMessage(message),
-    createdAt,
+    createdAt: timestamp,
   };
+}
+
+function areMessagesEqual(
+  existing: ReadonlyArray<UseChatMessage> | undefined,
+  incoming: ReadonlyArray<UseChatMessage>
+): boolean {
+  if (!existing || existing.length !== incoming.length) return false;
+
+  for (let index = 0; index < existing.length; index += 1) {
+    const left = existing[index];
+    const right = incoming[index];
+
+    if (left.id !== right.id || left.role !== right.role) return false;
+
+    const leftParts = JSON.stringify(left.parts ?? []);
+    const rightParts = JSON.stringify(right.parts ?? []);
+    if (leftParts !== rightParts) return false;
+  }
+
+  return true;
 }
 
 // ============================================================================
@@ -309,24 +319,18 @@ function useModelManagement(
   selectedModelInfo: SelectedModelInfo;
 } {
   const [models, setModels] = useState<Model[]>([]);
-  const onModelUpdateRef = useRef(onModelUpdate);
   const hasValidatedRef = useRef(false);
-
-  // Keep callback ref updated
-  useEffect(() => {
-    onModelUpdateRef.current = onModelUpdate;
-  }, [onModelUpdate]);
+  const controllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
-    const controller = new AbortController();
+    controllerRef.current = new AbortController();
+    const signal = controllerRef.current.signal;
 
-    const loadModels = async () => {
+    const loadModels = async (): Promise<void> => {
       try {
         const list = await fetchModels();
 
-        // Single atomic check for abort
-        if (controller.signal.aborted) return;
-
+        if (signal.aborted) return;
         setModels(list);
 
         // Validate selected model is available (only once)
@@ -336,11 +340,10 @@ function useModelManagement(
           !list.some((m) => m.id === currentModel)
         ) {
           hasValidatedRef.current = true;
-          onModelUpdateRef.current(list[0].id);
+          onModelUpdate(list[0].id);
         }
       } catch (err) {
-        if (controller.signal.aborted) return;
-
+        if (signal.aborted) return;
         logError("[Chat]", "Model loading error", err);
       }
     };
@@ -348,9 +351,9 @@ function useModelManagement(
     void loadModels();
 
     return () => {
-      controller.abort();
+      controllerRef.current?.abort();
     };
-  }, [currentModel]);
+  }, [currentModel, onModelUpdate]);
 
   const selectedModelInfo = useMemo<SelectedModelInfo>(() => {
     const selected = models.find((m) => m.id === currentModel);
@@ -966,6 +969,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const router = useRouter();
 
   const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
+    id: conversationId || "",
     transport: new DefaultChatTransport({
       api: "/api/chat",
       credentials: "include",
@@ -1024,8 +1028,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingCreateRef = useRef<Promise<string> | null>(null);
-  const statusChangeRef = useRef(status);
-  const lastSyncedConversationIdRef = useRef<string | null>(null);
+  const statusChangeRef = useRef<ReturnType<typeof useChat>["status"]>(status);
 
   // ----- Hooks
   const { models, selectedModelInfo } = useModelManagement(currentModel, (modelId) => {
@@ -1043,9 +1046,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   }, []);
 
   useEffect(() => {
-    if (!hydrated && initialData) {
-      hydrate(initialData);
-    }
+    if (hydrated || !initialData) return;
+    hydrate(initialData);
   }, [hydrate, hydrated, initialData]);
 
   // Sync route conversationId with store selection when route changes
@@ -1056,34 +1058,28 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     selectConversationId(conversationId);
   }, [conversationId, storeSelectedId, selectConversationId]);
 
-  // Sync chat UI state when switching conversations without re-triggering store updates
+  // Initialize messages from store only once when the conversation is first loaded
+  // useChat's id parameter handles state isolation per conversation
   useEffect(() => {
-    const currentId = conversationId || storeSelectedId;
+    if (!hydrated || !conversationId) return;
 
-    if (!currentId) {
-      lastSyncedConversationIdRef.current = null;
-      setMessages([]);
-      return;
-    }
-
-    if (lastSyncedConversationIdRef.current === currentId) {
-      return;
-    }
-
-    const conversation = conversations[currentId];
-    if (conversation) {
-      lastSyncedConversationIdRef.current = currentId;
+    const conversation = conversations[conversationId];
+    if (conversation?.messages.length && !messages.length) {
+      // Only set messages if useChat is empty but store has messages
       setMessages(conversation.messages);
-    } else {
-      setMessages([]);
     }
-  }, [conversations, conversationId, storeSelectedId, setMessages]);
+  }, [hydrated, conversationId, conversations, messages.length, setMessages]);
 
   useEffect(() => {
-    if (selectedId) {
-      updateConversationMessages(selectedId, messages);
-    }
-  }, [messages, selectedId, updateConversationMessages]);
+    if (!selectedId) return;
+
+    // With useChat's id parameter, messages are automatically isolated per conversation
+    // Just sync the current conversation's messages to the store
+    const storedMessages = conversations[selectedId]?.messages;
+    if (areMessagesEqual(storedMessages, messages)) return;
+
+    updateConversationMessages(selectedId, messages);
+  }, [messages, selectedId, conversations, updateConversationMessages]);
 
   useEffect(() => {
     if (selectedId) {
@@ -1092,7 +1088,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   }, [selectedId, setConversationStatus, status]);
 
   const persistConversation = useCallback(
-    async (conversationId: string) => {
+    async (conversationId: string): Promise<void> => {
       const conversation = conversations[conversationId];
       if (!conversation) return;
 
@@ -1119,13 +1115,16 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             status: response.status,
             detail,
           });
+          return;
         }
       } catch (err) {
         // Ignore abort errors (component unmounted or new request started)
         if (err instanceof Error && err.name === "AbortError") {
           return;
         }
-        logError("[Chat]", "Persist conversation error", err, { conversationId });
+        logError("[Chat]", "Persist conversation error", err, {
+          conversationId,
+        });
       }
     },
     [conversations, messages]
@@ -1146,18 +1145,20 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       if (conversationId === selectedId) return;
 
       selectConversationId(conversationId);
-      const conversation = conversations[conversationId];
-      if (conversation) {
-        setMessages(conversation.messages);
-      } else {
-        setMessages([]);
-      }
+      // Don't manually set messages here - route change will trigger useChat state update
+      // via the id parameter changing. Just clear UI state.
       setText("");
       setEditingMessageId(null);
       setEditText("");
     },
-    [conversations, selectConversationId, selectedId, setMessages]
+    [selectConversationId, selectedId]
   );
+
+  const resetUIState = useCallback((): void => {
+    setText("");
+    setEditingMessageId(null);
+    setEditText("");
+  }, []);
 
   const createConversation = useCallback(async (): Promise<string> => {
     // Prevent concurrent create requests
@@ -1165,54 +1166,46 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       return pendingCreateRef.current;
     }
 
-    const createPromise = (async () => {
+    const createPromise = (async (): Promise<string> => {
       setCreatingChat(true);
+      const timeoutId = setTimeout(
+        () => abortControllerRef.current?.abort(),
+        CHAT_REQUEST_TIMEOUT_MS
+      );
+
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
+        const response = await fetch("/api/chat/create", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ model: currentModel }),
+          signal: abortControllerRef.current?.signal,
+        });
 
-        try {
-          const response = await fetch("/api/chat/create", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ model: currentModel }),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const detail = await response.text().catch(() => "Unknown error");
-            throw new Error(`Create failed: ${response.status} - ${detail}`);
-          }
-
-          const data = await response.json().catch((err) => {
-            throw new Error(
-              `Invalid response: ${err instanceof Error ? err.message : String(err)}`
-            );
-          });
-
-          const conversation = chatSessionToConversation(data.chat);
-          upsertConversation(conversation);
-          selectConversationId(conversation.id);
-          router.push(`/chat/${conversation.id}`);
-          setMessages([]);
-          setText("");
-          setEditingMessageId(null);
-          setEditText("");
-          return conversation.id;
-        } catch (err) {
-          clearTimeout(timeoutId);
-          throw err;
+        if (!response.ok) {
+          const detail = await response.text().catch(() => "Unknown error");
+          throw new Error(`Create failed: ${response.status} - ${detail}`);
         }
+
+        const data = (await response.json()) as { chat: ChatSession };
+        const conversation = chatSessionToConversation(data.chat);
+        upsertConversation(conversation);
+        selectConversationId(conversation.id);
+        router.push(`/chat/${conversation.id}`);
+        setMessages([]);
+        resetUIState();
+        return conversation.id;
       } catch (error) {
-        // Ignore abort errors
+        // Handle abort errors separately
         if (error instanceof Error && error.name === "AbortError") {
           logDebug("[Chat]", "Create conversation aborted");
           throw error;
         }
 
-        logWarn("[Chat]", "Falling back to local chat creation", { error });
+        // Fallback to local creation on error
+        logWarn("[Chat]", "Falling back to local chat creation", {
+          error: error instanceof Error ? error.message : String(error),
+        });
+
         const localId = crypto.randomUUID();
         const now = new Date().toISOString();
         upsertConversation({
@@ -1220,6 +1213,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           title: "New chat",
           pinned: false,
           updatedAt: now,
+          lastUserMessageAt: now,
           model: currentModel,
           suggestions: [],
           messages: [],
@@ -1228,11 +1222,10 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         selectConversationId(localId);
         router.push(`/chat/${localId}`);
         setMessages([]);
-        setText("");
-        setEditingMessageId(null);
-        setEditText("");
+        resetUIState();
         return localId;
       } finally {
+        clearTimeout(timeoutId);
         setCreatingChat(false);
         pendingCreateRef.current = null;
       }
@@ -1240,7 +1233,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
     pendingCreateRef.current = createPromise;
     return createPromise;
-  }, [currentModel, selectConversationId, setMessages, upsertConversation, router]);
+  }, [currentModel, selectConversationId, setMessages, upsertConversation, router, resetUIState]);
 
   const ensureConversation = useCallback(async () => {
     if (selectedId && conversations[selectedId]) return selectedId;
@@ -1377,52 +1370,44 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   );
 
   const handleDeleteConversation = useCallback(
-    async (conversationIdToDelete: string) => {
+    async (conversationIdToDelete: string): Promise<void> => {
       setDeleting((prev) => ({ ...prev, [conversationIdToDelete]: true }));
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
+
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
+        const response = await fetch("/api/chat/delete", {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: conversationIdToDelete }),
+          signal: controller.signal,
+        });
 
-        try {
-          const response = await fetch("/api/chat/delete", {
-            method: "DELETE",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: conversationIdToDelete }),
-            signal: controller.signal,
-          });
-
-          clearTimeout(timeoutId);
-
-          if (!response.ok) {
-            const detail = await response.text().catch(() => "Unknown error");
-            throw new Error(detail || "Failed to delete conversation");
-          }
-
-          removeConversation(conversationIdToDelete);
-
-          // Navigate away if deleting the current route's conversation
-          if (conversationIdToDelete === conversationId) {
-            const fallback = order.find((id) => id !== conversationIdToDelete) ?? null;
-            selectConversationId(fallback);
-            if (fallback) {
-              router.push(`/chat/${fallback}`);
-              const conversation = conversations[fallback];
-              if (conversation) {
-                setMessages(conversation.messages);
-              }
-            } else {
-              router.push("/");
-              setMessages([]);
-            }
-          }
-
-          toast.success("Conversation deleted");
-        } catch (err) {
-          clearTimeout(timeoutId);
-          throw err;
+        if (!response.ok) {
+          const detail = await response.text().catch(() => "Unknown error");
+          throw new Error(detail || "Failed to delete conversation");
         }
+
+        removeConversation(conversationIdToDelete);
+
+        // Navigate away if deleting the current route's conversation
+        if (conversationIdToDelete === conversationId) {
+          const fallback = order.find((id) => id !== conversationIdToDelete) ?? null;
+          selectConversationId(fallback);
+          if (fallback) {
+            router.push(`/chat/${fallback}`);
+            const conversation = conversations[fallback];
+            if (conversation) {
+              setMessages(conversation.messages);
+            }
+          } else {
+            router.push("/");
+            setMessages([]);
+          }
+        }
+
+        toast.success("Conversation deleted");
       } catch (err) {
-        // Ignore abort errors
         if (err instanceof Error && err.name === "AbortError") {
           logDebug("[Chat]", "Delete conversation aborted", { conversationIdToDelete });
           return;
@@ -1430,6 +1415,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         logError("[Chat]", "Delete conversation failed", err, { conversationIdToDelete });
         toast.error("Failed to delete conversation");
       } finally {
+        clearTimeout(timeoutId);
         setDeleting((prev) => ({ ...prev, [conversationIdToDelete]: false }));
       }
     },
@@ -1506,7 +1492,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       />
       <SidebarInset>
         <ChatHeader conversationTitle={conversationTitle} />
-        <div className="flex flex-1 flex-col gap-4 p-4 pt-0">
+        <div className="flex flex-1 flex-col gap-4 p-y4 pt-0">
           {/* Settings Modal */}
           <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
 
