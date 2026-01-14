@@ -320,17 +320,21 @@ function useModelManagement(
 } {
   const [models, setModels] = useState<Model[]>([]);
   const hasValidatedRef = useRef(false);
-  const controllerRef = useRef<AbortController | null>(null);
+  const onModelUpdateRef = useRef(onModelUpdate);
+
+  // Keep callback ref updated
+  useEffect(() => {
+    onModelUpdateRef.current = onModelUpdate;
+  }, [onModelUpdate]);
 
   useEffect(() => {
-    controllerRef.current = new AbortController();
-    const signal = controllerRef.current.signal;
+    const controller = new AbortController();
 
     const loadModels = async (): Promise<void> => {
       try {
         const list = await fetchModels();
 
-        if (signal.aborted) return;
+        if (controller.signal.aborted) return;
         setModels(list);
 
         // Validate selected model is available (only once)
@@ -340,10 +344,10 @@ function useModelManagement(
           !list.some((m) => m.id === currentModel)
         ) {
           hasValidatedRef.current = true;
-          onModelUpdate(list[0].id);
+          onModelUpdateRef.current(list[0].id);
         }
       } catch (err) {
-        if (signal.aborted) return;
+        if (controller.signal.aborted) return;
         logError("[Chat]", "Model loading error", err);
       }
     };
@@ -351,9 +355,9 @@ function useModelManagement(
     void loadModels();
 
     return () => {
-      controllerRef.current?.abort();
+      controller.abort();
     };
-  }, [currentModel, onModelUpdate]);
+  }, [currentModel]);
 
   const selectedModelInfo = useMemo<SelectedModelInfo>(() => {
     const selected = models.find((m) => m.id === currentModel);
@@ -968,8 +972,23 @@ ChatHeader.displayName = "ChatHeader";
 export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const router = useRouter();
 
+  // Get store and hydrate immediately
+  const {
+    conversations,
+    order,
+    selectedId: storeSelectedId,
+    status: conversationStatuses,
+    hydrated,
+    hydrate,
+    select: selectConversationId,
+    upsert: upsertConversation,
+    updateMessages: updateConversationMessages,
+    updateTitle: updateConversationTitle,
+    setStatus: setConversationStatus,
+    remove: removeConversation,
+  } = useChatStore();
+
   const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
-    id: conversationId || "",
     transport: new DefaultChatTransport({
       api: "/api/chat",
       credentials: "include",
@@ -996,21 +1015,6 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const updateSettings = useSettingsStore((state) => state.update);
   const currentModel = settings.models.defaultModel;
 
-  const {
-    conversations,
-    order,
-    selectedId: storeSelectedId,
-    status: conversationStatuses,
-    hydrated,
-    hydrate,
-    select: selectConversationId,
-    upsert: upsertConversation,
-    updateMessages: updateConversationMessages,
-    updateTitle: updateConversationTitle,
-    setStatus: setConversationStatus,
-    remove: removeConversation,
-  } = useChatStore();
-
   // Use route conversationId if provided, otherwise use store selectedId
   const selectedId = conversationId ?? storeSelectedId;
 
@@ -1029,6 +1033,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
   const pendingCreateRef = useRef<Promise<string> | null>(null);
   const statusChangeRef = useRef<ReturnType<typeof useChat>["status"]>(status);
+  const loadedConversationIdRef = useRef<string | null>(null);
 
   // ----- Hooks
   const { models, selectedModelInfo } = useModelManagement(currentModel, (modelId) => {
@@ -1045,42 +1050,61 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     };
   }, []);
 
+  // Step 1: Hydrate store on mount
   useEffect(() => {
     if (hydrated || !initialData) return;
     hydrate(initialData);
-  }, [hydrate, hydrated, initialData]);
+  }, [hydrated, initialData, hydrate]);
 
-  // Sync route conversationId with store selection when route changes
+  // Step 2: Sync route conversationId with store selection
   useEffect(() => {
-    if (!conversationId || conversationId === storeSelectedId) {
-      return;
-    }
+    if (!conversationId || conversationId === storeSelectedId) return;
     selectConversationId(conversationId);
   }, [conversationId, storeSelectedId, selectConversationId]);
 
-  // Initialize messages from store only once when the conversation is first loaded
-  // useChat's id parameter handles state isolation per conversation
+  // Step 3: Load conversation messages when selectedId or conversations change
   useEffect(() => {
-    if (!hydrated || !conversationId) return;
+    // Don't load messages until store is hydrated
+    if (!hydrated) return;
 
-    const conversation = conversations[conversationId];
-    if (conversation?.messages.length && !messages.length) {
-      // Only set messages if useChat is empty but store has messages
-      setMessages(conversation.messages);
+    if (!selectedId) {
+      // No conversation selected - clear everything
+      loadedConversationIdRef.current = null;
+      setMessages([]);
+      return;
     }
-  }, [hydrated, conversationId, conversations, messages.length, setMessages]);
 
+    const conversation = conversations[selectedId];
+
+    // Wait for conversation to exist in store
+    if (!conversation) {
+      return;
+    }
+
+    // Skip if we've already loaded this exact conversation
+    if (loadedConversationIdRef.current === selectedId) {
+      return;
+    }
+
+    // Load conversation messages
+    loadedConversationIdRef.current = selectedId;
+    setMessages(conversation.messages || []);
+  }, [selectedId, conversations, setMessages, hydrated]);
+
+  // Step 4: Sync messages from useChat back to store
   useEffect(() => {
     if (!selectedId) return;
 
-    // With useChat's id parameter, messages are automatically isolated per conversation
-    // Just sync the current conversation's messages to the store
+    // Skip syncing back during initial load - messages are being set FROM store in Step 3
+    if (loadedConversationIdRef.current !== selectedId) return;
+
     const storedMessages = conversations[selectedId]?.messages;
     if (areMessagesEqual(storedMessages, messages)) return;
 
     updateConversationMessages(selectedId, messages);
   }, [messages, selectedId, conversations, updateConversationMessages]);
 
+  // Step 5: Update conversation status
   useEffect(() => {
     if (selectedId) {
       setConversationStatus(selectedId, mapUseChatStatus(status));

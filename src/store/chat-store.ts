@@ -140,8 +140,9 @@ export const useChatStore = create<ChatState>((set) => ({
       if (data.chats && typeof data.chats === "object") {
         Object.values(data.chats).forEach((session) => {
           if (session && typeof session === "object" && "id" in session) {
-            conversations[session.id] = chatSessionToConversation(session as ChatSession);
-            statuses[session.id] = "idle";
+            const sess = session as ChatSession;
+            conversations[sess.id] = chatSessionToConversation(sess);
+            statuses[sess.id] = "idle";
           }
         });
       }
