@@ -63,7 +63,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 }
 
 /**
- * Configure which routes use proxy
+ * Configure which routes use the proxy middleware
  */
 export const config = {
   // Match all routes except Next.js internals and static files

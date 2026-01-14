@@ -1,3 +1,9 @@
+/**
+ * @deprecated This endpoint is superseded by /api/models which provides better error handling,
+ * caching, and multiple fallback strategies. Use /api/models instead.
+ * This file will be removed in a future version.
+ */
+
 import { APIError, ErrorCodes } from "@/lib/api/errors";
 
 import { NextResponse } from "next/server";

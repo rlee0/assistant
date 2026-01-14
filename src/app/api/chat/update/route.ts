@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { v5 as uuidv5 } from "uuid";
+import { logError } from "@/lib/logging";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { type ChatMessage } from "@/types/chat";
@@ -132,7 +133,7 @@ export async function PATCH(request: NextRequest) {
       const { error: messagesError } = await supabase.from("messages").upsert(messagePayload);
 
       if (messagesError) {
-        console.error("Failed to update messages:", messagesError);
+        logError("[Chat Update]", "Failed to update messages", messagesError, { chatId: id });
       }
     }
 

@@ -1,5 +1,11 @@
 "use client";
 
+/**
+ * @deprecated This component is no longer used. Settings are now managed through the /settings page.
+ * Navigate to /settings instead of opening this modal.
+ * This file is kept for reference only and may be removed in future versions.
+ */
+
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {

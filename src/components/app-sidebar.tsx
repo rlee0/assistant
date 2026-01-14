@@ -58,7 +58,6 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   readonly onNewChat: () => void;
   readonly onSelectConversation: (id: string) => void;
   readonly onDeleteConversation: (id: string) => void;
-  readonly onSettingsClick: () => void;
 }
 
 /**
@@ -88,7 +87,6 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   onNewChat,
   onSelectConversation,
   onDeleteConversation,
-  onSettingsClick,
   ...props
 }) {
   const router = useRouter();
@@ -184,7 +182,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
         )}
       </SidebarContent>
       <SidebarFooter>
-        <NavUser user={user} onSettingsClick={onSettingsClick} />
+        <NavUser user={user} />
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>

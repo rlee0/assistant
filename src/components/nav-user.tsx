@@ -20,6 +20,7 @@ import {
 import { memo, useCallback, useMemo } from "react";
 
 import { useLogout } from "@/hooks/use-logout";
+import { useRouter } from "next/navigation";
 
 /**
  * User profile data
@@ -32,7 +33,6 @@ interface UserProfile {
 
 interface NavUserProps {
   readonly user: UserProfile;
-  readonly onSettingsClick: () => void;
 }
 
 /**
@@ -60,15 +60,16 @@ function generateInitials(name: string): string {
  * User profile menu displayed in sidebar footer
  * Shows avatar, name, email with dropdown for settings and logout
  */
-export const NavUser = memo<NavUserProps>(function NavUser({ user, onSettingsClick }) {
+export const NavUser = memo<NavUserProps>(function NavUser({ user }) {
   const { isMobile } = useSidebar();
   const { logout, isLoading } = useLogout();
+  const router = useRouter();
 
   const initials = useMemo(() => generateInitials(user.name), [user.name]);
 
   const handleSettingsClick = useCallback(() => {
-    onSettingsClick();
-  }, [onSettingsClick]);
+    router.push("/settings");
+  }, [router]);
 
   const handleLogout = useCallback(() => {
     logout();

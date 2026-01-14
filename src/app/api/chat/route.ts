@@ -23,7 +23,7 @@ function isToolFactory(entry: [string, unknown]): entry is [string, ToolFactory]
 
 /**
  * Build a map of available tools by invoking all exported tool factories.
- * Tools are instantiated once at module load to avoid per-request overhead.
+ * Tools are instantiated per-request to allow per-request configuration.
  */
 function buildTools(): Record<string, Tool> {
   return Object.fromEntries(
@@ -32,8 +32,6 @@ function buildTools(): Record<string, Tool> {
       .map(([name, factory]) => [name, factory()])
   );
 }
-
-const tools = buildTools();
 
 /**
  * Type-safe request validation
@@ -152,22 +150,20 @@ export async function POST(req: Request): Promise<Response> {
     const config = getAPIConfiguration();
     const selectedModel = requestModel || config.defaultModel;
 
-    // Authenticate user (for future features like user tracking)
-    let userId: string | null = null;
-    try {
-      const supabase = await createSupabaseServerClient({
-        allowCookieWrite: true,
-      });
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-      userId = user?.id ?? null;
-    } catch (error) {
-      // Authentication is not required for chat, but log if it fails
-      if (isDevelopment) {
-        console.debug("[Chat] User authentication failed (optional):", error);
-      }
+    // Authenticate user - required for chat streaming
+    const supabase = await createSupabaseServerClient({
+      allowCookieWrite: true,
+    });
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      throw new APIError("Authentication required to access chat", 401, ErrorCodes.UNAUTHORIZED);
     }
+
+    const userId = user.id;
 
     // Convert UI messages to model format
     let modelMessages;
@@ -191,6 +187,9 @@ export async function POST(req: Request): Promise<Response> {
 
     // Prepare system message
     const systemMessage = context ? `Context: ${context}` : "You are a helpful assistant.";
+
+    // Build tools per-request to allow per-request configuration
+    const tools = buildTools();
 
     // Create custom OpenAI-compatible provider for AI Gateway
     const provider = createOpenAI({
@@ -227,7 +226,7 @@ export async function POST(req: Request): Promise<Response> {
     if (isDevelopment) {
       console.debug("[Chat] Stream started:", {
         requestId,
-        userId: userId ? "authenticated" : "anonymous",
+        userId,
         model: selectedModel,
         messageCount: messages.length,
       });

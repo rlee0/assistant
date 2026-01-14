@@ -90,7 +90,6 @@ import {
   type Model,
 } from "@/lib/models";
 import { Check, AlertCircle, Copy, RefreshCcw, Edit2, Trash2, X } from "lucide-react";
-import { SettingsModal } from "@/components/settings-modal";
 import { useSettingsStore } from "@/store/settings-store";
 import {
   useChatStore,
@@ -983,6 +982,16 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       credentials: "include",
     }),
     onError: (error) => {
+      // Check if error is due to authentication failure
+      if (
+        error instanceof Error &&
+        "status" in error &&
+        (error as { status?: number }).status === 401
+      ) {
+        logError("[Chat]", "Authentication required - redirecting to login", error);
+        router.push("/login");
+        return;
+      }
       logError("[Chat]", "Transport error", error, {
         type: error?.constructor?.name,
       });
@@ -1012,7 +1021,6 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const [selectorOpen, setSelectorOpen] = useState(false);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
   const [editText, setEditText] = useState("");
-  const [settingsOpen, setSettingsOpen] = useState(false);
   const [creatingChat, setCreatingChat] = useState(false);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
 
@@ -1133,6 +1141,16 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         });
 
         if (!response.ok) {
+          // Check for authentication error
+          if (response.status === 401) {
+            logError(
+              "[Chat]",
+              "Authentication required for persistence",
+              new Error("Unauthorized")
+            );
+            router.push("/login");
+            return;
+          }
           const detail = await response.text().catch(() => "Unknown error");
           logWarn("[Chat]", "Persist conversation failed", {
             conversationId,
@@ -1206,6 +1224,16 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         });
 
         if (!response.ok) {
+          // Check for authentication error
+          if (response.status === 401) {
+            logError(
+              "[Chat]",
+              "Authentication required for conversation creation",
+              new Error("Unauthorized")
+            );
+            router.push("/login");
+            throw new Error("Authentication required");
+          }
           const detail = await response.text().catch(() => "Unknown error");
           throw new Error(`Create failed: ${response.status} - ${detail}`);
         }
@@ -1225,29 +1253,10 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           throw error;
         }
 
-        // Fallback to local creation on error
-        logWarn("[Chat]", "Falling back to local chat creation", {
-          error: error instanceof Error ? error.message : String(error),
-        });
-
-        const localId = crypto.randomUUID();
-        const now = new Date().toISOString();
-        upsertConversation({
-          id: localId,
-          title: "New chat",
-          pinned: false,
-          updatedAt: now,
-          lastUserMessageAt: now,
-          model: currentModel,
-          suggestions: [],
-          messages: [],
-          checkpoints: [],
-        });
-        selectConversationId(localId);
-        router.push(`/chat/${localId}`);
-        setMessages([]);
-        resetUIState();
-        return localId;
+        // Log error and re-throw - no fallback to prevent desync
+        logError("[Chat]", "Failed to create conversation", error);
+        toast.error("Failed to create conversation. Please try again.");
+        throw error;
       } finally {
         clearTimeout(timeoutId);
         setCreatingChat(false);
@@ -1515,14 +1524,10 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         onNewChat={handleNewChat}
         onSelectConversation={handleSelectConversation}
         onDeleteConversation={handleDeleteConversation}
-        onSettingsClick={() => setSettingsOpen(true)}
       />
       <SidebarInset>
         <ChatHeader conversationTitle={conversationTitle} />
         <div className="flex flex-1 flex-col min-h-0">
-          {/* Settings Modal */}
-          <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
-
           {/* Messages */}
           <ChatMessages
             messages={messages}

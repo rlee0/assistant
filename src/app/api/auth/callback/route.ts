@@ -1,5 +1,7 @@
-import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { NextRequest, NextResponse } from "next/server";
+
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { logError } from "@/lib/logging";
 
 /**
  * GET /api/auth/callback
@@ -25,8 +27,7 @@ export async function GET(request: NextRequest) {
 
     // Handle OAuth errors from provider
     if (error && typeof error === "string") {
-      console.error("[Auth Callback] OAuth error:", {
-        error,
+      logError("[Auth Callback]", "OAuth error from provider", new Error(error), {
         description: errorDescription,
       });
       return NextResponse.redirect(new URL("/login?error=oauth_failed", request.url));
@@ -34,7 +35,11 @@ export async function GET(request: NextRequest) {
 
     // Code is required for successful callback
     if (!code || typeof code !== "string") {
-      console.error("[Auth Callback] Missing or invalid authorization code");
+      logError(
+        "[Auth Callback]",
+        "Missing or invalid authorization code",
+        new Error("No code provided")
+      );
       return NextResponse.redirect(new URL("/login?error=missing_code", request.url));
     }
 
@@ -43,14 +48,14 @@ export async function GET(request: NextRequest) {
     const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code);
 
     if (exchangeError) {
-      console.error("[Auth Callback] Failed to exchange code for session:", exchangeError);
+      logError("[Auth Callback]", "Failed to exchange code for session", exchangeError);
       return NextResponse.redirect(new URL("/login?error=auth_failed", request.url));
     }
 
     // Successfully authenticated, redirect to home page
     return NextResponse.redirect(new URL("/", request.url));
   } catch (error) {
-    console.error("[Auth Callback] Unexpected error:", error);
+    logError("[Auth Callback]", "Unexpected error in callback handler", error);
     return NextResponse.redirect(new URL("/login?error=unexpected", request.url));
   }
 }

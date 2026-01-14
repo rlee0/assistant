@@ -4,6 +4,7 @@ import { buildDefaultSettings, settingsSchema } from "@/lib/settings";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { loadSettings } from "@/lib/supabase/settings";
+import { logError } from "@/lib/logging";
 import { parseRequestBody } from "@/lib/api/middleware";
 
 /**
@@ -133,9 +134,8 @@ export async function PUT(request: NextRequest) {
       .select();
 
     if (upsertError) {
-      console.error("[API] Settings upsert failed:", {
+      logError("[Settings API]", "Settings upsert failed", upsertError, {
         userId: user.id,
-        error: upsertError.message,
         code: upsertError.code,
       });
 

@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { validateObject, validateUUID } from "@/lib/api/validation";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { logError } from "@/lib/logging";
 import { parseRequestBody } from "@/lib/api/middleware";
 
 interface DeleteChatRequest {
@@ -60,7 +61,7 @@ export async function DELETE(request: NextRequest) {
       .eq("chat_id", id)
       .then((result) => {
         if (result.error) {
-          console.error("Failed to delete messages:", result.error);
+          logError("[Chat Delete]", "Failed to delete messages", result.error, { chatId: id });
         }
       });
 
@@ -70,7 +71,7 @@ export async function DELETE(request: NextRequest) {
       .eq("chat_id", id)
       .then((result) => {
         if (result.error) {
-          console.error("Failed to delete checkpoints:", result.error);
+          logError("[Chat Delete]", "Failed to delete checkpoints", result.error, { chatId: id });
         }
       });
 
