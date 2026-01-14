@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/dialog";
 import { memo, useCallback, useEffect, useReducer, useRef, useState } from "react";
 
+import { API_ROUTES } from "@/lib/api/routes";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -195,7 +196,7 @@ function SettingsModalContent({ open, onOpenChange }: SettingsModalProps) {
     deleteDispatch({ type: "START_DELETE" });
 
     try {
-      const response = await fetch("/api/account/delete", {
+      const response = await fetch(API_ROUTES.ACCOUNT.DELETE, {
         method: "POST",
         credentials: "include",
       });

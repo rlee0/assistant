@@ -1,3 +1,4 @@
+import { API_ROUTES } from "@/lib/api/routes";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -30,7 +31,7 @@ export function useLogout() {
       setIsLoading(true);
       setError(null);
 
-      const response = await fetch("/api/auth/logout", {
+      const response = await fetch(API_ROUTES.AUTH.LOGOUT, {
         method: "POST",
         credentials: "include",
         signal: controller.signal,

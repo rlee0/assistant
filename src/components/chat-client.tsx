@@ -6,6 +6,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardE
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import { toast } from "sonner";
+import { API_ROUTES } from "@/lib/api/routes";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { AppSidebar } from "@/components/app-sidebar";
 import {
@@ -321,6 +322,7 @@ function useModelManagement(
   const [models, setModels] = useState<Model[]>([]);
   const hasValidatedRef = useRef(false);
   const onModelUpdateRef = useRef(onModelUpdate);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Keep callback ref updated
   useEffect(() => {
@@ -328,34 +330,44 @@ function useModelManagement(
   }, [onModelUpdate]);
 
   useEffect(() => {
-    const controller = new AbortController();
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
 
     const loadModels = async (): Promise<void> => {
       try {
         const list = await fetchModels();
 
-        if (controller.signal.aborted) return;
+        if (signal.aborted) return;
+
+        // Validate models array
+        if (!Array.isArray(list) || list.length === 0) {
+          logWarn("[Chat]", "Empty models list returned from API");
+          setModels([]);
+          return;
+        }
+
         setModels(list);
 
-        // Validate selected model is available (only once)
-        if (
-          !hasValidatedRef.current &&
-          list.length > 0 &&
-          !list.some((m) => m.id === currentModel)
-        ) {
+        // Validate selected model is available (only once, use stable ref check)
+        if (!hasValidatedRef.current && !list.some((m) => m.id === currentModel)) {
           hasValidatedRef.current = true;
-          onModelUpdateRef.current(list[0].id);
+          const firstModel = list[0];
+          if (firstModel && "id" in firstModel) {
+            onModelUpdateRef.current(firstModel.id);
+          }
         }
       } catch (err) {
-        if (controller.signal.aborted) return;
-        logError("[Chat]", "Model loading error", err);
+        if (signal.aborted) return;
+        logError("[Chat]", "Model loading failed", err);
+        setModels([]);
       }
     };
 
     void loadModels();
 
     return () => {
-      controller.abort();
+      abortControllerRef.current?.abort();
     };
   }, [currentModel]);
 
@@ -1121,7 +1133,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       abortControllerRef.current = new AbortController();
 
       try {
-        const response = await fetch("/api/chat/update", {
+        const response = await fetch(API_ROUTES.CHAT.UPDATE, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -1198,7 +1210,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       );
 
       try {
-        const response = await fetch("/api/chat/create", {
+        const response = await fetch(API_ROUTES.CHAT.CREATE, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ model: currentModel }),
@@ -1400,7 +1412,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
 
       try {
-        const response = await fetch("/api/chat/delete", {
+        const response = await fetch(API_ROUTES.CHAT.DELETE, {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: conversationIdToDelete }),

@@ -4,6 +4,7 @@ import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCallback, useEffect, useState } from "react";
 
+import { API_ROUTES } from "@/lib/api/routes";
 import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
@@ -45,7 +46,7 @@ export default function SettingsPage() {
     setDeleteError(null);
 
     try {
-      const response = await fetch("/api/account/delete", {
+      const response = await fetch(API_ROUTES.ACCOUNT.DELETE, {
         method: "POST",
         credentials: "include",
       });

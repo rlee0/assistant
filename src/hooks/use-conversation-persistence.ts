@@ -1,7 +1,9 @@
-import { useCallback, useRef, useEffect } from "react";
-import type { UIMessage } from "ai";
+import { logDebug, logError, logWarn } from "@/lib/logging";
+import { useCallback, useEffect, useRef } from "react";
+
+import { API_ROUTES } from "@/lib/api/routes";
 import type { Conversation } from "@/store/chat-store";
-import { logError, logWarn, logDebug } from "@/lib/logging";
+import type { UIMessage } from "ai";
 
 type UIMessageToChatMessage = (msg: UIMessage) => {
   id: string;
@@ -44,7 +46,7 @@ export function useConversationPersistence(uiMessageToChatMessage: UIMessageToCh
       abortControllerRef.current = new AbortController();
 
       try {
-        const response = await fetch("/api/chat/update", {
+        const response = await fetch(API_ROUTES.CHAT.UPDATE, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({

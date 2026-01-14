@@ -2,6 +2,8 @@
 
 import { useEffect, useRef } from "react";
 
+/** Request timeout for settings operations (ms) */
+import { API_ROUTES } from "@/lib/api/routes";
 import type { Settings } from "@/lib/settings";
 import { logError } from "@/lib/logging";
 import { useSettingsStore } from "@/store/settings-store";
@@ -9,7 +11,6 @@ import { useSettingsStore } from "@/store/settings-store";
 /** Debounce interval for settings save operations (ms) */
 const SETTINGS_SAVE_DEBOUNCE_MS = 500;
 
-/** Request timeout for settings operations (ms) */
 const SETTINGS_REQUEST_TIMEOUT_MS = 10000;
 
 /** Max retry attempts for failed persist operations */
@@ -38,7 +39,7 @@ async function fetchServerSettings(signal?: AbortSignal): Promise<Settings | nul
     const timeoutId = setTimeout(() => controller.abort(), SETTINGS_REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch("/api/settings", {
+      const response = await fetch(API_ROUTES.SETTINGS, {
         method: "GET",
         credentials: "include",
         signal: signal ?? controller.signal,
@@ -106,7 +107,7 @@ async function persistServerSettings(
     const timeoutId = setTimeout(() => controller.abort(), SETTINGS_REQUEST_TIMEOUT_MS);
 
     try {
-      const response = await fetch("/api/settings", {
+      const response = await fetch(API_ROUTES.SETTINGS, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

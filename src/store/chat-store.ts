@@ -120,6 +120,66 @@ export function chatSessionToConversation(session: ChatSession): Conversation {
   };
 }
 
+/**
+ * Type guard for ChatSession objects
+ */
+function isChatSession(value: unknown): value is ChatSession {
+  if (!value || typeof value !== "object") return false;
+  const obj = value as Record<string, unknown>;
+  return (
+    typeof obj.id === "string" &&
+    typeof obj.title === "string" &&
+    typeof obj.pinned === "boolean" &&
+    Array.isArray(obj.messages)
+  );
+}
+
+/**
+ * Type guard for order array
+ */
+function isOrderArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((id) => typeof id === "string");
+}
+
+/**
+ * Validate and hydrate store with initial data
+ */
+function validateInitialData(data: unknown): InitialChatData | null {
+  if (!data || typeof data !== "object") return null;
+
+  const obj = data as Record<string, unknown>;
+
+  // Validate chats object
+  if (!obj.chats || typeof obj.chats !== "object") return null;
+
+  const chatsRecord = obj.chats as Record<string, unknown>;
+  const chats: Record<string, ChatSession> = {};
+
+  for (const [id, session] of Object.entries(chatsRecord)) {
+    if (!isChatSession(session)) {
+      console.warn(`[ChatStore] Invalid chat session at key "${id}", skipping`, session);
+      continue;
+    }
+    chats[id] = session;
+  }
+
+  if (Object.keys(chats).length === 0) return null;
+
+  // Validate order
+  const order = isOrderArray(obj.order)
+    ? obj.order.filter((id) => id in chats)
+    : Object.keys(chats);
+
+  if (order.length === 0) return null;
+
+  return {
+    chats,
+    order,
+    selectedId:
+      typeof obj.selectedId === "string" && obj.selectedId in chats ? obj.selectedId : undefined,
+  };
+}
+
 export const useChatStore = create<ChatState>((set) => ({
   conversations: {},
   order: [],
@@ -128,8 +188,10 @@ export const useChatStore = create<ChatState>((set) => ({
   hydrated: false,
 
   hydrate: (data) => {
-    if (!data || typeof data !== "object") {
-      console.error("[ChatStore] Invalid hydration data", { data });
+    const validated = validateInitialData(data);
+    if (!validated) {
+      console.error("[ChatStore] Hydration data validation failed", { data });
+      set({ hydrated: true });
       return;
     }
 
@@ -137,26 +199,13 @@ export const useChatStore = create<ChatState>((set) => ({
       const conversations: Record<string, Conversation> = {};
       const statuses: Record<string, ConversationStatus> = {};
 
-      if (data.chats && typeof data.chats === "object") {
-        Object.values(data.chats).forEach((session) => {
-          if (session && typeof session === "object" && "id" in session) {
-            const sess = session as ChatSession;
-            conversations[sess.id] = chatSessionToConversation(sess);
-            statuses[sess.id] = "idle";
-          }
-        });
+      for (const [id, session] of Object.entries(validated.chats)) {
+        conversations[id] = chatSessionToConversation(session);
+        statuses[id] = "idle";
       }
 
-      const order = sortOrderByLastUserMessage(
-        (Array.isArray(data.order) ? data.order : Object.keys(conversations)).filter(
-          (id): id is string => typeof id === "string" && id in conversations
-        ),
-        conversations
-      );
-      const selectedId =
-        typeof data.selectedId === "string" && data.selectedId in conversations
-          ? data.selectedId
-          : order[0] ?? null;
+      const order = sortOrderByLastUserMessage(validated.order, conversations);
+      const selectedId = validated.selectedId ?? order[0] ?? null;
 
       set({
         conversations,
@@ -166,7 +215,7 @@ export const useChatStore = create<ChatState>((set) => ({
         hydrated: true,
       });
     } catch (error) {
-      console.error("[ChatStore] Hydration failed", { error });
+      console.error("[ChatStore] Hydration processing failed", { error });
       set({ hydrated: true });
     }
   },

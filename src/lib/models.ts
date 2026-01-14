@@ -1,3 +1,4 @@
+import { API_ROUTES } from "@/lib/api/routes";
 import { DEFAULT_FALLBACK_MODELS } from "@/lib/constants";
 
 // ============================================================================
@@ -157,7 +158,7 @@ function createModelFetchError(
  */
 export async function fetchModels(): Promise<Model[]> {
   try {
-    const response = await fetch("/api/models", {
+    const response = await fetch(API_ROUTES.MODELS, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

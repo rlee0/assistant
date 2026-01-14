@@ -707,8 +707,9 @@ export const PromptInput = ({
                   controller.textInput.clear();
                 }
               })
-              .catch(() => {
-                // Don't clear on error - user may want to retry
+              .catch((error) => {
+                // Log submission error but don't clear - user may want to retry
+                console.error("[PromptInput] Submission failed", { error });
               });
           } else {
             // Sync function completed without throwing, clear attachments
@@ -717,12 +718,14 @@ export const PromptInput = ({
               controller.textInput.clear();
             }
           }
-        } catch {
-          // Don't clear on error - user may want to retry
+        } catch (error) {
+          // Log submission error but don't clear - user may want to retry
+          console.error("[PromptInput] Submission error", { error });
         }
       })
-      .catch(() => {
-        // Don't clear on error - user may want to retry
+      .catch((error) => {
+        // Log file conversion error but don't clear - user may want to retry
+        console.error("[PromptInput] File conversion failed", { error });
       });
   };
 

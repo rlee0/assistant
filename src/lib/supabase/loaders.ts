@@ -23,30 +23,23 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
   const supabase = await createSupabaseServerClient();
 
   // Execute all queries in parallel instead of sequentially
-  const [{ data: chatRowsData }, { data: messageRowsData }, { data: checkpointRowsData }] =
-    await Promise.all([
-      supabase
-        .from("chats")
-        .select("id,title,is_pinned,updated_at")
-        .eq("user_id", userId)
-        .order("updated_at", { ascending: false }),
-      supabase
-        .from("messages")
-        .select("id,chat_id,role,content,created_at")
-        .order("created_at", { ascending: true }),
-      supabase
-        .from("checkpoints")
-        .select("chat_id,payload,created_at")
-        .order("created_at", { ascending: true }),
-    ]);
+  const [{ data: chatRowsData }, { data: messageRowsData }] = await Promise.all([
+    supabase
+      .from("chats")
+      .select("id,title,is_pinned,updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("messages")
+      .select("id,chat_id,role,content,created_at")
+      .order("created_at", { ascending: true }),
+  ]);
 
   const chatRows = chatRowsData ?? [];
   const messageRows = messageRowsData ?? [];
-  const checkpointRows = checkpointRowsData ?? [];
 
-  // Index messages and checkpoints by chat_id for O(1) lookup instead of O(n) filter
+  // Index messages by chat_id for O(1) lookup instead of O(n) filter
   const messagesByChat = new Map<string, typeof messageRows>();
-  const checkpointsByChat = new Map<string, typeof checkpointRows>();
 
   messageRows.forEach((msg) => {
     if (!messagesByChat.has(msg.chat_id)) {
@@ -55,20 +48,12 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
     messagesByChat.get(msg.chat_id)!.push(msg);
   });
 
-  checkpointRows.forEach((checkpoint) => {
-    if (!checkpointsByChat.has(checkpoint.chat_id)) {
-      checkpointsByChat.set(checkpoint.chat_id, []);
-    }
-    checkpointsByChat.get(checkpoint.chat_id)!.push(checkpoint);
-  });
-
   const chats: Record<string, ChatSession> = {};
   const order: string[] = [];
 
   chatRows.forEach((row) => {
     const id = row.id;
     const chatMessages = messagesByChat.get(id) ?? [];
-    const chatCheckpoints = checkpointsByChat.get(id) ?? [];
 
     const messages: ChatMessage[] = chatMessages.map((m) => ({
       id: m.id,
@@ -76,8 +61,6 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
       content: m.content,
       createdAt: m.created_at,
     }));
-
-    const checkpoints: ChatCheckpoint[] = chatCheckpoints.map((c) => c.payload as ChatMessage[]);
 
     chats[id] = {
       id,
@@ -87,7 +70,7 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
       model: DEFAULT_MODEL,
       suggestions: [],
       messages,
-      checkpoints,
+      checkpoints: [],
     };
     order.push(id);
   });
