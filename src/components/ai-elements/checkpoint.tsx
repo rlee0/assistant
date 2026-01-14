@@ -1,85 +1,97 @@
 "use client";
 
+import type { ComponentProps, HTMLAttributes, ReactNode } from "react";
+import { BookmarkIcon, type LucideProps } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { DelayedTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   AlertDialog,
-  AlertDialogTrigger,
+  AlertDialogAction,
+  AlertDialogCancel,
   AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
   AlertDialogDescription,
   AlertDialogFooter,
-  AlertDialogCancel,
-  AlertDialogAction,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { BookmarkIcon, type LucideProps } from "lucide-react";
-import type { ComponentProps, HTMLAttributes } from "react";
 
-export type CheckpointProps = HTMLAttributes<HTMLDivElement> & {
+export interface CheckpointProps extends HTMLAttributes<HTMLDivElement> {
   messageIndex: number;
   totalMessages: number;
   onRestore?: () => void;
-};
+}
 
-export const Checkpoint = ({
+export function Checkpoint({
   className,
   children,
   messageIndex,
   totalMessages,
   onRestore,
   ...props
-}: CheckpointProps) => (
-  <div
-    className={cn(
-      "group flex items-center gap-0.5 text-muted-foreground overflow-hidden opacity-0 hover:opacity-100 transition-opacity",
-      className
-    )}
-    {...props}>
-    {children}
-    <Separator className="flex-1" />
-  </div>
-);
+}: CheckpointProps) {
+  return (
+    <div
+      className={cn(
+        "group flex items-center gap-0.5 text-muted-foreground overflow-hidden opacity-0 hover:opacity-100 transition-opacity",
+        className
+      )}
+      {...props}>
+      {children}
+      <Separator className="flex-1" />
+    </div>
+  );
+}
 
-export type CheckpointIconProps = LucideProps;
+export interface CheckpointIconProps extends LucideProps {
+  children?: ReactNode;
+}
 
-export const CheckpointIcon = ({ className, children, ...props }: CheckpointIconProps) =>
-  children ?? <BookmarkIcon className={cn("size-4 shrink-0", className)} {...props} />;
+export function CheckpointIcon({ className, children, ...props }: CheckpointIconProps) {
+  return children ?? <BookmarkIcon className={cn("size-4 shrink-0", className)} {...props} />;
+}
 
-export type CheckpointTriggerProps = ComponentProps<typeof Button> & {
+export interface CheckpointTriggerProps extends ComponentProps<typeof Button> {
   tooltip?: string;
   messageIndex: number;
   totalMessages: number;
   onRestore?: () => void;
-};
+}
 
-export const CheckpointTrigger = ({
+export function CheckpointTrigger({
   children,
   className,
   variant = "ghost",
   size = "sm",
-  tooltip,
+  tooltip = "Restore conversation",
   messageIndex,
   totalMessages,
   onRestore,
   ...props
-}: CheckpointTriggerProps) => {
+}: CheckpointTriggerProps) {
   const messagesToDiscard = totalMessages - messageIndex - 1;
+  const discardMessage = messagesToDiscard === 1 ? "1 message" : `${messagesToDiscard} messages`;
 
   return (
     <AlertDialog>
       <DelayedTooltip>
         <TooltipTrigger asChild>
           <AlertDialogTrigger asChild>
-            <Button size={size} type="button" variant={variant} className="h-6" {...props}>
-              {children ?? "Restore Checkpoint"}
+            <Button
+              size={size}
+              type="button"
+              variant={variant}
+              className={cn("h-6", className)}
+              {...props}>
+              {children ?? <BookmarkIcon className="size-3" />}
             </Button>
           </AlertDialogTrigger>
         </TooltipTrigger>
         <TooltipContent align="start" side="bottom" className="text-xs">
-          {tooltip ?? "Restore conversation"}
+          {tooltip}
         </TooltipContent>
       </DelayedTooltip>
 
@@ -87,8 +99,7 @@ export const CheckpointTrigger = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Restore to Checkpoint</AlertDialogTitle>
           <AlertDialogDescription>
-            This will restore the conversation to this point and discard{" "}
-            {messagesToDiscard === 1 ? "1 message" : `${messagesToDiscard} messages`}.
+            This will restore the conversation to this point and discard {discardMessage}.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -98,4 +109,4 @@ export const CheckpointTrigger = ({
       </AlertDialogContent>
     </AlertDialog>
   );
-};
+}
