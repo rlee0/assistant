@@ -26,7 +26,7 @@ export const CSS_CLASSES = {
   image: "max-w-sm rounded-md h-auto",
   messagesContainer: "flex flex-col flex-1 min-h-0",
   messagesInner: "mx-auto py-8 space-y-6",
-  inputContainer: "sticky bottom-0 z-20 border-t bg-background p-4",
+  inputContainer: "sticky bottom-0 z-20 bg-background px-4 pb-4",
   modelButton: "flex items-center gap-2 min-w-max px-2",
   modelName: "text-sm font-medium truncate",
   modelId: "text-muted-foreground truncate text-xs",
