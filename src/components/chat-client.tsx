@@ -1,17 +1,8 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isToolUIPart, getToolName, type UIMessage } from "ai";
-import {
-  useState,
-  useRef,
-  useEffect,
-  useCallback,
-  useMemo,
-  memo,
-  type KeyboardEvent,
-  useId,
-} from "react";
+import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
+import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -138,6 +129,7 @@ import {
   EDIT_INPUT_MIN_WIDTH,
   EDIT_PLACEHOLDER,
   TOAST_MESSAGES,
+  CHAT_REQUEST_TIMEOUT_MS,
 } from "@/lib/chat-constants";
 
 // ============================================================================
@@ -532,10 +524,16 @@ function useAutoScroll(
 ): void {
   const isAtBottomRef = useRef(true); // Start assuming user is at bottom
   const scrollListenerRef = useRef<(() => void) | null>(null);
+  const containerRefRef = useRef(messagesContainerRef);
+
+  // Keep containerRef updated
+  useEffect(() => {
+    containerRefRef.current = messagesContainerRef;
+  }, [messagesContainerRef]);
 
   // Setup scroll listener once on mount (stable)
   useEffect(() => {
-    const containerElement = messagesContainerRef.current;
+    const containerElement = containerRefRef.current?.current;
     if (!containerElement) return;
 
     // Find the scroll viewport element within the container
@@ -566,7 +564,7 @@ function useAutoScroll(
 
   // Scroll when messages change (only if user is at bottom)
   useEffect(() => {
-    const containerElement = messagesContainerRef.current;
+    const containerElement = containerRefRef.current?.current;
     if (!containerElement) return;
 
     // Find the scroll viewport element within the container
@@ -671,10 +669,12 @@ const ChatMessages = memo<ChatMessagesProps>(
               const isAfterEditedMessage =
                 editingMessageId &&
                 messageIndex > messages.findIndex((m) => m.id === editingMessageId);
-              // const isLastMessage = messageIndex === messages.length - 1;
+
+              // Validate message.parts is an array before accessing
+              const parts = Array.isArray(message.parts) ? message.parts : [];
 
               // Extract text content for copy and edit functionality
-              const textParts = message.parts
+              const textParts = parts
                 .filter((part) => part.type === MESSAGE_PART_TYPE.TEXT)
                 .map((part) => part.text)
                 .join("\n");
@@ -730,10 +730,10 @@ const ChatMessages = memo<ChatMessagesProps>(
                       </PromptInput>
                     ) : (
                       <>
-                        {message.parts.map((part, index) => (
+                        {parts.map((part, index) => (
                           <MessagePartRenderer key={index} part={part} index={index} />
                         ))}
-                        <SourcesRenderer parts={message.parts} />
+                        <SourcesRenderer parts={parts} />
                       </>
                     )}
                   </MessageContent>
@@ -1062,8 +1062,6 @@ ChatHeader.displayName = "ChatHeader";
  * @see {@link https://sdk.vercel.ai/docs/ai-sdk-ui/chatbot AI SDK UI Documentation}
  */
 export function ChatClient({ initialData }: ChatClientProps) {
-  const hydrationIdRef = useRef(useId()); // Stable ID for hydration key
-
   const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
@@ -1253,7 +1251,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
       setCreatingChat(true);
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
 
         try {
           const response = await fetch("/api/chat/create", {
@@ -1414,33 +1412,29 @@ export function ChatClient({ initialData }: ChatClientProps) {
       const editIndex = messages.findIndex((m) => m.id === messageId);
       if (editIndex === -1) {
         logWarn("[Chat]", "Edit failed: message not found", { messageId });
+        toast.error("Message not found. Please try again.");
         return;
       }
 
-      try {
-        // Remove all messages from the edited message onwards
-        const newMessages = messages.slice(0, editIndex);
-        setMessages(newMessages);
+      // Remove all messages from the edited message onwards
+      const newMessages = messages.slice(0, editIndex);
+      setMessages(newMessages);
 
-        // Clear edit state
-        setEditingMessageId(null);
-        setEditText("");
+      // Clear edit state
+      setEditingMessageId(null);
+      setEditText("");
 
-        // Re-send the edited message
-        sendMessage(
-          { text: newText },
-          {
-            body: {
-              model: currentModel,
-            },
-          }
-        );
+      // Re-send the edited message
+      sendMessage(
+        { text: newText },
+        {
+          body: {
+            model: currentModel,
+          },
+        }
+      );
 
-        toast.success(TOAST_MESSAGES.MESSAGE_UPDATED);
-      } catch (error) {
-        logError("[Chat]", "Edit save failed", error);
-        toast.error("Failed to update message");
-      }
+      toast.success(TOAST_MESSAGES.MESSAGE_UPDATED);
     },
     [messages, setMessages, sendMessage, currentModel]
   );
@@ -1451,6 +1445,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
       const deleteIndex = messages.findIndex((m) => m.id === messageId);
       if (deleteIndex === -1) {
         logWarn("[Chat]", "Delete failed: message not found", { messageId });
+        toast.error("Message not found. Please try again.");
         return;
       }
 
@@ -1466,7 +1461,7 @@ export function ChatClient({ initialData }: ChatClientProps) {
       setDeleting((prev) => ({ ...prev, [conversationId]: true }));
       try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+        const timeoutId = setTimeout(() => controller.abort(), CHAT_REQUEST_TIMEOUT_MS);
 
         try {
           const response = await fetch("/api/chat/delete", {
