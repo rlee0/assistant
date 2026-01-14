@@ -1519,7 +1519,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       />
       <SidebarInset>
         <ChatHeader conversationTitle={conversationTitle} />
-        <div className="flex flex-1 flex-col gap-4 p-y4 pt-0 min-h-0">
+        <div className="flex flex-1 flex-col min-h-0">
           {/* Settings Modal */}
           <SettingsModal open={settingsOpen} onOpenChange={setSettingsOpen} />
 

@@ -33,6 +33,16 @@ export async function GET() {
     // Return defaults if no settings exist for this user
     const resolvedSettings = settings ? settingsSchema.parse(settings) : buildDefaultSettings();
 
+    // Always populate account information with actual user data from auth
+    resolvedSettings.account = {
+      email: user.email ?? resolvedSettings.account.email,
+      displayName:
+        user.user_metadata?.display_name ??
+        user.user_metadata?.full_name ??
+        user.email?.split("@")[0] ??
+        resolvedSettings.account.displayName,
+    };
+
     return NextResponse.json({
       success: true,
       settings: resolvedSettings,
