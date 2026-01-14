@@ -1,6 +1,6 @@
 "use client";
 
-import { Loader2, Plus, Trash2 } from "lucide-react";
+import { Edit, Loader2, Trash2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -116,13 +116,17 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
         <div className="flex gap-2">
-          <Button onClick={handleNewChat} className="w-full justify-start" disabled={creatingChat}>
+          <Button
+            variant="ghost"
+            onClick={handleNewChat}
+            className="w-full justify-start"
+            disabled={creatingChat}>
             {creatingChat ? (
               <Loader2 className="size-4 animate-spin" />
             ) : (
-              <Plus className="size-4" />
+              <Edit className="size-4" />
             )}
-            <span>New Chat</span>
+            <span>New chat</span>
           </Button>
         </div>
       </SidebarHeader>

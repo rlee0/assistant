@@ -1493,7 +1493,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   );
 
   const currentConversation = selectedId ? conversations[selectedId] : null;
-  const conversationTitle = currentConversation?.title || "New Chat";
+  const conversationTitle = currentConversation?.title || "New chat";
 
   // Get user info from settings or use default
   const user = {
