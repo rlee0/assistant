@@ -54,30 +54,22 @@ export async function DELETE(request: NextRequest) {
       return notFoundError("Chat");
     }
 
-    // Delete associated records in cascade
-    await supabase
-      .from("messages")
-      .delete()
-      .eq("chat_id", id)
-      .eq("user_id", user.id)
-      .then((result) => {
-        if (result.error) {
-          logError("[Chat Delete]", "Failed to delete messages", result.error, { chatId: id });
-        }
-      });
+    // Delete associated records in cascade using parallel execution
+    const [messagesResult, checkpointsResult] = await Promise.all([
+      supabase.from("messages").delete().eq("chat_id", id).eq("user_id", user.id),
+      supabase.from("checkpoints").delete().eq("chat_id", id).eq("user_id", user.id),
+    ]);
 
-    await supabase
-      .from("checkpoints")
-      .delete()
-      .eq("chat_id", id)
-      .eq("user_id", user.id)
-      .then((result) => {
-        if (result.error) {
-          logError("[Chat Delete]", "Failed to delete checkpoints", result.error, { chatId: id });
-        }
-      });
+    if (messagesResult.error) {
+      logError("[Chat Delete]", "Failed to delete messages", messagesResult.error, { chatId: id });
+    }
 
-    // Delete the chat itself
+    if (checkpointsResult.error) {
+      logError("[Chat Delete]", "Failed to delete checkpoints", checkpointsResult.error, {
+        chatId: id,
+      });
+    }
+
     const { error: delChatError } = await supabase
       .from("chats")
       .delete()

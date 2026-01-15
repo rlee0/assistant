@@ -2,83 +2,72 @@
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import { useRouter } from "next/navigation";
+
+type FormState = {
+  email: string;
+  password: string;
+  error: string | null;
+  isLoading: boolean;
+};
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
-  const supabase = useMemo(() => {
-    try {
-      return createSupabaseBrowserClient();
-    } catch (error) {
-      console.error(error);
-      return null;
-    }
-  }, []);
-  const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const isDisabled = isLoading || !supabase;
+  const [state, setState] = useState<FormState>({
+    email: "",
+    password: "",
+    error: null,
+    isLoading: false,
+  });
 
-  async function handleLogin(e: React.FormEvent<HTMLFormElement>): Promise<void> {
-    e.preventDefault();
+  const handleLogin = useCallback(
+    async (e: React.FormEvent<HTMLFormElement>) => {
+      e.preventDefault();
 
-    if (!supabase) {
-      setError("Authentication service is unavailable.");
-      return;
-    }
+      setState((prev) => ({ ...prev, error: null, isLoading: true }));
 
-    setError(null);
-    setIsLoading(true);
+      try {
+        const supabase = createSupabaseBrowserClient();
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: state.email,
+          password: state.password,
+        });
 
-    try {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+        if (signInError) {
+          setState((prev) => ({ ...prev, error: signInError.message, isLoading: false }));
+          return;
+        }
 
-      if (signInError) {
-        setError(signInError.message);
-        return;
+        window.location.href = "/";
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "An unexpected error occurred";
+        setState((prev) => ({ ...prev, error: message, isLoading: false }));
       }
+    },
+    [state.email, state.password]
+  );
 
-      // Force a full page reload to clear any stale data from previous user
-      window.location.href = "/";
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "An unexpected error occurred";
-      setError(message);
-    } finally {
-      setIsLoading(false);
-    }
-  }
-
-  async function oauth(provider: "google" | "github"): Promise<void> {
-    if (!supabase) {
-      setError("Authentication service is unavailable.");
-      return;
-    }
-
+  const handleOAuth = useCallback(async (provider: "google" | "github") => {
     try {
+      const supabase = createSupabaseBrowserClient();
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
         options: { redirectTo: `${window.location.origin}/api/auth/callback` },
       });
 
       if (error) {
-        setError(error.message);
+        setState((prev) => ({ ...prev, error: error.message }));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "OAuth authentication failed";
-      setError(message);
+      setState((prev) => ({ ...prev, error: message }));
     }
-  }
+  }, []);
 
   return (
     <div className={cn("flex flex-col gap-6", className)} {...props}>
@@ -96,9 +85,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 type="email"
                 placeholder="m@example.com"
                 required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isDisabled}
+                value={state.email}
+                onChange={(e) => setState((prev) => ({ ...prev, email: e.target.value }))}
+                disabled={state.isLoading}
               />
             </Field>
             <Field>
@@ -112,26 +101,21 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 id="password"
                 type="password"
                 required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isDisabled}
+                value={state.password}
+                onChange={(e) => setState((prev) => ({ ...prev, password: e.target.value }))}
+                disabled={state.isLoading}
               />
             </Field>
-            {error && <p className="text-sm text-red-600">{error}</p>}
-            {!supabase && (
-              <p className="text-xs text-red-500">
-                Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
-              </p>
-            )}
-            <Button type="submit" disabled={isDisabled} className="w-full">
-              {isLoading ? "Logging in..." : "Login"}
+            {state.error && <p className="text-sm text-red-600">{state.error}</p>}
+            <Button type="submit" disabled={state.isLoading} className="w-full">
+              {state.isLoading ? "Logging in..." : "Login"}
             </Button>
             <Button
               variant="outline"
               type="button"
-              disabled={isDisabled}
+              disabled={state.isLoading}
               className="w-full"
-              onClick={() => oauth("google")}>
+              onClick={() => handleOAuth("google")}>
               Login with Google
             </Button>
             <FieldDescription className="text-center">

@@ -1,9 +1,10 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+
 import { API_ROUTES } from "@/lib/api/routes";
 import { toast } from "sonner";
 import { useChatStore } from "@/store/chat-store";
 import { useRouter } from "next/navigation";
 import { useSettingsStore } from "@/store/settings-store";
-import { useState } from "react";
 
 /**
  * Hook for handling user logout
@@ -27,9 +28,17 @@ export function useLogout() {
   const [error, setError] = useState<string | null>(null);
   const resetChatStore = useChatStore((state) => state.reset);
   const resetSettingsStore = useSettingsStore((state) => state.reset);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
-  async function logout() {
-    const controller = new AbortController();
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+    };
+  }, []);
+
+  const logout = useCallback(async () => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = new AbortController();
 
     try {
       setIsLoading(true);
@@ -38,7 +47,7 @@ export function useLogout() {
       const response = await fetch(API_ROUTES.AUTH.LOGOUT, {
         method: "POST",
         credentials: "include",
-        signal: controller.signal,
+        signal: abortControllerRef.current.signal,
       });
 
       if (!response.ok) {
@@ -48,14 +57,11 @@ export function useLogout() {
 
       toast.success("Logged out successfully");
 
-      // Clear all stores to prevent showing other users' data
       resetChatStore();
       resetSettingsStore();
 
-      // Redirect to login page
       router.replace("/login");
     } catch (err) {
-      // Handle abort gracefully (component unmounted during request)
       if (err instanceof DOMException && err.name === "AbortError") {
         return;
       }
@@ -66,7 +72,7 @@ export function useLogout() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, [router, resetChatStore, resetSettingsStore]);
 
   return { logout, isLoading, error };
 }

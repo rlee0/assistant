@@ -163,7 +163,9 @@ function validateInitialData(data: unknown): InitialChatData | null {
 
   for (const [id, session] of Object.entries(chatsRecord)) {
     if (!isChatSession(session)) {
-      console.warn(`[ChatStore] Invalid chat session at key "${id}", skipping`, session);
+      if (process.env.NODE_ENV === "development") {
+        console.warn(`[ChatStore] Invalid chat session at key "${id}", skipping`, session);
+      }
       continue;
     }
     chats[id] = session;
@@ -195,15 +197,18 @@ export const useChatStore = create<ChatState>((set) => ({
   hydrate: (data) => {
     const validated = validateInitialData(data);
     if (!validated) {
-      console.error("[ChatStore] Hydration data validation failed", { data });
+      if (process.env.NODE_ENV === "development") {
+        console.error("[ChatStore] Hydration data validation failed", { data });
+      }
       set({ hydrated: true });
       return;
     }
 
-    // Security check: Validate data belongs to current user
     const newUserId = validated.userId || (data as { userId?: string }).userId;
     if (!newUserId) {
-      console.warn("[ChatStore] No userId in hydration data, clearing store");
+      if (process.env.NODE_ENV === "development") {
+        console.warn("[ChatStore] No userId in hydration data, clearing store");
+      }
       set({ conversations: {}, order: [], selectedId: null, currentUserId: null, hydrated: true });
       return;
     }
@@ -221,12 +226,13 @@ export const useChatStore = create<ChatState>((set) => ({
       const selectedId = validated.selectedId ?? order[0] ?? null;
 
       set((state) => {
-        // If user changed, log the switch (data is already filtered by RLS)
         if (state.currentUserId && state.currentUserId !== newUserId) {
-          console.warn("[ChatStore] User changed, replacing data", {
-            oldUser: state.currentUserId,
-            newUser: newUserId,
-          });
+          if (process.env.NODE_ENV === "development") {
+            console.warn("[ChatStore] User changed, replacing data", {
+              oldUser: state.currentUserId,
+              newUser: newUserId,
+            });
+          }
         }
 
         return {
@@ -239,7 +245,9 @@ export const useChatStore = create<ChatState>((set) => ({
         };
       });
     } catch (error) {
-      console.error("[ChatStore] Hydration processing failed", { error });
+      if (process.env.NODE_ENV === "development") {
+        console.error("[ChatStore] Hydration processing failed", { error });
+      }
       set({ hydrated: true });
     }
   },
