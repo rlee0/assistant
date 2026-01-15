@@ -13,7 +13,7 @@ export default function ChatLoading() {
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-4">
             {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-10 w-full rounded-lg" />
+              <Skeleton key={i} className="h-8 w-full rounded-lg" />
             ))}
           </div>
         </div>
