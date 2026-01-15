@@ -50,6 +50,7 @@ export async function persistMessages(chatId: string, messages: ChatMessage[]) {
   const payload = messages.map((m) => ({
     id: normalizeMessageId(m.id),
     chat_id: chatId,
+    user_id: supabase.userId,
     role: m.role,
     content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
     created_at: m.createdAt,
@@ -98,6 +99,7 @@ export async function persistCheckpoint(chatId: string, checkpoint: ChatCheckpoi
       .from("checkpoints")
       .insert({
         chat_id: chatId,
+        user_id: supabase.userId,
         payload: normalized,
         created_at: new Date().toISOString(),
       })
