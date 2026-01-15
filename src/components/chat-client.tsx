@@ -485,6 +485,7 @@ interface ChatMessagesProps {
   readonly hydrated: boolean;
   readonly scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
   readonly checkpoints: ChatCheckpoint[];
+  readonly selectedId: string | null;
   readonly onEditMessage: (messageId: string, initialText: string) => void;
   readonly onCancelEdit: () => void;
   readonly onSaveEdit: (messageId: string, newText: string) => void;
@@ -505,6 +506,7 @@ const ChatMessages = memo<ChatMessagesProps>(
     hydrated,
     scrollToBottomRef,
     checkpoints,
+    selectedId,
     onEditMessage,
     onCancelEdit,
     onSaveEdit,
@@ -533,7 +535,16 @@ const ChatMessages = memo<ChatMessagesProps>(
         <Conversation>
           <ConversationContent>
             <div className={cn("w-full", CSS_CLASSES.messagesInner, CHAT_CONTAINER_MAX_WIDTH)}>
-              {!hydrated ? null : messages.length === 0 ? (
+              {!hydrated ? null : !selectedId ? (
+                <Empty>
+                  <EmptyHeader>
+                    <EmptyTitle>No Chat Selected</EmptyTitle>
+                    <EmptyDescription>
+                      Create a new chat or select an existing one to begin.
+                    </EmptyDescription>
+                  </EmptyHeader>
+                </Empty>
+              ) : messages.length === 0 ? (
                 <Empty>
                   <EmptyHeader>
                     <EmptyTitle>Start a Conversation</EmptyTitle>
@@ -1192,8 +1203,11 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
     const conversation = conversations[selectedId];
 
-    // Wait for conversation to exist in store
+    // If selected conversation was deleted, clear the selection
     if (!conversation) {
+      loadedConversationIdRef.current = null;
+      setMessages([]);
+      selectConversationId(null);
       return;
     }
 
@@ -1205,7 +1219,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     // Load conversation messages
     loadedConversationIdRef.current = selectedId;
     setMessages(conversation.messages || []);
-  }, [selectedId, conversations, setMessages, hydrated]);
+  }, [selectedId, conversations, setMessages, hydrated, selectConversationId]);
 
   // Step 4: Sync messages from useChat back to store
   useEffect(() => {
@@ -1836,6 +1850,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             hydrated={hydrated}
             scrollToBottomRef={scrollToBottomRef}
             checkpoints={currentConversation?.checkpoints ?? []}
+            selectedId={selectedId}
             onEditMessage={handleEditMessage}
             onCancelEdit={handleCancelEdit}
             onSaveEdit={handleSaveEdit}
@@ -1846,7 +1861,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           />
 
           {/* Input */}
-          {!hydrated ? null : (
+          {!hydrated || !selectedId ? null : (
             <ChatInput
               text={text}
               onTextChange={setText}
