@@ -8,6 +8,7 @@ export type InitialChatData = {
   chats: Record<string, ChatSession>;
   order: string[];
   selectedId?: string;
+  userId?: string; // For validating data belongs to current user
 };
 
 /**
@@ -33,10 +34,12 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
       supabase
         .from("messages")
         .select("id,chat_id,role,content,created_at")
+        .eq("user_id", userId)
         .order("created_at", { ascending: true }),
       supabase
         .from("checkpoints")
         .select("id,chat_id,message_index,timestamp")
+        .eq("user_id", userId)
         .order("timestamp", { ascending: true }),
     ]);
 
@@ -102,5 +105,6 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
     chats,
     order,
     selectedId: order[0],
+    userId, // Include userId for validation
   };
 }

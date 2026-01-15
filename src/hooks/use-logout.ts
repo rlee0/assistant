@@ -1,6 +1,8 @@
 import { API_ROUTES } from "@/lib/api/routes";
 import { toast } from "sonner";
+import { useChatStore } from "@/store/chat-store";
 import { useRouter } from "next/navigation";
+import { useSettingsStore } from "@/store/settings-store";
 import { useState } from "react";
 
 /**
@@ -23,6 +25,8 @@ export function useLogout() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const resetChatStore = useChatStore((state) => state.reset);
+  const resetSettingsStore = useSettingsStore((state) => state.reset);
 
   async function logout() {
     const controller = new AbortController();
@@ -43,6 +47,10 @@ export function useLogout() {
       }
 
       toast.success("Logged out successfully");
+
+      // Clear all stores to prevent showing other users' data
+      resetChatStore();
+      resetSettingsStore();
 
       // Redirect to login page
       router.replace("/login");

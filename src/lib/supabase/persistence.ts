@@ -91,17 +91,14 @@ export async function persistCheckpoint(chatId: string, checkpoint: ChatCheckpoi
   const supabase = await supabaseClient();
   if (!supabase || !supabase.userId) return;
   try {
-    const normalized = checkpoint.map((m) => ({
-      ...m,
-      content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
-    }));
     const { error } = await supabase.client
       .from("checkpoints")
       .insert({
+        id: checkpoint.id,
         chat_id: chatId,
         user_id: supabase.userId,
-        payload: normalized,
-        created_at: new Date().toISOString(),
+        message_index: checkpoint.messageIndex,
+        timestamp: checkpoint.timestamp,
       })
       .select();
     if (error) {

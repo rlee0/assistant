@@ -140,6 +140,7 @@ export async function PATCH(request: NextRequest) {
       const messagePayload = messages.map((m) => ({
         id: normalizeMessageId(m.id),
         chat_id: id,
+        user_id: user.id,
         role: m.role,
         content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
         created_at: m.createdAt,
@@ -157,6 +158,7 @@ export async function PATCH(request: NextRequest) {
       const checkpointPayload = checkpoints.map((cp) => ({
         id: cp.id,
         chat_id: id,
+        user_id: user.id,
         message_index: cp.messageIndex,
         timestamp: cp.timestamp,
         created_at: cp.timestamp,

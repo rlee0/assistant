@@ -26,6 +26,7 @@ type ChatState = {
   selectedId: string | null;
   status: Record<string, ConversationStatus>;
   hydrated: boolean;
+  currentUserId: string | null; // Track current user to detect user switches
   hydrate: (data: InitialChatData) => void;
   select: (id: string | null) => void;
   upsert: (conversation: Conversation) => void;
@@ -179,6 +180,7 @@ function validateInitialData(data: unknown): InitialChatData | null {
     order,
     selectedId:
       typeof obj.selectedId === "string" && obj.selectedId in chats ? obj.selectedId : undefined,
+    userId: typeof obj.userId === "string" ? obj.userId : undefined,
   };
 }
 
@@ -188,12 +190,21 @@ export const useChatStore = create<ChatState>((set) => ({
   selectedId: null,
   status: {},
   hydrated: false,
+  currentUserId: null,
 
   hydrate: (data) => {
     const validated = validateInitialData(data);
     if (!validated) {
       console.error("[ChatStore] Hydration data validation failed", { data });
       set({ hydrated: true });
+      return;
+    }
+
+    // Security check: Validate data belongs to current user
+    const newUserId = validated.userId || (data as { userId?: string }).userId;
+    if (!newUserId) {
+      console.warn("[ChatStore] No userId in hydration data, clearing store");
+      set({ conversations: {}, order: [], selectedId: null, currentUserId: null, hydrated: true });
       return;
     }
 
@@ -209,12 +220,23 @@ export const useChatStore = create<ChatState>((set) => ({
       const order = sortOrderByLastUserMessage(validated.order, conversations);
       const selectedId = validated.selectedId ?? order[0] ?? null;
 
-      set({
-        conversations,
-        order,
-        selectedId,
-        status: statuses,
-        hydrated: true,
+      set((state) => {
+        // If user changed, log the switch (data is already filtered by RLS)
+        if (state.currentUserId && state.currentUserId !== newUserId) {
+          console.warn("[ChatStore] User changed, replacing data", {
+            oldUser: state.currentUserId,
+            newUser: newUserId,
+          });
+        }
+
+        return {
+          conversations,
+          order,
+          selectedId,
+          status: statuses,
+          currentUserId: newUserId,
+          hydrated: true,
+        };
       });
     } catch (error) {
       console.error("[ChatStore] Hydration processing failed", { error });
@@ -419,5 +441,13 @@ export const useChatStore = create<ChatState>((set) => ({
       };
     }),
 
-  reset: () => set({ conversations: {}, order: [], selectedId: null, status: {}, hydrated: false }),
+  reset: () =>
+    set({
+      conversations: {},
+      order: [],
+      selectedId: null,
+      status: {},
+      currentUserId: null,
+      hydrated: false,
+    }),
 }));

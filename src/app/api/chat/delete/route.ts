@@ -59,6 +59,7 @@ export async function DELETE(request: NextRequest) {
       .from("messages")
       .delete()
       .eq("chat_id", id)
+      .eq("user_id", user.id)
       .then((result) => {
         if (result.error) {
           logError("[Chat Delete]", "Failed to delete messages", result.error, { chatId: id });
@@ -69,6 +70,7 @@ export async function DELETE(request: NextRequest) {
       .from("checkpoints")
       .delete()
       .eq("chat_id", id)
+      .eq("user_id", user.id)
       .then((result) => {
         if (result.error) {
           logError("[Chat Delete]", "Failed to delete checkpoints", result.error, { chatId: id });
@@ -76,7 +78,11 @@ export async function DELETE(request: NextRequest) {
       });
 
     // Delete the chat itself
-    const { error: delChatError } = await supabase.from("chats").delete().eq("id", id);
+    const { error: delChatError } = await supabase
+      .from("chats")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", user.id);
 
     if (delChatError) {
       throw new APIError(delChatError.message, 400);

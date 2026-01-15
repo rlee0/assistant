@@ -49,7 +49,8 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
         return;
       }
 
-      router.replace("/");
+      // Force a full page reload to clear any stale data from previous user
+      window.location.href = "/";
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred";
       setError(message);

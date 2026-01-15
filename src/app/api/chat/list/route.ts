@@ -41,13 +41,15 @@ export async function GET(request: NextRequest) {
         .from("messages")
         .select("id,role,content,created_at")
         .eq("chat_id", chatId)
+        .eq("user_id", user.id)
         .order("created_at", { ascending: true });
 
       const { data: checkpointsData } = await supabase
         .from("checkpoints")
-        .select("payload,created_at")
+        .select("id,message_index,timestamp")
         .eq("chat_id", chatId)
-        .order("created_at", { ascending: true });
+        .eq("user_id", user.id)
+        .order("timestamp", { ascending: true });
 
       const messages: ChatMessage[] = (messagesData ?? []).map((m) => ({
         id: m.id,
@@ -56,9 +58,11 @@ export async function GET(request: NextRequest) {
         createdAt: m.created_at,
       }));
 
-      const checkpoints: ChatCheckpoint[] = (checkpointsData ?? []).map(
-        (c) => c.payload as ChatMessage[]
-      );
+      const checkpoints: ChatCheckpoint[] = (checkpointsData ?? []).map((c) => ({
+        id: c.id,
+        messageIndex: c.message_index,
+        timestamp: c.timestamp,
+      }));
 
       const chat: ChatSession = {
         id: chatData.id,
@@ -86,6 +90,7 @@ export async function GET(request: NextRequest) {
     const { data: messageRowsData } = await supabase
       .from("messages")
       .select("id,chat_id,role,content,created_at")
+      .eq("user_id", user.id)
       .in(
         "chat_id",
         chatRows.map((c) => c.id)
@@ -96,12 +101,13 @@ export async function GET(request: NextRequest) {
 
     const { data: checkpointRowsData } = await supabase
       .from("checkpoints")
-      .select("chat_id,payload,created_at")
+      .select("id,chat_id,message_index,timestamp")
+      .eq("user_id", user.id)
       .in(
         "chat_id",
         chatRows.map((c) => c.id)
       )
-      .order("created_at", { ascending: true });
+      .order("timestamp", { ascending: true });
 
     const checkpointRows = checkpointRowsData ?? [];
 
@@ -121,7 +127,11 @@ export async function GET(request: NextRequest) {
 
       const checkpoints: ChatCheckpoint[] = checkpointRows
         .filter((c) => c.chat_id === id)
-        .map((c) => c.payload as ChatMessage[]);
+        .map((c) => ({
+          id: c.id,
+          messageIndex: c.message_index,
+          timestamp: c.timestamp,
+        }));
 
       chats[id] = {
         id,
