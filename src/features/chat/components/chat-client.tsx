@@ -482,7 +482,16 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     return createConversation();
   }, [conversations, createConversation, selectedId]);
 
-  const handleNewChat = useCallback(async (): Promise<void> => {
+  /**
+   * Handle new chat creation or navigation to existing empty chat.
+   *
+   * @returns Promise resolving to true if navigation occurred, false if already on target
+   * @remarks
+   * The return value is used by callers to manage progress bar state:
+   * - true: Navigation occurred (progress bar auto-completes on pathname change)
+   * - false: Already on target chat (caller must manually complete progress bar)
+   */
+  const handleNewChat = useCallback(async (): Promise<boolean> => {
     const existingNewChatId = findExistingNewChat();
 
     if (existingNewChatId) {
@@ -495,11 +504,12 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       }
       resetUIState();
       textareaRef.current?.focus();
-      return;
+      return !alreadyOnTarget;
     }
 
     await createConversation();
     textareaRef.current?.focus();
+    return true;
   }, [
     conversationId,
     createConversation,

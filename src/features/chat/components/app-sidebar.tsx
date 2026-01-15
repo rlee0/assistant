@@ -64,7 +64,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   readonly deleting: Readonly<Record<string, boolean>>;
   readonly creatingChat: boolean;
   readonly hydrated: boolean;
-  readonly onNewChat: () => void;
+  readonly onNewChat: () => Promise<boolean>;
   readonly onSelectConversation: (id: string) => void;
   readonly onDeleteConversation: (id: string) => void;
   readonly onCopyConversation: (id: string) => Promise<void>;
@@ -102,12 +102,23 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
-  const { startProgress } = useManualProgress();
+  const { startProgress, completeProgress } = useManualProgress();
 
-  const handleNewChat = useCallback(() => {
+  const handleNewChat = useCallback(async () => {
     startProgress();
-    onNewChat();
-  }, [onNewChat, startProgress]);
+    try {
+      const didNavigate = await onNewChat();
+      // If no navigation occurred, complete the progress bar manually
+      // Navigation auto-completes via ProgressBarProvider pathname change
+      if (!didNavigate) {
+        completeProgress();
+      }
+    } catch (error) {
+      // Ensure progress bar completes even on error
+      completeProgress();
+      throw error;
+    }
+  }, [onNewChat, startProgress, completeProgress]);
 
   const handleSelectConversation = useCallback(
     (id: string) => {
