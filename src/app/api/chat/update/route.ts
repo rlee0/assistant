@@ -3,7 +3,7 @@ import { v5 as uuidv5 } from "uuid";
 import { logError } from "@/lib/logging";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { type ChatMessage, type ChatCheckpoint } from "@/types/chat";
+import { type ChatMessage, type ChatCheckpoint } from "@/features/chat/types";
 import {
   validateString,
   validateBoolean,
@@ -150,6 +150,7 @@ export async function PATCH(request: NextRequest) {
 
       if (messagesError) {
         logError("[Chat Update]", "Failed to update messages", messagesError, { chatId: id });
+        throw new APIError(messagesError.message ?? "Failed to update messages", 500);
       }
     }
 
@@ -170,6 +171,7 @@ export async function PATCH(request: NextRequest) {
 
       if (checkpointsError) {
         logError("[Chat Update]", "Failed to update checkpoints", checkpointsError, { chatId: id });
+        throw new APIError(checkpointsError.message ?? "Failed to update checkpoints", 500);
       }
     }
 

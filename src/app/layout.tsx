@@ -1,8 +1,8 @@
-import "./globals.css";
+import "@/styles/globals.css";
 
 import { Geist, Geist_Mono } from "next/font/google";
 
-import { ErrorBoundary } from "@/components/error-boundary";
+import { ErrorBoundary } from "@/components/feedback/error-boundary";
 import type { Metadata } from "next";
 import { Toaster } from "sonner";
 

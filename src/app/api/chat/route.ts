@@ -4,6 +4,7 @@ import { validateArray, validateObject, validateString } from "@/lib/api/validat
 import { DEFAULT_MODEL } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { parseRequestBody } from "@/lib/api/middleware";
+import { logError, logDebug } from "@/lib/logging";
 import {
   convertToModelMessages,
   streamText,
@@ -12,7 +13,7 @@ import {
   type LanguageModelUsage,
 } from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
-import * as toolFactories from "@/tools";
+import * as toolFactories from "@/features/chat/tools";
 
 /**
  * Tool factory function type
@@ -245,28 +246,24 @@ export async function POST(req: Request): Promise<Response> {
       tools,
       stopWhen: [],
       onStepFinish: (step) => {
-        if (isDevelopment) {
-          console.debug("[Chat] Step finished:", {
-            requestId,
-            toolCallsCount: step.toolCalls?.length ?? 0,
-            toolResultsCount: step.toolResults?.length ?? 0,
-            finishReason: step.finishReason,
-            hasText: step.text !== undefined && step.text.length > 0,
-            textLength: step.text?.length ?? 0,
-          });
-        }
+        logDebug("[Chat]", "Step finished", {
+          requestId,
+          toolCallsCount: step.toolCalls?.length ?? 0,
+          toolResultsCount: step.toolResults?.length ?? 0,
+          finishReason: step.finishReason,
+          hasText: step.text !== undefined && step.text.length > 0,
+          textLength: step.text?.length ?? 0,
+        });
       },
     });
 
-    // Log streaming initiation in development
-    if (isDevelopment) {
-      console.debug("[Chat] Stream started:", {
-        requestId,
-        userId,
-        model: selectedModel,
-        messageCount: messages.length,
-      });
-    }
+    // Log streaming initiation
+    logDebug("[Chat]", "Stream started", {
+      requestId,
+      userId,
+      model: selectedModel,
+      messageCount: messages.length,
+    });
 
     // Return UIMessageStream response expected by DefaultChatTransport/useChat
     return result.toUIMessageStreamResponse({
@@ -287,22 +284,12 @@ export async function POST(req: Request): Promise<Response> {
         return undefined;
       },
       onError: (error: unknown) => {
-        console.error("[Chat] Stream error:", {
-          requestId,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        logError("[Chat]", "Stream error", error, { requestId });
         return "An error occurred while processing your request.";
       },
     });
   } catch (error: unknown) {
-    // Enhanced error logging with request context
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error("[Chat API Error]:", {
-      requestId,
-      message: errorMessage,
-      ...(isDevelopment && error instanceof Error && { stack: error.stack }),
-    });
-
+    logError("[Chat API]", "Request processing failed", error, { requestId });
     return handleAPIError(error, { requestId, isDevelopment });
   }
 }

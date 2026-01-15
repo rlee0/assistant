@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { logError } from "@/lib/logging";
 
 export class APIError extends Error {
   constructor(
@@ -60,11 +61,12 @@ export function handleAPIError(
   const isDevelopment = options?.isDevelopment ?? process.env.NODE_ENV === "development";
   const requestId = options?.requestId;
 
-  // Log with appropriate detail level
-  console.error(`[API Error]${requestId ? ` [${requestId}]` : ""}:`, {
-    message: formatErrorForLogging(error, isDevelopment),
-    ...(isDevelopment && error instanceof Error && { stack: error.stack }),
-  });
+  // Log with structured logging
+  logError(
+    "[API Error]" + (requestId ? ` [${requestId}]` : ""),
+    formatErrorForLogging(error, isDevelopment),
+    error
+  );
 
   if (error instanceof APIError) {
     const code: ErrorCode = (error.code as ErrorCode) ?? ErrorCodes.INTERNAL_ERROR;

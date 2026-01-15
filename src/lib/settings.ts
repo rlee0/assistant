@@ -7,7 +7,7 @@ import {
   DEFAULT_USER_EMAIL,
 } from "@/lib/constants";
 
-import { defaultToolSettings } from "@/tools";
+import { defaultToolSettings } from "@/features/chat/tools";
 import { z } from "zod";
 
 /**

@@ -8,7 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
-import { useLogout } from "@/hooks/use-logout";
+import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useRouter } from "next/navigation";
 
 export default function SettingsPage() {
