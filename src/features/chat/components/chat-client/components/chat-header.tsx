@@ -19,7 +19,7 @@ export const ChatHeader = memo<ChatHeaderProps>(({ conversationTitle, lastMessag
   return (
     <header className="sticky top-0 z-10 flex shrink-0 items-center p-4 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
       <div className="flex items-center gap-2">
-        <SidebarTrigger className="-ml-1" />
+        <SidebarTrigger />
         <Separator orientation="vertical" />
         <Breadcrumb>
           <BreadcrumbList>
@@ -29,7 +29,7 @@ export const ChatHeader = memo<ChatHeaderProps>(({ conversationTitle, lastMessag
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div className="text-xs ml-auto text-muted-foreground whitespace-nowrap">
+      <div className="text-xs ml-auto text-muted-foreground whitespace-nowrap mr-4">
         {lastMessageLabel}
       </div>
     </header>

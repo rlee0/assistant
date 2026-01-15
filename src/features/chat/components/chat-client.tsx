@@ -21,6 +21,7 @@ import {
   mapUseChatStatus,
   uiMessageToChatMessage,
   areMessagesEqual,
+  extractTextFromMessage,
 } from "./chat-client/utils/message-utils";
 import {
   persistConversation,
@@ -509,6 +510,39 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     selectedId,
   ]);
 
+  const handleCopyConversation = useCallback(
+    async (conversationIdToCopy: string): Promise<void> => {
+      try {
+        const conversation = conversations[conversationIdToCopy];
+        if (!conversation) {
+          toast.error("Conversation not found");
+          return;
+        }
+
+        const title = conversation.title || "Untitled chat";
+        const messages = conversation.messages;
+
+        // Format messages as markdown
+        const messageText = messages
+          .map((message) => {
+            const role = message.role === "user" ? "User" : "Assistant";
+            const content = extractTextFromMessage(message);
+            return `**${role}:**\n${content}\n`;
+          })
+          .join("\n");
+
+        const markdown = `# ${title}\n\n${messageText}`;
+
+        await navigator.clipboard.writeText(markdown);
+        toast.success("Conversation copied to clipboard");
+      } catch (error) {
+        logError("[Chat]", "Failed to copy conversation", error, { conversationIdToCopy });
+        toast.error("Failed to copy conversation");
+      }
+    },
+    [conversations]
+  );
+
   const handleDeleteConversation = useCallback(
     async (conversationIdToDelete: string): Promise<void> => {
       setDeleting((prev) => ({ ...prev, [conversationIdToDelete]: true }));
@@ -821,6 +855,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         onNewChat={handleNewChat}
         onSelectConversation={handleSelectConversation}
         onDeleteConversation={handleDeleteConversation}
+        onCopyConversation={handleCopyConversation}
       />
       <SidebarInset>
         <ChatHeader conversationTitle={conversationTitle} lastMessageLabel={lastMessageLabel} />

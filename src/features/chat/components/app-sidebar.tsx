@@ -1,5 +1,6 @@
 "use client";
 
+import { Copy, Edit, Loader2, MoreHorizontal, Trash2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -7,7 +8,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Edit, Loader2, MoreHorizontal, Share2, Trash2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -66,6 +66,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
   readonly onNewChat: () => void;
   readonly onSelectConversation: (id: string) => void;
   readonly onDeleteConversation: (id: string) => void;
+  readonly onCopyConversation: (id: string) => Promise<void>;
 }
 
 /**
@@ -73,9 +74,9 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
  */
 const ConversationStatusIndicator = memo<{ status: ConversationStatus }>(
   function ConversationStatusIndicator({ status }) {
-    if (status !== "streaming") return null;
+    if (status !== "streaming" && status !== "loading") return null;
 
-    return <Loader2 className="size-3 animate-spin text-muted-foreground" />;
+    return <Loader2 className="size-4 animate-spin text-muted-foreground" />;
   }
 );
 
@@ -95,6 +96,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   onNewChat,
   onSelectConversation,
   onDeleteConversation,
+  onCopyConversation,
   ...props
 }) {
   const router = useRouter();
@@ -164,33 +166,38 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
                           onClick={() => handleSelectConversation(id)}
                           tooltip={title}>
                           <span className="flex-1 truncate">{title}</span>
-                          <ConversationStatusIndicator status={status} />
                         </SidebarMenuButton>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <SidebarMenuAction
-                              showOnHover
-                              disabled={isDeleting}
-                              aria-label={`Options for ${title}`}>
-                              {isDeleting ? (
-                                <Loader2 className="size-4 animate-spin" />
-                              ) : (
-                                <MoreHorizontal className="size-4" />
-                              )}
-                            </SidebarMenuAction>
+                            {status === "loading" || status === "streaming" ? (
+                              <SidebarMenuAction disabled aria-label={`${title} is ${status}`}>
+                                <ConversationStatusIndicator status={status} />
+                              </SidebarMenuAction>
+                            ) : (
+                              <SidebarMenuAction
+                                showOnHover
+                                disabled={isDeleting}
+                                aria-label={`Options for ${title}`}>
+                                {isDeleting ? (
+                                  <Loader2 className="size-4 animate-spin" />
+                                ) : (
+                                  <MoreHorizontal className="size-4" />
+                                )}
+                              </SidebarMenuAction>
+                            )}
                           </DropdownMenuTrigger>
                           <DropdownMenuContent
                             className="w-48"
                             side={isMobile ? "bottom" : "right"}
                             align={isMobile ? "end" : "start"}>
                             <DropdownMenuItem
-                              onClick={(event) => {
+                              onClick={async (event) => {
                                 event.stopPropagation();
-                                handleDeleteConversation(id);
+                                await onCopyConversation(id);
                               }}
                               disabled={isDeleting}>
-                              <Share2 className="size-4" />
-                              Share
+                              <Copy className="size-4" />
+                              Copy
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
