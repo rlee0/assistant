@@ -530,7 +530,11 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
               setMessages(conversation.messages);
             }
           } else {
-            router.push("/");
+            // Only navigate if we're currently on a specific chat page
+            // If conversationId is undefined, we're already on the root chat page
+            if (conversationId) {
+              router.push("/chat");
+            }
             setMessages([]);
           }
         }
