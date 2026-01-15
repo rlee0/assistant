@@ -20,6 +20,7 @@ import {
 import { memo, useCallback, useMemo } from "react";
 
 import { useLogout } from "@/features/auth/hooks/use-logout";
+import { useManualProgress } from "@/hooks/use-navigation-progress";
 import { useRouter } from "next/navigation";
 
 /**
@@ -64,16 +65,19 @@ export const NavUser = memo<NavUserProps>(function NavUser({ user }) {
   const { isMobile } = useSidebar();
   const { logout, isLoading } = useLogout();
   const router = useRouter();
+  const { startProgress } = useManualProgress();
 
   const initials = useMemo(() => generateInitials(user.name), [user.name]);
 
   const handleSettingsClick = useCallback(() => {
+    startProgress();
     router.push("/settings");
-  }, [router]);
+  }, [router, startProgress]);
 
   const handleLogout = useCallback(() => {
+    startProgress();
     logout();
-  }, [logout]);
+  }, [logout, startProgress]);
 
   return (
     <SidebarMenu>

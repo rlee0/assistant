@@ -10,6 +10,7 @@ import Link from "next/link";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { useManualProgress } from "@/hooks/use-navigation-progress";
 import { useRouter } from "next/navigation";
 
 export function LoginForm({ className, ...props }: React.ComponentProps<"div">) {
@@ -22,6 +23,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     }
   }, []);
   const router = useRouter();
+  const { startProgress, completeProgress } = useManualProgress();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -32,13 +34,21 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     e.preventDefault();
     setError(null);
     setIsLoading(true);
-    const { error: signInError } = await supabase!.auth.signInWithPassword({
-      email,
-      password,
-    });
-    setIsLoading(false);
-    if (signInError) setError(signInError.message);
-    else router.replace("/");
+    startProgress();
+    try {
+      const { error: signInError } = await supabase!.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (signInError) {
+        setError(signInError.message);
+        completeProgress();
+      } else {
+        router.replace("/");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   }
 
   async function oauth(provider: "google" | "github") {
@@ -46,10 +56,16 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
       setError("Supabase is not configured.");
       return;
     }
-    await supabase.auth.signInWithOAuth({
-      provider,
-      options: { redirectTo: `${window.location.origin}/` },
-    });
+    startProgress();
+    try {
+      await supabase.auth.signInWithOAuth({
+        provider,
+        options: { redirectTo: `${window.location.origin}/` },
+      });
+    } catch (error) {
+      completeProgress();
+      setError(error instanceof Error ? error.message : "OAuth failed");
+    }
   }
 
   return (

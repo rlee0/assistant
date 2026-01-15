@@ -10,6 +10,7 @@ import Link from "next/link";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { logError } from "@/lib/logging";
+import { useManualProgress } from "@/hooks/use-navigation-progress";
 import { useRouter } from "next/navigation";
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
@@ -22,6 +23,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     }
   }, []);
   const router = useRouter();
+  const { startProgress, completeProgress } = useManualProgress();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -70,6 +72,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     }
 
     setIsLoading(true);
+    startProgress();
 
     try {
       const { error: signUpError } = await supabase.auth.signUp({
@@ -84,6 +87,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 
       if (signUpError) {
         setError(signUpError.message);
+        completeProgress();
         return;
       }
 
@@ -91,6 +95,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     } catch (error) {
       const message = error instanceof Error ? error.message : "An unexpected error occurred";
       setError(message);
+      completeProgress();
     } finally {
       setIsLoading(false);
     }
@@ -102,6 +107,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
       return;
     }
 
+    startProgress();
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider,
@@ -110,10 +116,12 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
 
       if (error) {
         setError(error.message);
+        completeProgress();
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : "OAuth authentication failed";
       setError(message);
+      completeProgress();
     }
   }
 

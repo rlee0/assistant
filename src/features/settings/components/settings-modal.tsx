@@ -24,6 +24,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { logError } from "@/lib/logging";
 import { useLogout } from "@/features/auth/hooks/use-logout";
+import { useManualProgress } from "@/hooks/use-navigation-progress";
 import { useRouter } from "next/navigation";
 
 interface SettingsModalProps {
@@ -136,6 +137,7 @@ function isDeleteLoading(state: DeleteState): boolean {
 function SettingsModalContent({ open, onOpenChange }: SettingsModalProps) {
   const router = useRouter();
   const { logout, isLoading: isLoggingOut } = useLogout();
+  const { startProgress } = useManualProgress();
   const [userEmail, setUserEmail] = useState<string | null>(null);
   const [userLoadError, setUserLoadError] = useState<string | null>(null);
   const [deleteState, deleteDispatch] = useReducer(deleteStateReducer, { status: "idle" });
@@ -200,6 +202,7 @@ function SettingsModalContent({ open, onOpenChange }: SettingsModalProps) {
   // Handle account deletion
   const handleDeleteAccount = useCallback(async (): Promise<void> => {
     deleteDispatch({ type: "START_DELETE" });
+    startProgress();
 
     try {
       const response = await fetch(API_ROUTES.ACCOUNT.DELETE, {
@@ -223,10 +226,11 @@ function SettingsModalContent({ open, onOpenChange }: SettingsModalProps) {
       deleteDispatch({ type: "DELETE_ERROR", message });
       logError("[SettingsModal]", "Account deletion error", error as Error);
     }
-  }, [router, onOpenChange]);
+  }, [router, onOpenChange, startProgress]);
 
   // Handle logout
   const handleLogout = useCallback(async (): Promise<void> => {
+    startProgress();
     try {
       await logout();
       onOpenChange(false);
@@ -235,7 +239,7 @@ function SettingsModalContent({ open, onOpenChange }: SettingsModalProps) {
       // Still close modal even if logout has an error
       onOpenChange(false);
     }
-  }, [logout, onOpenChange]);
+  }, [logout, onOpenChange, startProgress]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

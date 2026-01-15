@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { NavUser } from "@/features/auth/components/nav-user";
 import { SidebarConversationsSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useManualProgress } from "@/hooks/use-navigation-progress";
 import { useRouter } from "next/navigation";
 
 /**
@@ -101,24 +102,28 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
 }) {
   const router = useRouter();
   const isMobile = useIsMobile();
+  const { startProgress } = useManualProgress();
 
   const handleNewChat = useCallback(() => {
+    startProgress();
     onNewChat();
-  }, [onNewChat]);
+  }, [onNewChat, startProgress]);
 
   const handleSelectConversation = useCallback(
     (id: string) => {
+      startProgress();
       router.push(`/chat/${id}`);
       onSelectConversation(id);
     },
-    [router, onSelectConversation]
+    [router, onSelectConversation, startProgress]
   );
 
   const handleDeleteConversation = useCallback(
     (id: string) => {
+      startProgress();
       onDeleteConversation(id);
     },
-    [onDeleteConversation]
+    [onDeleteConversation, startProgress]
   );
 
   return (

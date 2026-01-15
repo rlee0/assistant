@@ -1,36 +1,82 @@
 "use client";
 
-import { ProgressBar, useProgressBar } from "@/components/ui/progress-bar";
-import { useEffect, useRef } from "react";
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+
+import { ProgressBar } from "@/components/ui/progress-bar";
+
+interface ProgressBarContextValue {
+  start: () => void;
+  complete: () => void;
+  isLoading: boolean;
+}
+
+const ProgressBarContext = createContext<ProgressBarContextValue | null>(null);
+
+export function useProgressBarContext() {
+  const context = useContext(ProgressBarContext);
+  if (!context) {
+    throw new Error("useProgressBarContext must be used within ProgressBarProvider");
+  }
+  return context;
+}
 
 export function ProgressBarProvider({ children }: { children: React.ReactNode }) {
-  const { isLoading, start, complete } = useProgressBar();
+  const [isLoading, setIsLoading] = useState(false);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const isFirstRender = useRef(true);
 
+  const start = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsLoading(true);
+  }, []);
+
+  const complete = useCallback(() => {
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setIsLoading(false);
+  }, []);
+
+  // Auto-complete progress bar when navigation finishes
   useEffect(() => {
-    const handleStart = () => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      start();
-    };
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    complete();
+  }, [pathname, searchParams, complete]);
 
-    window.addEventListener("beforeunload", handleStart);
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
+  }, []);
+
+  // Track page unload
+  useEffect(() => {
+    const handleBeforeUnload = () => start();
+    window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
-      window.removeEventListener("beforeunload", handleStart);
-      if (timerRef.current) clearTimeout(timerRef.current);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [start]);
 
   return (
-    <>
-      <ProgressBar
-        isActive={isLoading}
-        onComplete={() => {
-          if (timerRef.current) clearTimeout(timerRef.current);
-          timerRef.current = setTimeout(complete, 1500);
-        }}
-      />
+    <ProgressBarContext.Provider value={{ start, complete, isLoading }}>
+      <ProgressBar isActive={isLoading} />
       {children}
-    </>
+    </ProgressBarContext.Provider>
   );
 }
