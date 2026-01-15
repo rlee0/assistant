@@ -1,6 +1,11 @@
 -- ============================================================================
--- Create settings table for storing user preferences
--- Includes complete schema with all columns, RLS policies, and triggers
+-- Create Settings Table
+-- Stores user preferences and configuration as JSONB
+-- Includes complete schema with RLS policies and auto-update trigger
+-- ============================================================================
+
+-- ============================================================================
+-- TABLE
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS settings (
@@ -11,10 +16,24 @@ CREATE TABLE IF NOT EXISTS settings (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================================
+-- INDEX
+-- ============================================================================
+
+-- Index for faster user lookups
+CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id);
+
+-- ============================================================================
+-- ROW LEVEL SECURITY (RLS)
+-- ============================================================================
+
 -- Enable Row Level Security
 ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies
+-- ============================================================================
+-- RLS POLICIES - SETTINGS
+-- ============================================================================
+
 CREATE POLICY "Users can read own settings"
   ON settings FOR SELECT
   USING (auth.uid() = user_id);
@@ -32,10 +51,11 @@ CREATE POLICY "Users can delete own settings"
   ON settings FOR DELETE
   USING (auth.uid() = user_id);
 
--- Create index for faster lookups
-CREATE INDEX IF NOT EXISTS idx_settings_user_id ON settings(user_id);
+-- ============================================================================
+-- TRIGGER FUNCTION
+-- ============================================================================
 
--- Create trigger function to automatically update updated_at timestamp
+-- Automatically update updated_at timestamp on settings changes
 CREATE OR REPLACE FUNCTION update_settings_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -48,7 +68,10 @@ BEGIN
 END;
 $$;
 
--- Create trigger
+-- ============================================================================
+-- TRIGGER
+-- ============================================================================
+
 CREATE TRIGGER settings_updated_at
   BEFORE UPDATE ON settings
   FOR EACH ROW

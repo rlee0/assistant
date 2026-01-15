@@ -1,9 +1,15 @@
 -- ============================================================================
 -- Initial Schema Creation
--- Creates the base tables for chats, messages, and checkpoints
+-- Creates the base tables for chats, messages, and checkpoints with all
+-- required columns, indexes, and Row Level Security policies.
+-- ============================================================================
+
+-- ============================================================================
+-- TABLES
 -- ============================================================================
 
 -- Create chats table
+-- Stores conversation sessions with title, model, context, and pinning support
 CREATE TABLE IF NOT EXISTS chats (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -16,6 +22,7 @@ CREATE TABLE IF NOT EXISTS chats (
 );
 
 -- Create messages table
+-- Stores individual messages within chats (user, assistant, system roles)
 CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
@@ -26,6 +33,7 @@ CREATE TABLE IF NOT EXISTS messages (
 );
 
 -- Create checkpoints table
+-- Stores conversation restore points for temporal navigation
 CREATE TABLE IF NOT EXISTS checkpoints (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   chat_id UUID NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
@@ -35,12 +43,50 @@ CREATE TABLE IF NOT EXISTS checkpoints (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+-- ============================================================================
+-- INDEXES
+-- ============================================================================
+
+-- Chats indexes - optimize user lookups and sorted queries
+CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id);
+CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC);
+
+-- Messages indexes - optimize chat and user queries
+CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
+CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_chat_user ON messages(chat_id, user_id, created_at);
+
+-- Checkpoints indexes - optimize chat and user queries
+CREATE INDEX IF NOT EXISTS idx_checkpoints_chat_id ON checkpoints(chat_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_user_id ON checkpoints(user_id);
+CREATE INDEX IF NOT EXISTS idx_checkpoints_chat_user ON checkpoints(chat_id, user_id, timestamp);
+
+-- ============================================================================
+-- ROW LEVEL SECURITY (RLS)
+-- ============================================================================
+
 -- Enable Row Level Security on all tables
 ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
 ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE checkpoints ENABLE ROW LEVEL SECURITY;
 
--- Create RLS policies for chats table
+-- ============================================================================
+-- ROW LEVEL SECURITY (RLS)
+-- ============================================================================
+
+-- Enable Row Level Security on all tables
+ALTER TABLE chats ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE checkpoints ENABLE ROW LEVEL SECURITY;
+
+-- ============================================================================
+-- RLS POLICIES - CHATS
+-- ============================================================================
+
 CREATE POLICY "Users can read own chats"
   ON chats FOR SELECT
   USING (auth.uid() = user_id);
@@ -58,7 +104,10 @@ CREATE POLICY "Users can delete own chats"
   ON chats FOR DELETE
   USING (auth.uid() = user_id);
 
--- Create RLS policies for messages table
+-- ============================================================================
+-- RLS POLICIES - MESSAGES
+-- ============================================================================
+
 CREATE POLICY "Users can read own messages"
   ON messages FOR SELECT
   USING (auth.uid() = user_id);
@@ -76,7 +125,10 @@ CREATE POLICY "Users can delete own messages"
   ON messages FOR DELETE
   USING (auth.uid() = user_id);
 
--- Create RLS policies for checkpoints table
+-- ============================================================================
+-- RLS POLICIES - CHECKPOINTS
+-- ============================================================================
+
 CREATE POLICY "Users can read own checkpoints"
   ON checkpoints FOR SELECT
   USING (auth.uid() = user_id);
@@ -93,13 +145,3 @@ CREATE POLICY "Users can update own checkpoints"
 CREATE POLICY "Users can delete own checkpoints"
   ON checkpoints FOR DELETE
   USING (auth.uid() = user_id);
-
--- Create indexes for better query performance
-CREATE INDEX IF NOT EXISTS idx_chats_user_id ON chats(user_id);
-CREATE INDEX IF NOT EXISTS idx_chats_user_updated ON chats(user_id, updated_at DESC);
-CREATE INDEX IF NOT EXISTS idx_messages_chat_id ON messages(chat_id);
-CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
-CREATE INDEX IF NOT EXISTS idx_messages_chat_user ON messages(chat_id, user_id, created_at);
-CREATE INDEX IF NOT EXISTS idx_checkpoints_chat_id ON checkpoints(chat_id);
-CREATE INDEX IF NOT EXISTS idx_checkpoints_user_id ON checkpoints(user_id);
-CREATE INDEX IF NOT EXISTS idx_checkpoints_chat_user ON checkpoints(chat_id, user_id, timestamp);

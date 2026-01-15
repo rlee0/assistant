@@ -1,14 +1,32 @@
 -- ============================================================================
 -- COMPLETE DATABASE RESET AND SETUP
--- WARNING: This will DELETE ALL DATA and recreate tables from scratch
+-- ⚠️ WARNING: This will DELETE ALL DATA and recreate tables from scratch
 -- Only use for development/testing, NEVER in production!
 -- ============================================================================
+-- 
+-- This script provides a quick way to reset your development database to a
+-- clean state. It drops all tables and recreates them with the complete schema.
+-- 
+-- Use this when:
+-- - Setting up a new development environment
+-- - Fixing schema inconsistencies in development
+-- - Testing fresh installations
+-- 
+-- ⚠️ DO NOT USE IN PRODUCTION - ALL DATA WILL BE LOST
+-- ============================================================================
 
--- Drop all tables (cascade will remove all data and constraints)
+-- ============================================================================
+-- DROP EXISTING TABLES
+-- ============================================================================
+
 DROP TABLE IF EXISTS checkpoints CASCADE;
 DROP TABLE IF EXISTS messages CASCADE;
 DROP TABLE IF EXISTS chats CASCADE;
 DROP TABLE IF EXISTS settings CASCADE;
+
+-- Drop functions
+DROP FUNCTION IF EXISTS delete_own_account() CASCADE;
+DROP FUNCTION IF EXISTS update_settings_updated_at() CASCADE;
 
 -- ============================================================================
 -- RECREATE TABLES WITH COMPLETE SCHEMA
@@ -149,31 +167,31 @@ CREATE POLICY "Users can delete own settings"
   USING (auth.uid() = user_id);
 
 -- ============================================================================
--- CREATE INDEXES FOR PERFORMANCE
+-- INDEXES
 -- ============================================================================
 
--- Chats indexes
+-- Chats indexes - optimize user lookups and sorted queries
 CREATE INDEX idx_chats_user_id ON chats(user_id);
 CREATE INDEX idx_chats_user_updated ON chats(user_id, updated_at DESC);
-CREATE INDEX idx_chats_updated_at ON chats(updated_at DESC);
 
--- Messages indexes
+-- Messages indexes - optimize chat and user queries
 CREATE INDEX idx_messages_chat_id ON messages(chat_id);
 CREATE INDEX idx_messages_user_id ON messages(user_id);
 CREATE INDEX idx_messages_chat_user ON messages(chat_id, user_id, created_at);
 
--- Checkpoints indexes
+-- Checkpoints indexes - optimize chat and user queries
 CREATE INDEX idx_checkpoints_chat_id ON checkpoints(chat_id);
 CREATE INDEX idx_checkpoints_user_id ON checkpoints(user_id);
 CREATE INDEX idx_checkpoints_chat_user ON checkpoints(chat_id, user_id, timestamp);
 
--- Settings indexes
+-- Settings indexes - optimize user lookups
 CREATE INDEX idx_settings_user_id ON settings(user_id);
 
 -- ============================================================================
--- CREATE TRIGGER FOR SETTINGS updated_at
+-- TRIGGER FUNCTION AND TRIGGER
 -- ============================================================================
 
+-- Function to automatically update settings.updated_at timestamp
 CREATE OR REPLACE FUNCTION update_settings_updated_at()
 RETURNS TRIGGER
 LANGUAGE plpgsql
@@ -186,49 +204,17 @@ BEGIN
 END;
 $$;
 
+-- Trigger for settings table
 CREATE TRIGGER settings_updated_at
   BEFORE UPDATE ON settings
   FOR EACH ROW
   EXECUTE FUNCTION update_settings_updated_at();
 
 -- ============================================================================
--- VERIFICATION
+-- ACCOUNT DELETION FUNCTION
 -- ============================================================================
 
--- Verify tables were created
-SELECT 
-  '✓ Tables Created' as status,
-  COUNT(*) as table_count
-FROM information_schema.tables 
-WHERE table_schema = 'public' 
-  AND table_name IN ('chats', 'messages', 'checkpoints', 'settings');
-
--- Verify RLS is enabled
-SELECT 
-  '✓ RLS Enabled' as status,
-  tablename,
-  rowsecurity as enabled
-FROM pg_tables 
-WHERE schemaname = 'public' 
-  AND tablename IN ('chats', 'messages', 'checkpoints', 'settings')
-ORDER BY tablename;
-
--- Verify policies were created
-SELECT 
-  '✓ Policies Created' as status,
-  tablename,
-  COUNT(*) as policy_count
-FROM pg_policies 
-WHERE schemaname = 'public'
-  AND tablename IN ('chats', 'messages', 'checkpoints', 'settings')
-GROUP BY tablename
-ORDER BY tablename;
-
--- ============================================================================
--- CREATE USER DELETION FUNCTION
--- ============================================================================
-
--- Create a function that allows users to delete their own account
+-- Function to allow users to delete their own account
 CREATE OR REPLACE FUNCTION delete_own_account()
 RETURNS void
 LANGUAGE plpgsql
@@ -247,18 +233,62 @@ BEGIN
   END IF;
   
   -- Delete the user from auth.users
-  -- This will cascade to all related tables (chats, messages, checkpoints, settings)
+  -- CASCADE DELETE automatically removes: chats, messages, checkpoints, settings
   DELETE FROM auth.users WHERE id = current_user_id;
 END;
 $$;
 
--- Grant execute permission to authenticated users
+-- Grant execute permission to authenticated users only
 GRANT EXECUTE ON FUNCTION delete_own_account() TO authenticated;
 
--- Add comment for documentation
+-- Add documentation
 COMMENT ON FUNCTION delete_own_account() IS 
-'Allows authenticated users to delete their own account and all associated data via CASCADE DELETE';
+'Allows authenticated users to delete their own account and all associated data via CASCADE DELETE. Uses SECURITY DEFINER to elevate privileges for auth.users deletion.';
+
+-- ============================================================================
+-- VERIFICATION
+-- ============================================================================
+
+-- Verify tables were created
+SELECT 
+  '✓ Tables Created' as status,
+  COUNT(*) as table_count,
+  'Expected: 4' as expected
+FROM information_schema.tables 
+WHERE table_schema = 'public' 
+  AND table_name IN ('chats', 'messages', 'checkpoints', 'settings');
+
+-- Verify RLS is enabled
+SELECT 
+  '✓ RLS Enabled' as status,
+  tablename,
+  rowsecurity as enabled
+FROM pg_tables 
+WHERE schemaname = 'public' 
+  AND tablename IN ('chats', 'messages', 'checkpoints', 'settings')
+ORDER BY tablename;
+
+-- Verify policies were created
+SELECT 
+  '✓ RLS Policies Created' as status,
+  tablename,
+  COUNT(*) as policy_count,
+  '4 expected per table' as expected
+FROM pg_policies 
+WHERE schemaname = 'public'
+  AND tablename IN ('chats', 'messages', 'checkpoints', 'settings')
+GROUP BY tablename
+ORDER BY tablename;
+
+-- Verify functions exist
+SELECT 
+  '✓ Functions Created' as status,
+  COUNT(*) as function_count,
+  'Expected: 2' as expected
+FROM pg_proc
+WHERE proname IN ('delete_own_account', 'update_settings_updated_at');
 
 -- ============================================================================
 -- COMPLETE! Database is ready for use.
+-- Run verify_complete_schema.sql for comprehensive verification.
 -- ============================================================================

@@ -9,13 +9,11 @@ supabase/
 ├── migrations/              # Database migrations (apply in order)
 │   ├── 20260100000000_create_initial_schema.sql
 │   ├── 20260112132149_create_settings_table.sql
-│   ├── 20260115080000_add_missing_chat_columns.sql
 │   └── 20260115220000_add_delete_user_function.sql
 ├── schema.sql                # Complete schema reference (DO NOT run directly)
 ├── verify_complete_schema.sql    # Verify database schema
 ├── RESET_AND_SETUP.sql           # Development reset (⚠️ deletes data)
 └── MIGRATION_ORDER.md            # Detailed migration guide
-
 ```
 
 ## 🚀 Quick Start
@@ -176,9 +174,9 @@ Completely drops and recreates all tables with the correct schema. Use this for:
 
 Run the initial schema migration: `20260100000000_create_initial_schema.sql`
 
-### Missing columns?
+### Missing settings table?
 
-Run the missing columns migration: `20260115080000_add_missing_chat_columns.sql`
+Run the settings migration: `20260112132149_create_settings_table.sql`
 
 ### RLS errors?
 

@@ -1,9 +1,14 @@
 -- ============================================================================
--- Add function to allow users to delete their own account
--- Uses SECURITY DEFINER to bypass RLS and delete from auth.users
+-- Account Deletion Function
+-- Allows authenticated users to delete their own account and all associated data
+-- Uses SECURITY DEFINER to bypass RLS for auth.users deletion
+-- CASCADE DELETE automatically removes: chats, messages, checkpoints, settings
 -- ============================================================================
 
--- Create a function that allows users to delete their own account
+-- ============================================================================
+-- FUNCTION
+-- ============================================================================
+
 CREATE OR REPLACE FUNCTION delete_own_account()
 RETURNS void
 LANGUAGE plpgsql
@@ -22,14 +27,23 @@ BEGIN
   END IF;
   
   -- Delete the user from auth.users
-  -- This will cascade to all related tables (chats, messages, checkpoints, settings)
+  -- CASCADE DELETE will automatically remove all related data:
+  --   - chats (and cascades to messages and checkpoints)
+  --   - settings
   DELETE FROM auth.users WHERE id = current_user_id;
 END;
 $$;
 
--- Grant execute permission to authenticated users
+-- ============================================================================
+-- PERMISSIONS
+-- ============================================================================
+
+-- Grant execute permission to authenticated users only
 GRANT EXECUTE ON FUNCTION delete_own_account() TO authenticated;
 
--- Add comment for documentation
+-- ============================================================================
+-- DOCUMENTATION
+-- ============================================================================
+
 COMMENT ON FUNCTION delete_own_account() IS 
-'Allows authenticated users to delete their own account and all associated data via CASCADE DELETE';
+'Allows authenticated users to delete their own account and all associated data via CASCADE DELETE. Uses SECURITY DEFINER to elevate privileges for auth.users deletion.';
