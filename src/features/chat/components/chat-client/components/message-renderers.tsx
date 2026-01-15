@@ -38,8 +38,8 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
   // Tool calls with proper type checking using AI SDK type guards
   if (isToolUIPart(part)) {
     const toolName = getToolName(part);
-    const shouldDefaultOpen =
-      partAsRecord.state === "output-available" || partAsRecord.state === "output-error";
+    // Keep tools collapsed by default for cleaner conversation view
+    const shouldDefaultOpen = false;
 
     return (
       <Tool key={index} defaultOpen={shouldDefaultOpen}>

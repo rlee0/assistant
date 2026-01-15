@@ -89,13 +89,46 @@ function normalizeOrder(order: string[]): string[] {
 }
 
 export function chatMessageToUIMessage(message: ChatMessage): UIMessage {
-  const text =
-    typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? "");
+  let parts: UIMessage["parts"] = [];
+
+  // Try to parse the content as stored message parts (JSON array)
+  if (typeof message.content === "string") {
+    try {
+      // Attempt to parse as JSON array of parts
+      const parsed = JSON.parse(message.content);
+
+      // Check if it looks like a parts array (array of objects with type property)
+      if (
+        Array.isArray(parsed) &&
+        parsed.length > 0 &&
+        typeof parsed[0] === "object" &&
+        "type" in parsed[0]
+      ) {
+        // Type assertion: we trust that stored parts are valid UIMessage parts
+        parts = parsed as UIMessage["parts"];
+      } else {
+        // Not a parts array, treat as plain text
+        parts = [{ type: "text", text: message.content }];
+      }
+    } catch {
+      // JSON parsing failed, treat as plain text
+      parts = [{ type: "text", text: message.content }];
+    }
+  } else if (Array.isArray(message.content)) {
+    // Content is already an array (shouldn't happen with current code, but handle it)
+    // Type assertion: trust that the array contains valid message parts
+    parts = message.content as UIMessage["parts"];
+  } else {
+    // Content is some other type, convert to string and wrap in text part
+    const text =
+      typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? "");
+    parts = [{ type: "text", text }];
+  }
 
   return {
     id: message.id,
     role: message.role as UIMessage["role"],
-    parts: [{ type: "text", text }],
+    parts,
   };
 }
 

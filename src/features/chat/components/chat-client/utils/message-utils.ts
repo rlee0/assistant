@@ -3,6 +3,43 @@ import type { UseChatMessage } from "../types";
 import { extractTextParts } from "../message-parts";
 import type { useChat } from "@ai-sdk/react";
 
+// ============================================================================
+// Constants
+// ============================================================================
+
+const DEFAULT_CHAT_TITLE = "New chat";
+const TITLE_MAX_LENGTH = 64;
+const WHITESPACE_REGEX = /\s+/g;
+
+const STATUS_MAP = {
+  streaming: "streaming",
+  submitted: "loading",
+  error: "error",
+  ready: "idle",
+} as const;
+
+// ============================================================================
+// Internal Utilities
+// ============================================================================
+
+/**
+ * Parses and validates a date value (either Date object or ISO string)
+ * @internal
+ */
+function tryParseDate(value: Date | string | undefined): Date | null {
+  if (!value) return null;
+  if (value instanceof Date) return value;
+  if (typeof value === "string") {
+    const parsed = new Date(value);
+    return !Number.isNaN(parsed.getTime()) ? parsed : null;
+  }
+  return null;
+}
+
+// ============================================================================
+// Exports
+// ============================================================================
+
 /**
  * Extracts text content from a message using type-safe utilities
  *
@@ -35,15 +72,16 @@ export function extractTextFromMessage(message: UseChatMessage): string {
  * ```
  */
 export function generateTitleFromText(text: string): string {
-  if (typeof text !== "string") return "New chat";
-  const normalized = text.replace(/\s+/g, " ").trim();
-  if (!normalized) return "New chat";
-  const maxLength = 64;
-  return normalized.length > maxLength ? `${normalized.slice(0, maxLength - 1)}…` : normalized;
+  const normalized = text.replace(WHITESPACE_REGEX, " ").trim();
+  if (!normalized) return DEFAULT_CHAT_TITLE;
+  if (normalized.length > TITLE_MAX_LENGTH) {
+    return `${normalized.slice(0, TITLE_MAX_LENGTH - 1)}…`;
+  }
+  return normalized;
 }
 
 /**
- * Converts a useChat status to a ConversationStatus
+ * Maps useChat hook status to conversation status
  *
  * @param status - The useChat hook status
  * @returns The mapped ConversationStatus
@@ -57,40 +95,36 @@ export function generateTitleFromText(text: string): string {
 export function mapUseChatStatus(
   status: ReturnType<typeof useChat>["status"]
 ): "idle" | "loading" | "streaming" | "error" {
-  if (status === "streaming") return "streaming";
-  if (status === "submitted") return "loading";
-  if (status === "error") return "error";
-  return "idle";
+  return STATUS_MAP[status] ?? "idle";
 }
 
 /**
  * Safely extracts timestamp from a message with multiple fallbacks
- * Type-safe alternative to loose property checking
+ *
+ * @param message - The message to extract timestamp from
+ * @returns Valid Date instance, defaults to current time if extraction fails
+ *
+ * @remarks
+ * Tries both camelCase (createdAt) and snake_case (created_at) properties
+ * to support different data sources. Validates date values before returning.
  */
 export function extractTimestamp(message: UseChatMessage): Date {
-  // Check if message has createdAt property with defensive programming
-  if (message && typeof message === "object") {
-    const msg = message as unknown as { createdAt?: Date | string; created_at?: Date | string };
-
-    // Try createdAt (standard)
-    if (msg.createdAt) {
-      if (msg.createdAt instanceof Date) return msg.createdAt;
-      if (typeof msg.createdAt === "string") {
-        const parsed = new Date(msg.createdAt);
-        if (!Number.isNaN(parsed.getTime())) return parsed;
-      }
-    }
-
-    // Try created_at (snake_case)
-    if (msg.created_at) {
-      if (msg.created_at instanceof Date) return msg.created_at;
-      if (typeof msg.created_at === "string") {
-        const parsed = new Date(msg.created_at);
-        if (!Number.isNaN(parsed.getTime())) return parsed;
-      }
-    }
+  // Guard: ensure message is an object (shouldn't fail with proper typing, but safe)
+  if (!message || typeof message !== "object") {
+    return new Date();
   }
 
+  const msg = message as unknown as { createdAt?: Date | string; created_at?: Date | string };
+
+  // Try camelCase property
+  const camelCaseDate = tryParseDate(msg.createdAt);
+  if (camelCaseDate) return camelCaseDate;
+
+  // Try snake_case property (legacy support)
+  const snakeCaseDate = tryParseDate(msg.created_at);
+  if (snakeCaseDate) return snakeCaseDate;
+
+  // Fallback to current time
   return new Date();
 }
 
@@ -101,7 +135,9 @@ export function extractTimestamp(message: UseChatMessage): Date {
  * @returns The converted ChatMessage suitable for storage
  *
  * @remarks
- * Extracts createdAt timestamp from message with fallback to current time
+ * Preserves the full message structure including all parts (text, tool calls, etc.)
+ * by storing the parts array as JSON to ensure tool display components persist
+ * across page refreshes. Falls back to extracting text only if no parts are available.
  *
  * @example
  * ```ts
@@ -111,10 +147,14 @@ export function extractTimestamp(message: UseChatMessage): Date {
 export function uiMessageToChatMessage(message: UseChatMessage): ChatMessage {
   const timestamp = extractTimestamp(message);
 
+  // Preserve full message structure by storing parts as JSON
+  // This ensures tool calls, reasoning, and other UI parts persist across refreshes
+  const content = message.parts ? JSON.stringify(message.parts) : extractTextFromMessage(message);
+
   return {
     id: message.id,
     role: message.role as "user" | "assistant",
-    content: extractTextFromMessage(message),
+    content,
     createdAt: timestamp.toISOString(),
   };
 }
