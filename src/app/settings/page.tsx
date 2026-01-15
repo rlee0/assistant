@@ -56,14 +56,15 @@ export default function SettingsPage() {
         throw new Error(data.error || "Failed to delete account");
       }
 
-      // Redirect to login after successful deletion
-      router.push("/login");
+      // Account deleted successfully, redirect to login
+      // The API has already signed out the user
+      window.location.href = "/login";
     } catch (error) {
       const message = error instanceof Error ? error.message : "An error occurred";
       setDeleteError(message);
       setIsLoadingDelete(false);
     }
-  }, [router]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">

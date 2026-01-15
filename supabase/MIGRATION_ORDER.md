@@ -69,6 +69,7 @@ If starting fresh, apply migrations in this order:
 3. `20260112140000_add_data_column_to_settings.sql` - Adds data column to settings
 4. `20260112141500_update_settings_schema.sql` - Updates settings schema
 5. `20260115080000_add_missing_chat_columns.sql` - Adds model/context columns (idempotent)
+6. `20260115220000_add_delete_user_function.sql` - Adds delete_own_account() function for secure account deletion
 
 ### Existing Database (Migration Path)
 
@@ -138,6 +139,7 @@ Expected results:
 - ✓ All RLS policies created (4 per table = 16 total)
 - ✓ All indexes created
 - ✓ All foreign keys established
+- ✓ `delete_own_account()` function exists for secure account deletion
 
 ## App Type Definitions Alignment
 
@@ -186,6 +188,25 @@ All tables have Row Level Security (RLS) enabled with policies that ensure:
 - Users can only insert/update/delete their own data
 - No NULL user_id values are allowed
 - Cascade deletes when user account is deleted
+
+### Account Deletion
+
+The `delete_own_account()` function provides a secure way for users to delete their accounts:
+
+- Uses `SECURITY DEFINER` to elevate privileges only for this specific operation
+- Validates that the user is authenticated before deletion
+- Automatically cascades to delete all related data (chats, messages, checkpoints, settings)
+- No service role key required (modern approach)
+- Only the authenticated user can delete their own account
+
+**How it works:**
+
+1. User initiates account deletion from the app
+2. API route calls `supabase.rpc('delete_own_account')`
+3. Function validates the user is authenticated
+4. Function deletes the user from `auth.users`
+5. CASCADE DELETE automatically removes all related records
+6. User is signed out and redirected to login
 
 ## Notes
 

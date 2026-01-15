@@ -3,7 +3,7 @@
  */
 
 // Model defaults
-export const DEFAULT_MODEL = "gpt-4o-mini";
+export const DEFAULT_MODEL = "gpt-5.2";
 export const DEFAULT_TEMPERATURE = 0.4;
 
 // Default fallback models

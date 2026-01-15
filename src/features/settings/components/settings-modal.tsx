@@ -218,9 +218,9 @@ function SettingsModalContent({ open, onOpenChange }: SettingsModalProps) {
       }
 
       deleteDispatch({ type: "DELETE_SUCCESS" });
-      // Close modal and redirect to login after successful deletion
-      onOpenChange(false);
-      router.push("/login");
+      // Account deleted successfully, redirect to login
+      // The API has already signed out the user
+      window.location.href = "/login";
     } catch (error) {
       const message = parseErrorMessage(error);
       deleteDispatch({ type: "DELETE_ERROR", message });

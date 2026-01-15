@@ -2,7 +2,6 @@ import { APIError, ErrorCodes, authenticationError, handleAPIError } from "@/lib
 import { logDebug, logError } from "@/lib/logging";
 
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 
 /**
@@ -10,11 +9,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server-client";
  *
  * Security:
  * - Requires authenticated user session
- * - Uses service role key for admin operations (never exposed to client)
- * - Validates environment configuration before proceeding
+ * - Uses database function with SECURITY DEFINER to delete user
+ * - Data cleanup handled automatically via CASCADE DELETE constraints
  * - Structured logging prevents credential leakage
  *
- * @returns 200 on success, 401 if unauthenticated, 500 on configuration or deletion error
+ * @returns 200 on success, 401 if unauthenticated, 500 on deletion error
  */
 export async function POST() {
   const isDevelopment = process.env.NODE_ENV === "development";
@@ -38,37 +37,14 @@ export async function POST() {
       return authenticationError();
     }
 
-    // Validate service role configuration (required for user deletion)
-    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-    if (!serviceKey || !supabaseUrl) {
-      logError(
-        "[Account Delete]",
-        "Service role configuration missing",
-        new Error("Missing SUPABASE_SERVICE_ROLE_KEY or NEXT_PUBLIC_SUPABASE_URL"),
-        { requestId, userId: user.id }
-      );
-      throw new APIError(
-        "Account deletion is temporarily unavailable",
-        500,
-        ErrorCodes.INTERNAL_ERROR
-      );
-    }
-
     if (isDevelopment) {
       logDebug("[Account Delete]", "Attempting user deletion", { requestId, userId: user.id });
     }
 
-    // Create admin client and delete user
-    const admin = createClient(supabaseUrl, serviceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-      },
-    });
-
-    const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
+    // Call the database function to delete the user account
+    // This function uses SECURITY DEFINER to delete from auth.users
+    // CASCADE DELETE will automatically remove all related data
+    const { error: deleteError } = await supabase.rpc("delete_own_account");
 
     if (deleteError) {
       logError("[Account Delete]", "Supabase deletion failed", deleteError, {
@@ -87,14 +63,11 @@ export async function POST() {
       logDebug("[Account Delete]", "User deletion successful", { requestId, userId: user.id });
     }
 
+    // Sign out the user after successful deletion
+    await supabase.auth.signOut();
+
     return NextResponse.json({ success: true }, { status: 200 });
   } catch (error) {
-    // Ensure service role key is never logged
-    const sanitizedError =
-      error instanceof Error
-        ? new Error(error.message.replace(/service_role=[^\s&]+/gi, "service_role=***"))
-        : error;
-
-    return handleAPIError(sanitizedError, { requestId, isDevelopment });
+    return handleAPIError(error, { requestId, isDevelopment });
   }
 }

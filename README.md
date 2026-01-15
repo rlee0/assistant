@@ -119,9 +119,9 @@ Comprehensive components for visualizing AI processes:
    supabase db push        # Apply migrations to remote database
 
    # Option 2: Manual application via Supabase Dashboard
-   # - Go to SQL Editor
+   # - Go to SQL Editor in your Supabase project
    # - Copy and paste migration files from /supabase/migrations/
-   # - Execute them in order
+   # - Execute them in numerical order
    ```
 
    The migrations create:
@@ -129,8 +129,11 @@ Comprehensive components for visualizing AI processes:
    - `chats`, `messages` - Chat history and messaging tables
    - `checkpoints` - AI reasoning/chain-of-thought tracking
    - `settings` - User preferences and configuration
+   - `delete_own_account()` - Secure account deletion function
    - Row-level security (RLS) policies for data isolation
    - Indexes for performance optimization
+
+   See [supabase/README.md](supabase/README.md) for detailed database documentation.
 
 5. **Run the development server**
 
@@ -197,8 +200,12 @@ assistant/
 │   │   └── globals.css
 │   └── proxy.ts                 # Proxy configuration
 ├── supabase/
-│   ├── migrations/              # Database migrations
-│   └── Various SQL scripts      # Utility and maintenance scripts
+│   ├── migrations/              # Database migrations (apply in order)
+│   ├── schema.sql              # Complete schema reference
+│   ├── verify_complete_schema.sql  # Schema verification script
+│   ├── RESET_AND_SETUP.sql     # Development reset script
+│   ├── MIGRATION_ORDER.md      # Migration documentation
+│   └── README.md               # Database documentation
 ├── public/                      # Static assets
 └── Configuration files
     ├── next.config.ts

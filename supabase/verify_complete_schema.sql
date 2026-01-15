@@ -101,3 +101,21 @@ WHERE tc.constraint_type = 'FOREIGN KEY'
   AND tc.table_schema = 'public'
   AND tc.table_name IN ('chats', 'messages', 'checkpoints', 'settings')
 ORDER BY tc.table_name;
+
+-- Check delete_own_account function exists
+SELECT 
+  'delete_own_account Function' as check_type,
+  CASE 
+    WHEN COUNT(*) > 0 THEN '✓ Function exists'
+    ELSE '✗ Function missing - run 20260115220000_add_delete_user_function.sql'
+  END as status
+FROM pg_proc
+WHERE proname = 'delete_own_account';
+
+-- Show function details if it exists
+SELECT 
+  'Function Details' as check_type,
+  proname as function_name,
+  pg_get_functiondef(oid) as definition
+FROM pg_proc
+WHERE proname = 'delete_own_account';
