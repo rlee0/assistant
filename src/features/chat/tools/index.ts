@@ -9,8 +9,8 @@
  */
 
 // Re-export all tool factory functions
-export * from "./datetime";
-export * from "./weather";
+export * from "./getDateTime";
+export * from "./getWeather";
 
 /**
  * Get default settings for all tools
