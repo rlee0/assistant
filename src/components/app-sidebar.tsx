@@ -1,6 +1,13 @@
 "use client";
 
-import { Edit, Loader2, Trash2 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Edit, Loader2, MoreHorizontal, Share2, Trash2 } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -21,6 +28,7 @@ import { memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { NavUser } from "@/components/nav-user";
 import { SidebarConversationsSkeleton } from "@/components/skeletons/sidebar-skeleton";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useRouter } from "next/navigation";
 
 /**
@@ -90,6 +98,7 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   ...props
 }) {
   const router = useRouter();
+  const isMobile = useIsMobile();
 
   const handleNewChat = useCallback(() => {
     onNewChat();
@@ -157,21 +166,48 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
                           <span className="flex-1 truncate">{title}</span>
                           <ConversationStatusIndicator status={status} />
                         </SidebarMenuButton>
-                        <SidebarMenuAction
-                          type="button"
-                          aria-label={`Delete ${title}`}
-                          showOnHover
-                          disabled={isDeleting}
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            handleDeleteConversation(id);
-                          }}>
-                          {isDeleting ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <Trash2 className="size-4" />
-                          )}
-                        </SidebarMenuAction>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <SidebarMenuAction
+                              showOnHover
+                              disabled={isDeleting}
+                              aria-label={`Options for ${title}`}>
+                              {isDeleting ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <MoreHorizontal className="size-4" />
+                              )}
+                            </SidebarMenuAction>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            className="w-48"
+                            side={isMobile ? "bottom" : "right"}
+                            align={isMobile ? "end" : "start"}>
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteConversation(id);
+                              }}
+                              disabled={isDeleting}>
+                              <Share2 className="size-4" />
+                              Share
+                            </DropdownMenuItem>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleDeleteConversation(id);
+                              }}
+                              disabled={isDeleting}>
+                              {isDeleting ? (
+                                <Loader2 className="size-4 animate-spin" />
+                              ) : (
+                                <Trash2 className="size-4" />
+                              )}
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </SidebarMenuItem>
                     );
                   })}
