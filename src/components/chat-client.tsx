@@ -1252,11 +1252,22 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         return;
       }
 
+      // Validate checkpoint bounds
+      if (checkpoint.messageIndex < 0 || checkpoint.messageIndex > messages.length) {
+        logError("[Chat]", "Invalid checkpoint index", null, {
+          checkpointId,
+          messageIndex: checkpoint.messageIndex,
+          messagesLength: messages.length,
+        });
+        toast.error("Failed to restore checkpoint");
+        return;
+      }
+
       try {
-        // Restore to checkpoint in store
+        // Restore to checkpoint in store (which updates conversation.messages)
         storeRestoreCheckpoint(selectedId, checkpointId);
 
-        // Restore messages to before checkpoint index (excluding the user message at checkpoint)
+        // Sync UI messages with store state
         const restoredMessages = messages.slice(0, checkpoint.messageIndex);
         setMessages(restoredMessages);
 

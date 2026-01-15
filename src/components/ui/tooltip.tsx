@@ -58,7 +58,7 @@ interface DelayedTooltipProps extends React.PropsWithChildren {
  * Use when you need a tooltip with a different delay than the app-wide provider.
  * Prefers a single root TooltipProvider when possible (for performance).
  */
-function DelayedTooltip({ children, delayDuration = 400 }: DelayedTooltipProps) {
+function DelayedTooltip({ children, delayDuration = 800 }: DelayedTooltipProps) {
   return (
     <TooltipProvider delayDuration={delayDuration}>
       <Tooltip>{children}</Tooltip>

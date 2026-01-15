@@ -317,6 +317,11 @@ export const useChatStore = create<ChatState>((set) => ({
       const conversation = state.conversations[id];
       if (!conversation) return state;
 
+      // Validate messageIndex bounds
+      if (messageIndex < 0 || messageIndex > conversation.messages.length) {
+        return state;
+      }
+
       // Create new checkpoint
       const checkpoint: ChatCheckpoint = {
         id: nanoid(),
@@ -354,12 +359,17 @@ export const useChatStore = create<ChatState>((set) => ({
       const checkpoint = conversation.checkpoints.find((cp) => cp.id === checkpointId);
       if (!checkpoint) return state;
 
-      // Slice messages to checkpoint index (inclusive)
-      const restoredMessages = conversation.messages.slice(0, checkpoint.messageIndex + 1);
+      // Validate messageIndex bounds
+      if (checkpoint.messageIndex < 0 || checkpoint.messageIndex > conversation.messages.length) {
+        return state;
+      }
 
-      // Remove checkpoints after the restored one
+      // Slice messages before checkpoint index (excluding the user message at checkpoint)
+      const restoredMessages = conversation.messages.slice(0, checkpoint.messageIndex);
+
+      // Remove checkpoints at or after the restored index
       const restoredCheckpoints = conversation.checkpoints.filter(
-        (cp) => new Date(cp.timestamp).getTime() <= new Date(checkpoint.timestamp).getTime()
+        (cp) => cp.messageIndex < checkpoint.messageIndex
       );
 
       const updatedConversation: Conversation = {
