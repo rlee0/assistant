@@ -29,8 +29,8 @@ export const ChatHeader = memo<ChatHeaderProps>(({ conversationTitle, lastMessag
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
-        Last message: {lastMessageLabel}
+      <div className="text-xs ml-auto text-muted-foreground whitespace-nowrap">
+        {lastMessageLabel}
       </div>
     </header>
   );

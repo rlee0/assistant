@@ -48,9 +48,14 @@ interface UpdateChatRequest {
 }
 
 const MESSAGE_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
+const CHECKPOINT_NAMESPACE = "6ba7b811-9dad-11d1-80b4-00c04fd430c9";
 
 function normalizeMessageId(messageId: string): string {
   return UUID_REGEX.test(messageId) ? messageId : uuidv5(messageId, MESSAGE_NAMESPACE);
+}
+
+function normalizeCheckpointId(checkpointId: string): string {
+  return UUID_REGEX.test(checkpointId) ? checkpointId : uuidv5(checkpointId, CHECKPOINT_NAMESPACE);
 }
 
 function isValidMessage(value: unknown): value is ChatMessage {
@@ -206,7 +211,7 @@ export async function PATCH(request: NextRequest) {
     // Persist checkpoints if provided
     if (checkpoints !== undefined && checkpoints.length > 0) {
       const checkpointPayload: CheckpointRow[] = checkpoints.map((cp) => ({
-        id: cp.id,
+        id: normalizeCheckpointId(cp.id),
         chat_id: id,
         user_id: user.id,
         message_index: cp.messageIndex,
