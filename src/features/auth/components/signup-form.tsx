@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { logError } from "@/lib/logging";
 import { useRouter } from "next/navigation";
 
 export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
@@ -15,7 +16,7 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
     try {
       return createSupabaseBrowserClient();
     } catch (error) {
-      console.error(error);
+      logError("[SignupForm]", "Failed to initialize Supabase client", error);
       return null;
     }
   }, []);

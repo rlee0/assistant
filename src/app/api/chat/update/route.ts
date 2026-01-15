@@ -15,6 +15,30 @@ import {
 import { handleAPIError, APIError, authenticationError, notFoundError } from "@/lib/api/errors";
 import { parseRequestBody } from "@/lib/api/middleware";
 
+type ChatUpdatePayload = {
+  updated_at: string;
+  title?: string;
+  is_pinned?: boolean;
+};
+
+type MessageRow = {
+  id: string;
+  chat_id: string;
+  user_id: string;
+  role: string;
+  content: string;
+  created_at: string;
+};
+
+type CheckpointRow = {
+  id: string;
+  chat_id: string;
+  user_id: string;
+  message_index: number;
+  timestamp: string;
+  created_at: string;
+};
+
 interface UpdateChatRequest {
   id: string;
   title?: string;
@@ -25,8 +49,27 @@ interface UpdateChatRequest {
 
 const MESSAGE_NAMESPACE = "6ba7b810-9dad-11d1-80b4-00c04fd430c8";
 
-function normalizeMessageId(messageId: string) {
+function normalizeMessageId(messageId: string): string {
   return UUID_REGEX.test(messageId) ? messageId : uuidv5(messageId, MESSAGE_NAMESPACE);
+}
+
+function isValidMessage(value: unknown): value is ChatMessage {
+  if (!validateObject(value)) return false;
+  const msg = value as Record<string, unknown>;
+  return (
+    validateString(msg.id) &&
+    validateString(msg.role) &&
+    (typeof msg.content === "string" || validateArray(msg.content)) &&
+    validateString(msg.createdAt)
+  );
+}
+
+function isValidCheckpoint(value: unknown): value is ChatCheckpoint {
+  if (!validateObject(value)) return false;
+  const cp = value as Record<string, unknown>;
+  return (
+    validateString(cp.id) && typeof cp.messageIndex === "number" && validateString(cp.timestamp)
+  );
 }
 
 function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
@@ -60,14 +103,20 @@ function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
     if (!validateArray(messages)) {
       throw new APIError("Messages must be an array", 400);
     }
-    request.messages = messages as ChatMessage[];
+    if (!messages.every(isValidMessage)) {
+      throw new APIError("Invalid message format", 400);
+    }
+    request.messages = messages;
   }
 
   if (checkpoints !== undefined) {
     if (!validateArray(checkpoints)) {
       throw new APIError("Checkpoints must be an array", 400);
     }
-    request.checkpoints = checkpoints as ChatCheckpoint[];
+    if (!checkpoints.every(isValidCheckpoint)) {
+      throw new APIError("Invalid checkpoint format", 400);
+    }
+    request.checkpoints = checkpoints;
   }
 
   // Check that at least one field is provided (besides id)
@@ -116,7 +165,7 @@ export async function PATCH(request: NextRequest) {
     }
 
     // Build update payload for chat
-    const updatePayload: Record<string, unknown> = {
+    const updatePayload: ChatUpdatePayload = {
       updated_at: new Date().toISOString(),
     };
     if (title !== undefined) updatePayload.title = title;
@@ -137,12 +186,12 @@ export async function PATCH(request: NextRequest) {
 
     // Update messages if provided
     if (messages !== undefined && messages.length > 0) {
-      const messagePayload = messages.map((m) => ({
+      const messagePayload: MessageRow[] = messages.map((m) => ({
         id: normalizeMessageId(m.id),
         chat_id: id,
         user_id: user.id,
         role: m.role,
-        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
+        content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
         created_at: m.createdAt,
       }));
 
@@ -156,7 +205,7 @@ export async function PATCH(request: NextRequest) {
 
     // Persist checkpoints if provided
     if (checkpoints !== undefined && checkpoints.length > 0) {
-      const checkpointPayload = checkpoints.map((cp) => ({
+      const checkpointPayload: CheckpointRow[] = checkpoints.map((cp) => ({
         id: cp.id,
         chat_id: id,
         user_id: user.id,

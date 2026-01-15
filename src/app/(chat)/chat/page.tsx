@@ -1,6 +1,7 @@
 import { ChatClient } from "@/features/chat/components/chat-client";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { isRedirectError } from "next/dist/client/components/redirect-error";
 import { loadInitialChats } from "@/lib/supabase/loaders";
 import { logError } from "@/lib/logging";
 import { redirect } from "next/navigation";
@@ -43,8 +44,8 @@ export default async function ChatIndexPage() {
       redirect(`/chat/${initialData.order[0]}`);
     }
   } catch (err) {
-    // Don't catch Next.js redirect errors - let them propagate
-    if (err instanceof Error && err.message === "NEXT_REDIRECT") {
+    // Re-throw Next.js redirects
+    if (isRedirectError(err)) {
       throw err;
     }
     logError("[ChatIndexPage]", "Failed to load chats", err);
