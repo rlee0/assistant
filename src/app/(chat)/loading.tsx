@@ -9,7 +9,7 @@ export default function ChatLoading() {
         {/* Sidebar skeleton */}
         <div className="hidden w-64 flex-col border-r bg-background md:flex">
           <div className="border-b p-4">
-            <Skeleton className="h-10 w-full rounded-lg" />
+            <Skeleton className="h-9 w-full rounded-lg" />
           </div>
           <div className="flex-1 space-y-2 overflow-y-auto p-4">
             {Array.from({ length: 8 }).map((_, i) => (
@@ -22,7 +22,7 @@ export default function ChatLoading() {
         <SidebarInset className="flex flex-col">
           {/* Header */}
           <div className="border-b bg-background px-6 py-4">
-            <Skeleton className="h-6 w-48" />
+            <Skeleton className="h-9 w-48" />
           </div>
 
           {/* Messages area */}
@@ -39,11 +39,6 @@ export default function ChatLoading() {
                 {i % 2 !== 0 && <Skeleton className="h-8 w-8 rounded-full shrink-0" />}
               </div>
             ))}
-          </div>
-
-          {/* Input area */}
-          <div className="border-t bg-background p-4">
-            <Skeleton className="h-12 w-full rounded-lg" />
           </div>
         </SidebarInset>
       </div>
