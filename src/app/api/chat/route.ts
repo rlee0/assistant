@@ -4,17 +4,23 @@ import { validateArray, validateObject, validateString } from "@/lib/api/validat
 import { DEFAULT_MODEL } from "@/lib/constants";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { parseRequestBody } from "@/lib/api/middleware";
-import { convertToModelMessages, streamText, type UIMessage, type Tool } from "ai";
+import {
+  convertToModelMessages,
+  streamText,
+  type UIMessage,
+  type Tool,
+  type LanguageModelUsage,
+} from "ai";
 import { createOpenAI } from "@ai-sdk/openai";
 import * as toolFactories from "@/tools";
 
 /**
- * Determine if an entry from the tools module is a tool factory.
+ * Tool factory function type
  */
 type ToolFactory = () => Tool;
 
 /**
- * Determine if an entry from the tools module is a tool factory.
+ * Type guard to check if a tools module export is a tool factory
  */
 function isToolFactory(entry: [string, unknown]): entry is [string, ToolFactory] {
   const [name, value] = entry;
@@ -22,8 +28,8 @@ function isToolFactory(entry: [string, unknown]): entry is [string, ToolFactory]
 }
 
 /**
- * Build a map of available tools by invoking all exported tool factories.
- * Tools are instantiated per-request to allow per-request configuration.
+ * Build tools registry by invoking all exported tool factories
+ * Tools are instantiated per-request to allow per-request configuration
  */
 function buildTools(): Record<string, Tool> {
   return Object.fromEntries(
@@ -34,7 +40,7 @@ function buildTools(): Record<string, Tool> {
 }
 
 /**
- * Type-safe request validation
+ * Validated chat request structure
  */
 interface ChatRequest {
   readonly messages: readonly UIMessage[];
@@ -43,8 +49,16 @@ interface ChatRequest {
 }
 
 /**
- * Validates the chat request body structure
- * Provides detailed error messages for debugging
+ * Type guard for chat request body
+ */
+function isChatRequestBody(
+  body: Record<string, unknown>
+): body is { messages: unknown; model?: unknown; context?: unknown } {
+  return "messages" in body;
+}
+
+/**
+ * Validates and types the chat request body
  *
  * @throws APIError if validation fails
  */
@@ -57,13 +71,17 @@ function validateChatRequest(body: unknown): ChatRequest {
     );
   }
 
-  const { messages, model, context } = body as Record<string, unknown>;
+  if (!isChatRequestBody(body)) {
+    throw new APIError("Request body must contain messages", 400, ErrorCodes.VALIDATION_ERROR);
+  }
+
+  const { messages, model, context } = body;
 
   if (!validateArray(messages)) {
     throw new APIError("Messages must be an array", 400, ErrorCodes.VALIDATION_ERROR);
   }
 
-  if ((messages as unknown[]).length === 0) {
+  if (messages.length === 0) {
     throw new APIError("Messages array cannot be empty", 400, ErrorCodes.VALIDATION_ERROR);
   }
 
@@ -75,16 +93,28 @@ function validateChatRequest(body: unknown): ChatRequest {
     throw new APIError("Context must be a non-empty string", 400, ErrorCodes.VALIDATION_ERROR);
   }
 
-  return { messages: messages as readonly UIMessage[], model, context };
+  return {
+    messages: messages as readonly UIMessage[],
+    model: model as string | undefined,
+    context: context as string | undefined,
+  };
 }
 
 /**
- * Retrieves and validates AI Gateway configuration from environment variables
- * Centralizes configuration logic for easy testing and debugging
+ * API configuration from environment
+ */
+interface APIConfiguration {
+  readonly apiKey: string;
+  readonly baseURL: string;
+  readonly defaultModel: string;
+}
+
+/**
+ * Retrieves and validates AI Gateway configuration
  *
  * @throws APIError if required configuration is missing
  */
-function getAPIConfiguration() {
+function getAPIConfiguration(): APIConfiguration {
   const apiKey =
     process.env.AI_GATEWAY_API_KEY ??
     process.env.OPENAI_API_KEY ??
@@ -115,6 +145,17 @@ function getAPIConfiguration() {
     baseURL,
     defaultModel,
   };
+}
+
+/**
+ * Message metadata structure
+ */
+interface MessageMetadata {
+  readonly model: string;
+  readonly totalTokens: number;
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly usage: LanguageModelUsage;
 }
 
 // Allow streaming responses up to 30 seconds
@@ -148,7 +189,7 @@ export async function POST(req: Request): Promise<Response> {
 
     // Get and validate API configuration
     const config = getAPIConfiguration();
-    const selectedModel = requestModel || config.defaultModel;
+    const selectedModel = requestModel ?? config.defaultModel;
 
     // Authenticate user - required for chat streaming
     const supabase = await createSupabaseServerClient({
@@ -159,18 +200,14 @@ export async function POST(req: Request): Promise<Response> {
       error: authError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
+    if (authError !== null || user === null) {
       throw new APIError("Authentication required to access chat", 401, ErrorCodes.UNAUTHORIZED);
     }
 
     const userId = user.id;
 
     // Convert UI messages to model format
-    let modelMessages;
-    try {
-      // Convert readonly array to mutable for AI SDK compatibility
-      modelMessages = await convertToModelMessages([...messages]);
-    } catch (error) {
+    const modelMessages = await convertToModelMessages([...messages]).catch((error: unknown) => {
       const cause = error instanceof Error ? error : new Error(String(error));
       throw new APIError(
         "Failed to convert messages to model format",
@@ -178,15 +215,16 @@ export async function POST(req: Request): Promise<Response> {
         ErrorCodes.VALIDATION_ERROR,
         cause
       );
-    }
+    });
 
     // Validate conversion result
-    if (!modelMessages || !Array.isArray(modelMessages) || modelMessages.length === 0) {
+    if (!Array.isArray(modelMessages) || modelMessages.length === 0) {
       throw new APIError("No valid messages after conversion", 400, ErrorCodes.VALIDATION_ERROR);
     }
 
     // Prepare system message
-    const systemMessage = context ? `Context: ${context}` : "You are a helpful assistant.";
+    const systemMessage =
+      context !== undefined ? `Context: ${context}` : "You are a helpful assistant.";
 
     // Build tools per-request to allow per-request configuration
     const tools = buildTools();
@@ -205,8 +243,6 @@ export async function POST(req: Request): Promise<Response> {
       messages: [{ role: "system", content: systemMessage }, ...modelMessages],
       temperature: 0.7,
       tools,
-      // Allow multiple steps: tool call -> tool result -> final text response
-      // Without this, it stops after the first step (tool call only)
       stopWhen: [],
       onStepFinish: (step) => {
         if (isDevelopment) {
@@ -215,7 +251,7 @@ export async function POST(req: Request): Promise<Response> {
             toolCallsCount: step.toolCalls?.length ?? 0,
             toolResultsCount: step.toolResults?.length ?? 0,
             finishReason: step.finishReason,
-            hasText: !!step.text,
+            hasText: step.text !== undefined && step.text.length > 0,
             textLength: step.text?.length ?? 0,
           });
         }
@@ -238,17 +274,19 @@ export async function POST(req: Request): Promise<Response> {
         "x-vercel-ai-ui-message-stream": "v1",
         "x-request-id": requestId,
       },
-      messageMetadata: ({ part }) => {
-        if (part.type === "finish") {
+      messageMetadata: ({ part }): MessageMetadata | undefined => {
+        if (part.type === "finish" && part.totalUsage !== undefined) {
           return {
             model: selectedModel,
-            totalTokens: part.totalUsage?.totalTokens ?? 0,
-            inputTokens: part.totalUsage?.inputTokens ?? 0,
-            outputTokens: part.totalUsage?.outputTokens ?? 0,
+            totalTokens: part.totalUsage.totalTokens ?? 0,
+            inputTokens: part.totalUsage.inputTokens ?? 0,
+            outputTokens: part.totalUsage.outputTokens ?? 0,
+            usage: part.totalUsage,
           };
         }
+        return undefined;
       },
-      onError: (error) => {
+      onError: (error: unknown) => {
         console.error("[Chat] Stream error:", {
           requestId,
           error: error instanceof Error ? error.message : String(error),
@@ -256,7 +294,7 @@ export async function POST(req: Request): Promise<Response> {
         return "An error occurred while processing your request.";
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     // Enhanced error logging with request context
     const errorMessage = error instanceof Error ? error.message : String(error);
     console.error("[Chat API Error]:", {

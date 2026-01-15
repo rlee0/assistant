@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, isToolUIPart, getToolName } from "ai";
+import { DefaultChatTransport, isToolUIPart, getToolName, type LanguageModelUsage } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo, memo, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
@@ -52,6 +52,18 @@ import {
 import { Loader } from "@/components/ai-elements/loader";
 import { Reasoning, ReasoningTrigger, ReasoningContent } from "@/components/ai-elements/reasoning";
 import { Sources, SourcesTrigger, SourcesContent, Source } from "@/components/ai-elements/sources";
+import {
+  Context,
+  ContextTrigger,
+  ContextContent,
+  ContextContentHeader,
+  ContextContentBody,
+  ContextContentFooter,
+  ContextInputUsage,
+  ContextOutputUsage,
+  ContextReasoningUsage,
+  ContextCacheUsage,
+} from "@/components/ai-elements/context";
 import {
   PromptInput,
   PromptInputHeader,
@@ -806,6 +818,8 @@ interface ChatInputProps {
   readonly modelsLoading: boolean;
   readonly onModelSelect: (modelId: string) => void;
   readonly textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  readonly totalUsedTokens: number;
+  readonly totalUsage: LanguageModelUsage;
 }
 
 const ChatInput = memo<ChatInputProps>(
@@ -822,6 +836,8 @@ const ChatInput = memo<ChatInputProps>(
     modelsLoading,
     onModelSelect,
     textareaRef,
+    totalUsedTokens,
+    totalUsage,
   }) => {
     const handleKeyDown = useTextareaKeyboardShortcuts();
     const groupedModels = useGroupedModels(models);
@@ -855,6 +871,24 @@ const ChatInput = memo<ChatInputProps>(
                   onTranscriptionChange={onTextChange}
                   textareaRef={textareaRef}
                 />
+
+                <Context
+                  usedTokens={totalUsedTokens}
+                  maxTokens={128000}
+                  usage={totalUsage}
+                  modelId={currentModel}>
+                  <ContextTrigger />
+                  <ContextContent>
+                    <ContextContentHeader />
+                    <ContextContentBody>
+                      <ContextInputUsage />
+                      <ContextOutputUsage />
+                      <ContextReasoningUsage />
+                      <ContextCacheUsage />
+                    </ContextContentBody>
+                    <ContextContentFooter />
+                  </ContextContent>
+                </Context>
 
                 <PromptInputButton
                   variant="ghost"
@@ -926,23 +960,34 @@ ChatInput.displayName = "ChatInput";
 /**
  * Chat header with breadcrumb navigation
  */
-const ChatHeader = memo(({ conversationTitle }: { conversationTitle: string }) => {
-  return (
-    <header className="sticky top-0 z-10 flex shrink-0 items-center p-4 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-      <div className="flex items-center gap-2">
-        <SidebarTrigger className="-ml-1" />
-        <Separator orientation="vertical" />
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              <BreadcrumbPage>{conversationTitle || "Chat"}</BreadcrumbPage>
-            </BreadcrumbItem>
-          </BreadcrumbList>
-        </Breadcrumb>
-      </div>
-    </header>
-  );
-});
+const ChatHeader = memo(
+  ({
+    conversationTitle,
+    lastMessageLabel,
+  }: {
+    conversationTitle: string;
+    lastMessageLabel: string;
+  }) => {
+    return (
+      <header className="sticky top-0 z-10 flex shrink-0 items-center p-4 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+        <div className="flex items-center gap-2">
+          <SidebarTrigger className="-ml-1" />
+          <Separator orientation="vertical" />
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbPage>{conversationTitle || "Chat"}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
+        </div>
+        <div className="ml-auto text-xs text-muted-foreground whitespace-nowrap">
+          Last message: {lastMessageLabel}
+        </div>
+      </header>
+    );
+  }
+);
 ChatHeader.displayName = "ChatHeader";
 
 /**
@@ -1035,6 +1080,32 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           isDisconnect: result.isDisconnect,
         });
       }
+
+      // Track usage from the latest message
+      const latestMessage = result.message;
+      const metadata = latestMessage.metadata as Record<string, unknown> | undefined;
+      const usage = metadata?.usage as LanguageModelUsage | undefined;
+
+      if (usage) {
+        setCumulativeUsage((prev) => ({
+          inputTokens: (prev.inputTokens || 0) + (usage.inputTokens || 0),
+          outputTokens: (prev.outputTokens || 0) + (usage.outputTokens || 0),
+          totalTokens: (prev.totalTokens || 0) + (usage.totalTokens || 0),
+          inputTokenDetails: {
+            noCacheTokens: prev.inputTokenDetails.noCacheTokens,
+            cacheReadTokens:
+              (prev.inputTokenDetails.cacheReadTokens || 0) +
+              (usage.inputTokenDetails?.cacheReadTokens || 0),
+            cacheWriteTokens: prev.inputTokenDetails.cacheWriteTokens,
+          },
+          outputTokenDetails: {
+            textTokens: prev.outputTokenDetails.textTokens,
+            reasoningTokens:
+              (prev.outputTokenDetails.reasoningTokens || 0) +
+              (usage.outputTokenDetails?.reasoningTokens || 0),
+          },
+        }));
+      }
     },
   });
 
@@ -1054,6 +1125,20 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const [editText, setEditText] = useState("");
   const [creatingChat, setCreatingChat] = useState(false);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+  const [cumulativeUsage, setCumulativeUsage] = useState<LanguageModelUsage>({
+    inputTokens: 0,
+    outputTokens: 0,
+    totalTokens: 0,
+    inputTokenDetails: {
+      noCacheTokens: undefined,
+      cacheReadTokens: undefined,
+      cacheWriteTokens: undefined,
+    },
+    outputTokenDetails: {
+      textTokens: undefined,
+      reasoningTokens: undefined,
+    },
+  });
 
   // ----- Refs
   const messagesContainerRef = useRef<HTMLDivElement>(null);
@@ -1150,6 +1235,24 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     scrollToBottomRef.current();
   }, [messages, selectedId, status]);
 
+  // Reset cumulative usage when switching conversations or starting new chat
+  useEffect(() => {
+    setCumulativeUsage({
+      inputTokens: 0,
+      outputTokens: 0,
+      totalTokens: 0,
+      inputTokenDetails: {
+        noCacheTokens: undefined,
+        cacheReadTokens: undefined,
+        cacheWriteTokens: undefined,
+      },
+      outputTokenDetails: {
+        textTokens: undefined,
+        reasoningTokens: undefined,
+      },
+    });
+  }, [selectedId]);
+
   const persistConversation = useCallback(
     async (conversationId: string): Promise<void> => {
       const conversation = conversations[conversationId];
@@ -1201,7 +1304,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         });
       }
     },
-    [conversations, messages]
+    [conversations, messages, router]
   );
 
   useEffect(() => {
@@ -1375,6 +1478,27 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     return createConversation();
   }, [conversations, createConversation, selectedId]);
 
+  const findExistingNewChat = useCallback((): string | null => {
+    const candidateIds = selectedId
+      ? [selectedId, ...order.filter((id) => id !== selectedId)]
+      : order;
+
+    for (const id of candidateIds) {
+      const conversation = conversations[id];
+      if (!conversation) continue;
+
+      const hasDefaultTitle = !conversation.title || conversation.title === "New chat";
+      const messages = conversation.messages ?? [];
+      const hasUserMessages = messages.some((message) => message.role === "user");
+
+      if (hasDefaultTitle && !hasUserMessages) {
+        return id;
+      }
+    }
+
+    return null;
+  }, [conversations, order, selectedId]);
+
   // ----- Event Handlers
   const handleModelSelect = useCallback(
     (modelId: string): void => {
@@ -1437,9 +1561,32 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   );
 
   const handleNewChat = useCallback(async (): Promise<void> => {
+    const existingNewChatId = findExistingNewChat();
+
+    if (existingNewChatId) {
+      if (existingNewChatId !== selectedId) {
+        selectConversationId(existingNewChatId);
+      }
+      const alreadyOnTarget = conversationId === existingNewChatId;
+      if (!alreadyOnTarget) {
+        router.push(`/chat/${existingNewChatId}`);
+      }
+      resetUIState();
+      textareaRef.current?.focus();
+      return;
+    }
+
     await createConversation();
     textareaRef.current?.focus();
-  }, [createConversation]);
+  }, [
+    conversationId,
+    createConversation,
+    findExistingNewChat,
+    resetUIState,
+    router,
+    selectConversationId,
+    selectedId,
+  ]);
 
   const handleEditMessage = useCallback((messageId: string, initialText: string): void => {
     setEditText(initialText);
@@ -1606,6 +1753,54 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const currentConversation = selectedId ? conversations[selectedId] : null;
   const conversationTitle = currentConversation?.title || "New chat";
 
+  const lastMessageTimestamp = useMemo(() => {
+    const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+
+    let candidate: unknown = null;
+    if (lastMessage && typeof lastMessage === "object") {
+      if ("createdAt" in lastMessage) {
+        candidate = (lastMessage as { createdAt?: unknown }).createdAt;
+      } else if ("created_at" in lastMessage) {
+        candidate = (lastMessage as { created_at?: unknown }).created_at;
+      }
+    }
+
+    const parsed =
+      candidate instanceof Date
+        ? candidate
+        : typeof candidate === "string"
+        ? new Date(candidate)
+        : null;
+
+    if (parsed && !Number.isNaN(parsed.getTime())) {
+      return parsed;
+    }
+
+    if (currentConversation?.updatedAt) {
+      const fallback = new Date(currentConversation.updatedAt);
+      return Number.isNaN(fallback.getTime()) ? null : fallback;
+    }
+
+    return null;
+  }, [messages, currentConversation?.updatedAt]);
+
+  const lastMessageLabel = useMemo(() => {
+    if (!lastMessageTimestamp) return "No messages yet";
+
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(lastMessageTimestamp);
+  }, [lastMessageTimestamp]);
+
+  // Calculate total token usage from cumulative state
+  const { totalUsedTokens, totalUsage } = useMemo(() => {
+    return {
+      totalUsedTokens: cumulativeUsage.totalTokens || 0,
+      totalUsage: cumulativeUsage,
+    };
+  }, [cumulativeUsage]);
+
   // Get user info from settings or use default
   const user = {
     name: settings.account.displayName,
@@ -1628,7 +1823,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         onDeleteConversation={handleDeleteConversation}
       />
       <SidebarInset>
-        <ChatHeader conversationTitle={conversationTitle} />
+        <ChatHeader conversationTitle={conversationTitle} lastMessageLabel={lastMessageLabel} />
         <div className="flex flex-1 flex-col min-h-0">
           {/* Messages */}
           <ChatMessages
@@ -1665,6 +1860,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
               modelsLoading={modelsLoading}
               onModelSelect={handleModelSelect}
               textareaRef={textareaRef}
+              totalUsedTokens={totalUsedTokens}
+              totalUsage={totalUsage}
             />
           )}
         </div>

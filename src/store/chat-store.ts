@@ -147,14 +147,14 @@ function isOrderArray(value: unknown): value is string[] {
 }
 
 /**
- * Validate and hydrate store with initial data
+ * Validate and type-check initial data structure
  */
 function validateInitialData(data: unknown): InitialChatData | null {
   if (!data || typeof data !== "object") return null;
 
   const obj = data as Record<string, unknown>;
 
-  // Validate chats object
+  // Validate chats object exists
   if (!obj.chats || typeof obj.chats !== "object") return null;
 
   const chatsRecord = obj.chats as Record<string, unknown>;
@@ -168,14 +168,11 @@ function validateInitialData(data: unknown): InitialChatData | null {
     chats[id] = session;
   }
 
-  if (Object.keys(chats).length === 0) return null;
-
-  // Validate order
+  // Empty chats is valid (new user or all chats deleted)
+  // Validate order array structure
   const order = isOrderArray(obj.order)
     ? obj.order.filter((id) => id in chats)
     : Object.keys(chats);
-
-  if (order.length === 0) return null;
 
   return {
     chats,
