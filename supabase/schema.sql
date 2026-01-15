@@ -73,6 +73,24 @@ CREATE INDEX idx_checkpoints_chat_user ON checkpoints(chat_id, user_id, timestam
 -- FUNCTIONS
 -- =========
 
+-- update_settings_updated_at: Automatically updates updated_at timestamp on settings changes
+CREATE OR REPLACE FUNCTION update_settings_updated_at()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER settings_updated_at
+  BEFORE UPDATE ON settings
+  FOR EACH ROW
+  EXECUTE FUNCTION update_settings_updated_at();
+
 -- delete_own_account: Allows authenticated users to delete their own account
 -- Uses SECURITY DEFINER to elevate privileges for this specific operation
 CREATE OR REPLACE FUNCTION delete_own_account()

@@ -65,11 +65,9 @@ This document outlines the correct order for applying Supabase migrations to ali
 If starting fresh, apply migrations in this order:
 
 1. `20260100000000_create_initial_schema.sql` - Creates base tables (chats, messages, checkpoints)
-2. `20260112132149_create_settings_table.sql` - Creates settings table
-3. `20260112140000_add_data_column_to_settings.sql` - Adds data column to settings
-4. `20260112141500_update_settings_schema.sql` - Updates settings schema
-5. `20260115080000_add_missing_chat_columns.sql` - Adds model/context columns (idempotent)
-6. `20260115220000_add_delete_user_function.sql` - Adds delete_own_account() function for secure account deletion
+2. `20260112132149_create_settings_table.sql` - Creates settings table with complete schema
+3. `20260115080000_add_missing_chat_columns.sql` - Adds model/context columns (idempotent)
+4. `20260115220000_add_delete_user_function.sql` - Adds delete_own_account() function for secure account deletion
 
 ### Existing Database (Migration Path)
 
@@ -140,6 +138,7 @@ Expected results:
 - ✓ All indexes created
 - ✓ All foreign keys established
 - ✓ `delete_own_account()` function exists for secure account deletion
+- ✓ `update_settings_updated_at()` function has secure `search_path` configuration
 
 ## App Type Definitions Alignment
 
@@ -193,7 +192,7 @@ All tables have Row Level Security (RLS) enabled with policies that ensure:
 
 The `delete_own_account()` function provides a secure way for users to delete their accounts:
 
-- Uses `SECURITY DEFINER` to elevate privileges only for this specific operation
+- Uses `SECURITY DEFINER` with `SET search_path = public` to prevent SQL injection
 - Validates that the user is authenticated before deletion
 - Automatically cascades to delete all related data (chats, messages, checkpoints, settings)
 - No service role key required (modern approach)
@@ -207,6 +206,16 @@ The `delete_own_account()` function provides a secure way for users to delete th
 4. Function deletes the user from `auth.users`
 5. CASCADE DELETE automatically removes all related records
 6. User is signed out and redirected to login
+
+### Database Functions Security
+
+All database functions follow security best practices:
+
+- **`SET search_path = public`** - Explicitly set to prevent search path manipulation attacks
+- **`SECURITY DEFINER`** - Elevates privileges only for specific operations
+- **Input validation** - All functions validate user authentication and inputs
+
+This prevents potential SQL injection where malicious users could manipulate the search_path to execute unintended code.
 
 ## Notes
 

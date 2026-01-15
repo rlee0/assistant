@@ -9,8 +9,6 @@ supabase/
 ├── migrations/              # Database migrations (apply in order)
 │   ├── 20260100000000_create_initial_schema.sql
 │   ├── 20260112132149_create_settings_table.sql
-│   ├── 20260112140000_add_data_column_to_settings.sql
-│   ├── 20260112141500_update_settings_schema.sql
 │   ├── 20260115080000_add_missing_chat_columns.sql
 │   └── 20260115220000_add_delete_user_function.sql
 ├── schema.sql                # Complete schema reference (DO NOT run directly)
@@ -93,7 +91,7 @@ supabase db push
 #### **delete_own_account()** - Secure account deletion
 
 - **Purpose**: Allows authenticated users to delete their own account
-- **Security**: Uses `SECURITY DEFINER` to elevate privileges for this operation only
+- **Security**: Uses `SECURITY DEFINER` with `SET search_path = public` to prevent SQL injection
 - **Behavior**:
   - Validates user is authenticated via `auth.uid()`
   - Deletes user from `auth.users` table
@@ -101,12 +99,20 @@ supabase db push
 - **Usage**: Called via `supabase.rpc('delete_own_account')`
 - **Permissions**: Granted to `authenticated` role only
 
+#### **update_settings_updated_at()** - Automatic timestamp updates
+
+- **Purpose**: Trigger function to update `updated_at` timestamp on settings changes
+- **Security**: Uses `SECURITY DEFINER` with `SET search_path = public`
+- **Behavior**: Automatically sets `updated_at = NOW()` on UPDATE operations
+- **Trigger**: Fires BEFORE UPDATE on `settings` table
+
 ### Security
 
 - ✓ Row Level Security (RLS) enabled on all tables
 - ✓ User isolation enforced (users only see their own data)
 - ✓ Cascade deletes when user account is removed
 - ✓ Secure account deletion via `delete_own_account()` function
+- ✓ All functions use `SET search_path = public` to prevent SQL injection
 
 ### Performance
 

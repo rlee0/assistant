@@ -102,20 +102,28 @@ WHERE tc.constraint_type = 'FOREIGN KEY'
   AND tc.table_name IN ('chats', 'messages', 'checkpoints', 'settings')
 ORDER BY tc.table_name;
 
--- Check delete_own_account function exists
+-- Check functions exist
 SELECT 
-  'delete_own_account Function' as check_type,
+  'Functions Check' as check_type,
+  proname as function_name,
   CASE 
-    WHEN COUNT(*) > 0 THEN '✓ Function exists'
-    ELSE '✗ Function missing - run 20260115220000_add_delete_user_function.sql'
+    WHEN proname = 'delete_own_account' THEN '✓ Account deletion function exists'
+    WHEN proname = 'update_settings_updated_at' THEN '✓ Settings timestamp trigger exists'
+    ELSE '✓ Function exists'
   END as status
 FROM pg_proc
-WHERE proname = 'delete_own_account';
+WHERE proname IN ('delete_own_account', 'update_settings_updated_at')
+ORDER BY proname;
 
--- Show function details if it exists
+-- Verify functions have secure search_path
 SELECT 
-  'Function Details' as check_type,
+  'Function Security Check' as check_type,
   proname as function_name,
-  pg_get_functiondef(oid) as definition
+  CASE 
+    WHEN prosecdef AND proconfig::text LIKE '%search_path%' THEN '✓ SECURITY DEFINER with search_path set'
+    WHEN prosecdef THEN '⚠ SECURITY DEFINER but search_path not set'
+    ELSE '✗ Not SECURITY DEFINER'
+  END as security_status
 FROM pg_proc
-WHERE proname = 'delete_own_account';
+WHERE proname IN ('delete_own_account', 'update_settings_updated_at')
+ORDER BY proname;

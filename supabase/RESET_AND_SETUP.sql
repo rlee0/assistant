@@ -175,12 +175,16 @@ CREATE INDEX idx_settings_user_id ON settings(user_id);
 -- ============================================================================
 
 CREATE OR REPLACE FUNCTION update_settings_updated_at()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
 BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$;
 
 CREATE TRIGGER settings_updated_at
   BEFORE UPDATE ON settings
