@@ -23,6 +23,7 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
   AlertDialogTrigger,
@@ -34,7 +35,13 @@ import {
   AlertDialogCancel,
   AlertDialogAction,
 } from "@/components/ui/alert-dialog";
-import { Empty, EmptyHeader, EmptyTitle, EmptyDescription } from "@/components/ui/empty";
+import {
+  Empty,
+  EmptyHeader,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from "@/components/ui/empty";
 import {
   Message,
   MessageContent,
@@ -486,6 +493,7 @@ interface ChatMessagesProps {
   readonly scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
   readonly checkpoints: ChatCheckpoint[];
   readonly selectedId: string | null;
+  readonly onNewChat: () => void;
   readonly onEditMessage: (messageId: string, initialText: string) => void;
   readonly onCancelEdit: () => void;
   readonly onSaveEdit: (messageId: string, newText: string) => void;
@@ -507,6 +515,7 @@ const ChatMessages = memo<ChatMessagesProps>(
     scrollToBottomRef,
     checkpoints,
     selectedId,
+    onNewChat,
     onEditMessage,
     onCancelEdit,
     onSaveEdit,
@@ -543,6 +552,9 @@ const ChatMessages = memo<ChatMessagesProps>(
                       Create a new chat or select an existing one to begin.
                     </EmptyDescription>
                   </EmptyHeader>
+                  <EmptyContent>
+                    <Button onClick={onNewChat}>New Chat</Button>
+                  </EmptyContent>
                 </Empty>
               ) : messages.length === 0 ? (
                 <Empty>
@@ -1851,6 +1863,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             scrollToBottomRef={scrollToBottomRef}
             checkpoints={currentConversation?.checkpoints ?? []}
             selectedId={selectedId}
+            onNewChat={handleNewChat}
             onEditMessage={handleEditMessage}
             onCancelEdit={handleCancelEdit}
             onSaveEdit={handleSaveEdit}
