@@ -817,7 +817,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   }, [messages, currentConversation?.updatedAt]);
 
   const lastMessageLabel = useMemo(() => {
-    if (!lastMessageTimestamp) return "No messages yet";
+    if (!lastMessageTimestamp) return "";
 
     return new Intl.DateTimeFormat(undefined, {
       dateStyle: "medium",
