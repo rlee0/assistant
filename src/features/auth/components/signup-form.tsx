@@ -7,6 +7,7 @@ import { useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { logError } from "@/lib/logging";
 import { useRouter } from "next/navigation";
@@ -181,9 +182,14 @@ export function SignupForm({ ...props }: React.ComponentProps<typeof Card>) {
               Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
             </p>
           )}
-          <Button type="submit" disabled={isDisabled} className="w-full">
-            {isLoading ? "Creating Account..." : "Create Account"}
-          </Button>
+          <LoadingButton
+            type="submit"
+            isLoading={isLoading}
+            loadingText="Creating Account..."
+            disabled={!supabase}
+            className="w-full">
+            Create Account
+          </LoadingButton>
           <Button
             variant="outline"
             type="button"

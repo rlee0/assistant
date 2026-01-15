@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 
 import { ErrorBoundary } from "@/components/feedback/error-boundary";
 import type { Metadata } from "next";
+import { ProgressBarProvider } from "@/components/providers/progress-bar-provider";
 import { Toaster } from "sonner";
 
 const geistSans = Geist({
@@ -29,10 +30,12 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
-          {children}
-        </ErrorBoundary>
-        <Toaster position="top-center" />
+        <ProgressBarProvider>
+          <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
+            {children}
+          </ErrorBoundary>
+          <Toaster position="top-center" />
+        </ProgressBarProvider>
       </body>
     </html>
   );

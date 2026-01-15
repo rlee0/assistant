@@ -9,62 +9,68 @@ A modern, full-featured AI chat assistant built with Next.js, React, and Supabas
 - Support for multiple AI providers (OpenAI, Anthropic, Google, Meta, Mistral, DeepSeek, and more)
 - Dynamic model selection with real-time provider switching
 - Configurable temperature and model parameters
-- AI SDK integration for streaming responses
+- Streaming responses for real-time interaction
+- AI SDK integration with tool use capabilities
 
 ### 💬 Advanced Chat Interface
 
-- Real-time streaming chat with AI models
+- Real-time streaming chat with multiple AI models
+- Persistent chat history with Supabase
 - Rich message formatting with Markdown and syntax highlighting (via Shiki)
-- Context-aware conversations with message history
+- Context-aware conversations with full message history
 - Attachment support for enhanced interactions
 - Speech input capabilities
 - Tool integration for extended functionality
+- Message actions and controls
 
-### 🎨 Rich UI Components
+### 🎨 Rich AI Components
 
-Comprehensive AI-specific components including:
+Comprehensive components for visualizing AI processes:
 
-- **Message Components**: Message bubbles, actions, and content rendering
-- **Canvas & Artifacts**: Interactive visual elements for AI-generated content
+- **Message Display**: Message bubbles with streaming support
 - **Code Blocks**: Syntax-highlighted code with copy functionality
 - **Chain of Thought**: Visualize AI reasoning processes
-- **Checkpoints & Tasks**: Track progress and milestones
-- **Web Preview**: Preview web content inline
-- **Inline Citations & Sources**: Reference and verification support
-- **Reasoning & Planning**: Visualize AI planning and decision-making
+- **Checkpoints & Planning**: Track AI decision-making and plan execution
+- **Canvas & Artifacts**: Interactive visual elements for AI-generated content
+- **Connections & Graphs**: Visual representation of AI workflows via @xyflow/react
+- **Inline Citations**: Reference and source attribution
+- **Conversation Threading**: Organized message hierarchies
 
 ### 🔐 Authentication & User Management
 
 - Secure authentication via Supabase Auth
 - User signup and login flows
-- Protected routes and session management
-- Row-level security for data isolation
+- Protected routes with session management
+- Row-level security (RLS) for data isolation
+- Account settings and profile management
 
 ### ⚙️ Settings & Customization
 
-- **Account Settings**: Manage user profile and credentials
-- **Appearance**: Theme selection (light/dark/system) and UI density
-- **Model Configuration**: Set default models, temperature, and API keys
-- **Tool Settings**: Configure individual tool preferences
-- Settings sync across devices via Supabase
+- **Account Settings**: Manage user profile and API credentials
+- **Appearance**: Theme selection (light/dark/system) and UI density customization
+- **Model Configuration**: Set default models, temperature, and configure API keys
+- **Tool Settings**: Enable/disable and configure individual tool preferences
+- Settings persistence with cross-device sync via Supabase
 
 ### 🎨 Modern UI/UX
 
 - Beautiful, responsive design with Tailwind CSS
 - Dark mode support with next-themes
 - Comprehensive component library powered by Radix UI
-- Smooth animations with Motion
+- Smooth animations and transitions with Motion
 - Toast notifications with Sonner
 - Accessible and keyboard-friendly interface
+- Loading skeletons for better UX
 
 ### 🛠️ Developer Experience
 
-- TypeScript for type safety
-- Zod for runtime validation
-- React Hook Form for form management
-- Zustand for state management
+- TypeScript for type safety and IDE support
+- Zod for runtime schema validation
+- React Hook Form for efficient form management
+- Zustand for lightweight state management
 - ESLint for code quality
-- pnpm for fast package management
+- pnpm for fast, deterministic package management
+- Well-organized feature modules
 
 ## 🚀 Getting Started
 
@@ -105,18 +111,26 @@ Comprehensive AI-specific components including:
 
 4. **Set up Supabase**
 
-   Run the migrations in your Supabase project:
+   Apply the database migrations to your Supabase project:
 
    ```bash
-   # The migrations are located in /supabase/migrations/
-   # Apply them via Supabase CLI or Dashboard
+   # Option 1: Using Supabase CLI
+   supabase migration list  # View all migrations
+   supabase db push        # Apply migrations to remote database
+
+   # Option 2: Manual application via Supabase Dashboard
+   # - Go to SQL Editor
+   # - Copy and paste migration files from /supabase/migrations/
+   # - Execute them in order
    ```
 
-   The migrations will create:
+   The migrations create:
 
-   - `settings` table for user preferences
-   - Row-level security policies
-   - Necessary triggers and functions
+   - `chats`, `messages` - Chat history and messaging tables
+   - `checkpoints` - AI reasoning/chain-of-thought tracking
+   - `settings` - User preferences and configuration
+   - Row-level security (RLS) policies for data isolation
+   - Indexes for performance optimization
 
 5. **Run the development server**
 
@@ -135,28 +149,41 @@ assistant/
 │   │   ├── (auth)/              # Authentication routes
 │   │   │   ├── login/           # Login page
 │   │   │   └── signup/          # Signup page
+│   │   ├── (chat)/              # Chat layout wrapper
+│   │   │   ├── page.tsx         # Main chat interface
+│   │   │   └── chat/            # Chat routes
 │   │   ├── api/                 # API routes
 │   │   │   ├── account/         # Account management
-│   │   │   ├── chat/            # Chat endpoints
-│   │   │   ├── models/          # Model listing
+│   │   │   ├── auth/            # Authentication endpoints
+│   │   │   ├── chat/            # Chat streaming endpoints
+│   │   │   ├── models/          # Available models endpoint
 │   │   │   └── settings/        # Settings CRUD
 │   │   ├── settings/            # Settings page
 │   │   ├── layout.tsx           # Root layout
-│   │   ├── page.tsx             # Home page (chat)
 │   │   └── globals.css          # Global styles
 │   ├── components/
-│   │   ├── ai-elements/         # AI-specific components
+│   │   ├── ai/                  # AI-specific components
 │   │   │   ├── artifact.tsx     # AI artifacts display
 │   │   │   ├── canvas.tsx       # Interactive canvas
 │   │   │   ├── chain-of-thought.tsx
 │   │   │   ├── code-block.tsx   # Syntax highlighted code
 │   │   │   ├── message.tsx      # Chat messages
 │   │   │   ├── model-selector.tsx
-│   │   │   ├── prompt-input.tsx # Chat input
-│   │   │   ├── reasoning.tsx    # AI reasoning display
+│   │   │   ├── conversation.tsx # Chat conversation wrapper
 │   │   │   └── ...
+│   │   ├── feedback/            # User feedback components
+│   │   ├── providers/           # Context providers
+│   │   ├── skeletons/           # Loading skeleton components
 │   │   └── ui/                  # Base UI components (Radix-based)
+│   ├── features/                # Feature modules
+│   │   ├── auth/               # Auth feature logic
+│   │   ├── chat/               # Chat feature logic
+│   │   └── settings/           # Settings feature logic
 │   ├── hooks/                   # React hooks
+│   │   ├── use-async-transition.ts
+│   │   ├── use-loading-state.ts
+│   │   ├── use-optimistic-action.ts
+│   │   └── ...
 │   ├── lib/                     # Utility libraries
 │   │   ├── agent/              # Agent logic
 │   │   ├── api/                # API helpers
@@ -164,42 +191,48 @@ assistant/
 │   │   ├── constants.ts        # App constants
 │   │   ├── models.ts           # Model management
 │   │   ├── settings.ts         # Settings schema & defaults
+│   │   ├── logging.ts          # Logging utilities
 │   │   └── utils.ts            # Utility functions
-│   ├── store/                   # Zustand stores
-│   ├── tools/                   # AI tool implementations
-│   └── types/                   # TypeScript type definitions
+│   ├── styles/                  # Global styles
+│   │   └── globals.css
+│   └── proxy.ts                 # Proxy configuration
 ├── supabase/
-│   └── migrations/              # Database migrations
+│   ├── migrations/              # Database migrations
+│   └── Various SQL scripts      # Utility and maintenance scripts
 ├── public/                      # Static assets
 └── Configuration files
     ├── next.config.ts
-    ├── tailwind.config.ts
     ├── tsconfig.json
-    └── package.json
+    ├── eslint.config.mjs
+    ├── components.json
+    ├── package.json
+    ├── pnpm-lock.yaml
+    └── postcss.config.mjs
 ```
 
 ## 🔧 Key Technologies
 
 ### Frontend
 
-- **Next.js 16** - React framework with App Router
+- **Next.js 15+** - React framework with App Router
 - **React 19** - UI library
 - **TypeScript 5** - Type safety
-- **Tailwind CSS 4** - Utility-first CSS
+- **Tailwind CSS** - Utility-first CSS
 - **Radix UI** - Headless UI components
-- **Motion** - Animations
+- **Motion** - Smooth animations
 - **ai-elements** - AI-specific UI components
 
 ### AI & Chat
 
-- **AI SDK** - Vercel AI SDK for streaming and tool use
+- **AI SDK v6+** - Vercel AI SDK for streaming and tool use
 - **@ai-sdk/react** - React hooks for AI interactions
 - **@ai-sdk/openai** - OpenAI integration
-- **@ai-sdk/gateway** - Multi-provider gateway
+- **@ai-sdk/gateway** - Multi-provider AI gateway
 
 ### Backend & Database
 
 - **Supabase** - Backend as a Service (Auth, Database, Storage)
+- **@supabase/supabase-js** - Supabase client library
 - **@supabase/ssr** - Server-side rendering support
 
 ### State & Forms
@@ -208,12 +241,19 @@ assistant/
 - **React Hook Form** - Form management
 - **Zod** - Schema validation
 
-### Additional Tools
+### UI & Visualization
 
-- **Shiki** - Syntax highlighting
-- **Streamdown** - Streaming markdown rendering (via AI SDK Elements)
+- **@xyflow/react** - Node-based UI library for canvas/graph components
+- **Shiki** - Syntax highlighting for code blocks
+- **lucide-react** - Icon library
+- **Sonner** - Toast notifications
 - **date-fns** - Date utilities
-- **lucide-react** - Icons
+
+### Development
+
+- **ESLint** - Code quality and linting
+- **pnpm** - Fast, efficient package manager
+- **TypeScript** - Type safety throughout the codebase
 
 ## 🎯 Usage
 

@@ -1,12 +1,13 @@
 "use client";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Field, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { useMemo, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import Link from "next/link";
+import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { useRouter } from "next/navigation";
@@ -94,9 +95,14 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
                 Configure NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
               </p>
             )}
-            <Button type="submit" disabled={isDisabled} className="w-full">
-              {isLoading ? "Logging in..." : "Login"}
-            </Button>
+            <LoadingButton
+              type="submit"
+              isLoading={isLoading}
+              loadingText="Logging in..."
+              disabled={!supabase}
+              className="w-full">
+              Login
+            </LoadingButton>
             <Button
               variant="outline"
               type="button"
