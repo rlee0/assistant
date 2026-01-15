@@ -17,7 +17,7 @@ import { memo } from "react";
  */
 export const ChatHeader = memo<ChatHeaderProps>(({ conversationTitle, lastMessageLabel }) => {
   return (
-    <header className="sticky top-0 z-10 flex shrink-0 items-center p-4 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
+    <header className="sticky top-0 z-10 flex shrink-0 items-center p-2 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
       <div className="flex items-center gap-2">
         <SidebarTrigger />
         <Separator orientation="vertical" />

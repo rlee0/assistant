@@ -8,10 +8,10 @@ export default function ChatLoading() {
       <div className="flex h-screen w-full">
         {/* Sidebar skeleton */}
         <div className="hidden w-64 flex-col border-r bg-background md:flex">
-          <div className="border-b p-4">
+          <div className="border-b p-2">
             <Skeleton className="h-9 w-full rounded-lg" />
           </div>
-          <div className="flex-1 space-y-2 overflow-y-auto p-4">
+          <div className="flex-1 space-y-2 overflow-y-auto p-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="h-8 w-full rounded-lg" />
             ))}
@@ -26,7 +26,7 @@ export default function ChatLoading() {
           </div>
 
           {/* Messages area */}
-          <div className="flex-1 space-y-4 overflow-y-auto p-4">
+          <div className="flex-1 space-y-4 overflow-y-auto p-2">
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
