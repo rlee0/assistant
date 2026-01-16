@@ -84,7 +84,7 @@ export function ProgressBar({ isActive = false, className, onComplete }: Progres
         <motion.div
           key="progress-bar"
           className={cn(
-            "fixed top-0 left-0 h-1 bg-linear-to-r from-blue-500 to-cyan-500 shadow-lg z-50",
+            "fixed top-0 left-0 h-0.5 bg-linear-to-r from-blue-500 to-cyan-500 shadow-lg z-50",
             className
           )}
           initial={{ opacity: 0, width: "0%" }}
