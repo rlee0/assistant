@@ -30,7 +30,7 @@ export function ProgressBar({ isActive = false, className, onComplete }: Progres
   useEffect(() => {
     const wasInactive = !prevActiveRef.current;
     const isNowActive = isActive;
-    
+
     // Starting progress
     if (isNowActive && wasInactive) {
       queueMicrotask(() => {
@@ -46,7 +46,7 @@ export function ProgressBar({ isActive = false, className, onComplete }: Progres
         });
       }, PROGRESS_CONFIG.INTERVAL_MS);
     }
-    
+
     // Completing progress
     if (!isNowActive && !wasInactive) {
       if (intervalRef.current) {
@@ -63,7 +63,7 @@ export function ProgressBar({ isActive = false, className, onComplete }: Progres
         onComplete?.();
       }, PROGRESS_CONFIG.COMPLETE_DELAY_MS);
     }
-    
+
     prevActiveRef.current = isActive;
 
     return () => {
