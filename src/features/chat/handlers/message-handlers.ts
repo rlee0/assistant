@@ -1,5 +1,6 @@
 import { TOAST_MESSAGES } from "@/features/chat/constants";
 import type { UseChatMessage } from "../types";
+import { isTextPart } from "../utils/message-parts";
 import { logWarn } from "@/lib/logging";
 import { toast } from "sonner";
 
@@ -62,15 +63,8 @@ export function extractMessageText(message: UseChatMessage): string {
   const textParts: string[] = [];
 
   for (const part of parts) {
-    if (
-      typeof part === "object" &&
-      part !== null &&
-      "type" in part &&
-      (part as Record<string, unknown>).type === "text" &&
-      "text" in part &&
-      typeof (part as Record<string, unknown>).text === "string"
-    ) {
-      textParts.push((part as Record<string, unknown>).text as string);
+    if (isTextPart(part)) {
+      textParts.push(part.text);
     }
   }
 

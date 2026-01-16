@@ -26,7 +26,7 @@ export type MessagePart =
       readonly result?: unknown;
     }
   | { readonly type: "image"; readonly image?: string; readonly mimeType?: string }
-  | { readonly type: "reasoning"; readonly thinking?: string }
+  | { readonly type: "reasoning"; readonly text?: string }
   | Record<string, unknown>;
 
 /**
@@ -46,9 +46,7 @@ export function isTextPart(part: unknown): part is { type: "text"; text: string 
 /**
  * Type guard for tool-call parts
  */
-export function isToolCallPart(
-  part: unknown
-): part is {
+export function isToolCallPart(part: unknown): part is {
   type: "tool-call";
   toolName?: string;
   toolUseId?: string;
@@ -93,7 +91,7 @@ export function isImagePart(
 /**
  * Type guard for reasoning parts
  */
-export function isReasoningPart(part: unknown): part is { type: "reasoning"; thinking?: string } {
+export function isReasoningPart(part: unknown): part is { type: "reasoning"; text?: string } {
   return (
     typeof part === "object" &&
     part !== null &&
@@ -144,17 +142,16 @@ export function extractToolCallParts(
 /**
  * Safely extracts all image parts from a message
  */
-export function extractImageParts(message: UseChatMessage): unknown[] {
+export function extractImageParts(message: UseChatMessage): Array<{
+  type: "image";
+  image?: string;
+  mimeType?: string;
+}> {
   const parts = Array.isArray(message.parts) ? message.parts : [];
-  const images: unknown[] = [];
+  const images: Array<{ type: "image"; image?: string; mimeType?: string }> = [];
 
   for (const part of parts) {
-    if (
-      typeof part === "object" &&
-      part !== null &&
-      "type" in part &&
-      (part as Record<string, unknown>).type === "image"
-    ) {
+    if (isImagePart(part)) {
       images.push(part);
     }
   }
@@ -171,7 +168,7 @@ export function extractReasoningParts(message: UseChatMessage): string[] {
 
   for (const part of parts) {
     if (isReasoningPart(part)) {
-      reasoning.push(part.thinking ?? "");
+      reasoning.push(part.text ?? "");
     }
   }
 
@@ -179,35 +176,38 @@ export function extractReasoningParts(message: UseChatMessage): string[] {
 }
 
 /**
- * Safely extract all source URLs from message parts
- * Handles multiple part types that might contain sources
+ * Type guard for source-url parts
  */
-export function extractSourceUrls(message: UseChatMessage): string[] {
+export function isSourceUrlPart(
+  part: unknown
+): part is { type: "source-url"; url: string; title?: string } {
+  return (
+    typeof part === "object" &&
+    part !== null &&
+    "type" in part &&
+    (part as Record<string, unknown>).type === "source-url" &&
+    "url" in part &&
+    typeof (part as Record<string, unknown>).url === "string"
+  );
+}
+
+/**
+ * Safely extract all source URL parts from message
+ * Returns properly typed source-url parts.
+ */
+export function extractSourceUrls(
+  message: UseChatMessage
+): Array<{ type: "source-url"; url: string; title?: string }> {
   const parts = Array.isArray(message.parts) ? message.parts : [];
-  const urls = new Set<string>();
+  const sources: Array<{ type: "source-url"; url: string; title?: string }> = [];
 
   for (const part of parts) {
-    if (
-      typeof part === "object" &&
-      part !== null &&
-      "sources" in part &&
-      Array.isArray((part as Record<string, unknown>).sources)
-    ) {
-      const sources = (part as Record<string, unknown>).sources as unknown[];
-      for (const source of sources) {
-        if (
-          typeof source === "object" &&
-          source !== null &&
-          "url" in source &&
-          typeof (source as Record<string, unknown>).url === "string"
-        ) {
-          urls.add((source as Record<string, unknown>).url as string);
-        }
-      }
+    if (isSourceUrlPart(part)) {
+      sources.push(part);
     }
   }
 
-  return Array.from(urls);
+  return sources;
 }
 
 /**

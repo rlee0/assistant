@@ -50,7 +50,7 @@ import { Button } from "@/components/ui/button";
 import type { ChatMessagesProps } from "../types";
 import { Loader } from "@/components/ai/loader";
 import { cn } from "@/lib/utils";
-import { copyToClipboard } from "../clipboard";
+import { copyToClipboard } from "../utils/clipboard";
 import { logError } from "@/lib/logging";
 import { toast } from "sonner";
 import { useStickToBottomContext } from "use-stick-to-bottom";
@@ -155,8 +155,17 @@ export const ChatMessages = memo<ChatMessagesProps>(
 
                     // Extract text content for copy and edit functionality
                     const textParts = parts
-                      .filter((part) => (part as Record<string, unknown>).type === "text")
-                      .map((part) => (part as Record<string, unknown>).text)
+                      .filter((part): part is { type: "text"; text: string } => {
+                        return (
+                          typeof part === "object" &&
+                          part !== null &&
+                          "type" in part &&
+                          (part as Record<string, unknown>).type === "text" &&
+                          "text" in part &&
+                          typeof (part as Record<string, unknown>).text === "string"
+                        );
+                      })
+                      .map((part) => part.text)
                       .join("\n");
 
                     const hasTextToCopy = textParts.trim().length > 0;

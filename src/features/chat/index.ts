@@ -1,5 +1,5 @@
 // Main export
-export { ChatClient } from "../chat-client";
+export { ChatClient } from "./components/chat-client";
 
 // Types
 export type {
@@ -26,7 +26,9 @@ export {
   useGroupedModels,
   useTextareaKeyboardShortcuts,
   useAutoFocusTextarea,
-} from "./use-chat-hooks";
+} from "./hooks/use-chat-hooks";
+export { useConversationManagement } from "./hooks/use-conversation-management";
+export { useMessageEditing } from "./hooks/use-message-editing";
 
 // Message utilities
 export {
@@ -51,8 +53,9 @@ export {
   isToolResultPart,
   isImagePart,
   isReasoningPart,
+  isSourceUrlPart,
   type MessagePart,
-} from "./message-parts";
+} from "./utils/message-parts";
 
 // Error handling
 export {
@@ -70,7 +73,7 @@ export {
   createErrorFromStatus,
   getErrorMessage,
   isRetryable,
-} from "./errors";
+} from "./utils/errors";
 
 // Clipboard utilities
 export {
@@ -78,7 +81,7 @@ export {
   copyToClipboard,
   readFromClipboard,
   safeCopyToClipboard,
-} from "./clipboard";
+} from "./utils/clipboard";
 
 // Conversation handlers
 export {

@@ -7,7 +7,7 @@ import {
   isAbortedError,
   createErrorFromStatus,
   getErrorMessage,
-} from "../errors";
+} from "../utils/errors";
 
 /**
  * Parameters for persisting a conversation

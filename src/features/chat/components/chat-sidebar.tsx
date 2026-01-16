@@ -55,7 +55,7 @@ interface UserProfile {
   readonly avatar?: string;
 }
 
-interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
+interface ChatSidebarProps extends React.ComponentProps<typeof Sidebar> {
   readonly user: UserProfile;
   readonly conversations: Readonly<Record<string, Conversation>>;
   readonly conversationOrder: ReadonlyArray<string>;
@@ -82,10 +82,10 @@ const ConversationStatusIndicator = memo<{ status: ConversationStatus }>(
 );
 
 /**
- * Main application sidebar component
+ * Main chat sidebar component
  * Displays conversation list, new chat button, and user menu
  */
-export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
+export const ChatSidebar = memo<ChatSidebarProps>(function ChatSidebar({
   user,
   conversations,
   conversationOrder,

@@ -4,7 +4,7 @@ import { useState, useRef, useEffect, useCallback, useMemo, type KeyboardEvent }
 import { fetchModels, getModelProvider, groupModelsByProvider, type Model } from "@/lib/models";
 import { logError, logWarn } from "@/lib/logging";
 import { DEFAULT_PROVIDER } from "@/features/chat/constants";
-import type { SelectedModelInfo, UseModelManagementReturn } from "./types";
+import type { SelectedModelInfo, UseModelManagementReturn } from "../types";
 
 /**
  * Manages model selection and fetching with validation

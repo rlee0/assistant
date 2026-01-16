@@ -7,35 +7,35 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { nanoid } from "nanoid";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
-import { AppSidebar } from "@/features/chat/components/app-sidebar";
+import { ChatSidebar } from "@/features/chat/components/chat-sidebar";
 import { useSettingsStore } from "@/features/settings/store/settings-store";
 import { useChatStore } from "@/features/chat/store/chat-store";
 import { useSettingsSync } from "@/features/settings/hooks/use-settings-sync";
 import { logError, logWarn, logDebug } from "@/lib/logging";
 import { CHAT_REQUEST_TIMEOUT_MS } from "@/features/chat/constants";
-import { ChatHeader } from "./chat-client/components/chat-header";
-import { ChatMessages } from "./chat-client/components/chat-messages";
-import { ChatInput } from "./chat-client/components/chat-input";
-import { useModelManagement, useAutoFocusTextarea } from "./chat-client/use-chat-hooks";
+import { ChatHeader } from "./chat-header";
+import { ChatMessages } from "./chat-messages";
+import { ChatInput } from "./chat-input";
+import { useModelManagement, useAutoFocusTextarea } from "../hooks/use-chat-hooks";
 import {
   generateTitleFromText,
   mapUseChatStatus,
   uiMessageToChatMessage,
   areMessagesEqual,
   extractTextFromMessage,
-} from "./chat-client/utils/message-utils";
+} from "../utils/message-utils";
 import {
   persistConversation,
   createConversationRequest,
   deleteConversationRequest,
-} from "./chat-client/handlers/conversation-handlers";
+} from "../handlers/conversation-handlers";
 import {
   findMessageIndex,
   validateMessageExists,
   validateEditText,
   validateRegenerateMessage,
-} from "./chat-client/handlers/message-handlers";
-import type { ChatClientProps } from "./chat-client/types";
+} from "../handlers/message-handlers";
+import type { ChatClientProps } from "../types";
 
 // System message constants
 const SYSTEM_MESSAGE_RESPONSE_STOPPED = "Response stopped by user." as const;
@@ -157,8 +157,14 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
       // Track usage from the latest message
       const latestMessage = result.message;
-      const metadata = latestMessage.metadata as Record<string, unknown> | undefined;
-      const usage = metadata?.usage as LanguageModelUsage | undefined;
+      const metadata =
+        typeof latestMessage.metadata === "object" && latestMessage.metadata !== null
+          ? (latestMessage.metadata as Record<string, unknown>)
+          : undefined;
+      const usage =
+        metadata && typeof metadata.usage === "object" && metadata.usage !== null
+          ? (metadata.usage as LanguageModelUsage)
+          : undefined;
 
       if (usage) {
         setCumulativeUsage((prev) => ({
@@ -632,8 +638,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
   const handlePromptSubmit = useCallback(
     async (message: Record<string, unknown>) => {
-      const hasText = Boolean((message.text as string)?.trim());
-      const hasAttachments = Boolean((message.files as unknown[])?.length);
+      const hasText = typeof message.text === "string" && message.text.trim().length > 0;
+      const hasAttachments = Array.isArray(message.files) && message.files.length > 0;
 
       if (!(hasText || hasAttachments)) {
         logWarn("[Chat]", "Message submission blocked: no content");
@@ -823,15 +829,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         toast.error("Failed to restore checkpoint");
       }
     },
-    [
-      selectedId,
-      conversations,
-      messages,
-      storeRestoreCheckpoint,
-      setMessages,
-      persistConversation,
-      uiMessageToChatMessage,
-    ]
+    [selectedId, conversations, messages, storeRestoreCheckpoint, setMessages]
   );
 
   // ============================================================================
@@ -845,12 +843,9 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
 
     let candidate: unknown = null;
-    if (lastMessage && typeof lastMessage === "object") {
-      if ("createdAt" in lastMessage) {
-        candidate = (lastMessage as Record<string, unknown>).createdAt;
-      } else if ("created_at" in lastMessage) {
-        candidate = (lastMessage as Record<string, unknown>).created_at;
-      }
+    if (lastMessage && typeof lastMessage === "object" && lastMessage !== null) {
+      const msg = lastMessage as unknown as Record<string, unknown>;
+      candidate = "createdAt" in msg ? msg.createdAt : "created_at" in msg ? msg.created_at : null;
     }
 
     const parsed =
@@ -899,7 +894,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
   return (
     <SidebarProvider>
-      <AppSidebar
+      <ChatSidebar
         user={user}
         conversations={conversations}
         conversationOrder={order}

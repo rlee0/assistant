@@ -46,7 +46,7 @@ import {
   usePromptInputAttachments,
 } from "@/components/ai/prompt-input";
 import { formatProviderName, getModelProvider } from "@/lib/models";
-import { useGroupedModels, useTextareaKeyboardShortcuts } from "../use-chat-hooks";
+import { useGroupedModels, useTextareaKeyboardShortcuts } from "../hooks/use-chat-hooks";
 
 import { Badge } from "@/components/ui/badge";
 import type { ChatInputProps } from "../types";

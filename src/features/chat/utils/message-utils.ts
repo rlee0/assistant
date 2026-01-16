@@ -1,6 +1,6 @@
 import type { ChatMessage } from "@/features/chat/types";
 import type { UseChatMessage } from "../types";
-import { extractTextParts } from "../message-parts";
+import { extractTextParts } from "./message-parts";
 import type { useChat } from "@ai-sdk/react";
 
 // ============================================================================
