@@ -202,7 +202,10 @@ const ToolHeader = React.forwardRef<React.ElementRef<typeof CollapsibleTrigger>,
     return (
       <CollapsibleTrigger
         ref={ref}
-        className={cn("flex w-full items-center justify-between gap-4 p-3 group", className)}
+        className={cn(
+          "flex w-full items-center justify-between gap-4 p-3 group cursor-pointer",
+          className
+        )}
         {...props}>
         <div className="flex items-center gap-2">
           <WrenchIcon className="size-4 text-muted-foreground" aria-hidden="true" />
