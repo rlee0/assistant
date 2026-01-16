@@ -9,6 +9,7 @@ import { getToolName, isToolUIPart } from "ai";
 
 import Image from "next/image";
 import { MessageResponse } from "@/components/ai/message";
+import { logDebug } from "@/lib/logging";
 import { memo } from "react";
 
 /**
@@ -23,12 +24,12 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
 
   // Debug logging - Enhanced to track reasoning parts
   if (typeof window !== "undefined") {
-    console.log("[MessagePartRenderer]", {
+    logDebug("[MessagePartRenderer]", "Render part", {
       index,
       type: partAsRecord.type,
       isStreaming,
       hasText: !!partAsRecord.text,
-      textLength: typeof partAsRecord.text === 'string' ? partAsRecord.text.length : 0,
+      textLength: typeof partAsRecord.text === "string" ? partAsRecord.text.length : 0,
       allKeys: Object.keys(partAsRecord),
       isReasoning: partAsRecord.type === MESSAGE_PART_TYPE.REASONING,
     });
@@ -41,11 +42,11 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
 
   // Reasoning/thinking content
   if (partAsRecord.type === MESSAGE_PART_TYPE.REASONING) {
-    console.log("[MessagePartRenderer] 🧠 Rendering reasoning part", { 
+    logDebug("[MessagePartRenderer]", "Rendering reasoning part", {
       isStreaming,
       hasText: !!partAsRecord.text,
-      textLength: typeof partAsRecord.text === 'string' ? partAsRecord.text.length : 0,
-      textPreview: typeof partAsRecord.text === 'string' ? partAsRecord.text.slice(0, 100) : null,
+      textLength: typeof partAsRecord.text === "string" ? partAsRecord.text.length : 0,
+      textPreview: typeof partAsRecord.text === "string" ? partAsRecord.text.slice(0, 100) : null,
       partKeys: Object.keys(partAsRecord),
     });
     return (

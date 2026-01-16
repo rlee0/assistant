@@ -81,16 +81,32 @@ const CACHE_DURATION_SECONDS = 3600; // 1 hour
  * Formats logs as JSON with optional request correlation.
  */
 function structuredLog(context: LogContext): void {
+  const LOG_LEVELS = ["debug", "info", "warn", "error"] as const;
+  type AnyLogLevel = (typeof LOG_LEVELS)[number];
+  function resolveLogLevel(): AnyLogLevel {
+    const envLevel = (process.env.LOG_LEVEL || process.env.NEXT_PUBLIC_LOG_LEVEL || "")
+      .toLowerCase()
+      .trim();
+    if (LOG_LEVELS.includes(envLevel as AnyLogLevel)) return envLevel as AnyLogLevel;
+    return process.env.NODE_ENV === "production" ? "warn" : "debug";
+  }
+  function shouldLog(level: LogContext["level"]): boolean {
+    const threshold = resolveLogLevel();
+    return LOG_LEVELS.indexOf(level) >= LOG_LEVELS.indexOf(threshold);
+  }
+
   const logEntry = {
     ...context,
   };
+
+  if (!shouldLog(context.level)) return;
 
   if (context.level === "error") {
     console.error(JSON.stringify(logEntry));
   } else if (context.level === "warn") {
     console.warn(JSON.stringify(logEntry));
   } else {
-    console.log(JSON.stringify(logEntry));
+    console.info(JSON.stringify(logEntry));
   }
 }
 

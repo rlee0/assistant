@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { CodeBlock } from "@/components/ai/code-block";
 import type { ToolUIPart } from "ai";
 import { cn } from "@/lib/utils";
+import { logError } from "@/lib/logging";
 
 // ============================================================================
 // Types
@@ -106,10 +107,8 @@ function safeJsonStringify(value: unknown): string {
     return JSON.stringify(value, null, 2);
   } catch (error) {
     // Log structured error for debugging
-    console.error("[Tool] JSON serialization failed:", {
-      error: error instanceof Error ? error.message : String(error),
+    logError("[Tool]", "JSON serialization failed", error, {
       valueType: typeof value,
-      timestamp: new Date().toISOString(),
     });
 
     // Handle circular references or non-serializable values

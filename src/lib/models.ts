@@ -1,3 +1,5 @@
+import { logError, logWarn } from "@/lib/logging";
+
 import { API_ROUTES } from "@/lib/api/routes";
 import { DEFAULT_FALLBACK_MODELS } from "@/lib/constants";
 
@@ -219,11 +221,15 @@ export async function fetchModels(): Promise<Model[]> {
     });
 
     if (!response.ok) {
-      console.error("[Models] API error:", {
-        status: response.status,
-        statusText: response.statusText,
-        timestamp: new Date().toISOString(),
-      });
+      logError(
+        "[Models]",
+        "API error",
+        new Error(`API returned ${response.status}: ${response.statusText}`),
+        {
+          status: response.status,
+          statusText: response.statusText,
+        }
+      );
 
       throw createModelFetchError(
         `API returned ${response.status}: ${response.statusText}`,
@@ -246,17 +252,16 @@ export async function fetchModels(): Promise<Model[]> {
     ) {
       models = data.models;
     } else {
-      console.error("[Models] Invalid response format:", {
+      logError("[Models]", "Invalid response format", "Invalid response", {
         receivedType: typeof data,
         isArray: Array.isArray(data),
-        timestamp: new Date().toISOString(),
       });
 
       throw createModelFetchError("Invalid response format from API", "INVALID_RESPONSE");
     }
 
     if (models.length === 0) {
-      console.warn("[Models] API returned empty model list, using fallback");
+      logWarn("[Models]", "API returned empty model list, using fallback");
       return [...DEFAULT_FALLBACK_MODELS];
     }
 
@@ -264,15 +269,14 @@ export async function fetchModels(): Promise<Model[]> {
   } catch (error) {
     // Handle timeout
     if (error instanceof Error && error.name === "TimeoutError") {
-      console.error("[Models] Request timeout after 10s");
+      logError("[Models]", "Request timeout after 10s", error);
       return [...DEFAULT_FALLBACK_MODELS];
     }
 
     // Handle network errors
     if (error instanceof TypeError) {
-      console.error("[Models] Network error:", {
+      logError("[Models]", "Network error", error, {
         message: error.message,
-        timestamp: new Date().toISOString(),
       });
       return [...DEFAULT_FALLBACK_MODELS];
     }
@@ -283,7 +287,7 @@ export async function fetchModels(): Promise<Model[]> {
     }
 
     // Unknown error
-    console.error("[Models] Unexpected error:", error);
+    logError("[Models]", "Unexpected error", error);
     return [...DEFAULT_FALLBACK_MODELS];
   }
 }

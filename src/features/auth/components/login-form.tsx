@@ -10,6 +10,7 @@ import Link from "next/link";
 import { LoadingButton } from "@/components/ui/loading-button";
 import { cn } from "@/lib/utils";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { logError } from "@/lib/logging";
 import { useManualProgress } from "@/hooks/use-navigation-progress";
 import { useRouter } from "next/navigation";
 
@@ -18,7 +19,7 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
     try {
       return createSupabaseBrowserClient();
     } catch (error) {
-      console.error(error);
+      logError("[LoginForm]", "Supabase client creation failed", error);
       return null;
     }
   }, []);

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from "react";
 import { API_ROUTES } from "@/lib/api/routes";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
+import { logError } from "@/lib/logging";
 import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useRouter } from "next/navigation";
 
@@ -34,7 +35,7 @@ export default function SettingsPage() {
       } catch (error) {
         const msg = error instanceof Error ? error.message : "Failed to load user information";
         setUserLoadError(msg);
-        console.error("Failed to load user:", error);
+        logError("[Settings]", "Failed to load user", error);
       }
     }
     loadUser();

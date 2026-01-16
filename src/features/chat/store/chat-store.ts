@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { logWarn, logError } from "@/lib/logging";
 import { type UIMessage } from "ai";
 import { type InitialChatData } from "@/lib/supabase/loaders";
 import { type ChatCheckpoint, type ChatMessage, type ChatSession } from "@/features/chat/types";
@@ -197,7 +198,7 @@ function validateInitialData(data: unknown): InitialChatData | null {
   for (const [id, session] of Object.entries(chatsRecord)) {
     if (!isChatSession(session)) {
       if (process.env.NODE_ENV === "development") {
-        console.warn(`[ChatStore] Invalid chat session at key "${id}", skipping`, session);
+        logWarn("[ChatStore]", `Invalid chat session at key "${id}", skipping`, { session });
       }
       continue;
     }
@@ -231,7 +232,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const validated = validateInitialData(data);
     if (!validated) {
       if (process.env.NODE_ENV === "development") {
-        console.error("[ChatStore] Hydration data validation failed", { data });
+        logError("[ChatStore]", "Hydration data validation failed", "Invalid hydration", { data });
       }
       set({ hydrated: true });
       return;
@@ -240,7 +241,7 @@ export const useChatStore = create<ChatState>((set) => ({
     const newUserId = validated.userId || (data as { userId?: string }).userId;
     if (!newUserId) {
       if (process.env.NODE_ENV === "development") {
-        console.warn("[ChatStore] No userId in hydration data, clearing store");
+        logWarn("[ChatStore]", "No userId in hydration data, clearing store");
       }
       set({ conversations: {}, order: [], selectedId: null, currentUserId: null, hydrated: true });
       return;
@@ -261,7 +262,7 @@ export const useChatStore = create<ChatState>((set) => ({
       set((state) => {
         if (state.currentUserId && state.currentUserId !== newUserId) {
           if (process.env.NODE_ENV === "development") {
-            console.warn("[ChatStore] User changed, replacing data", {
+            logWarn("[ChatStore]", "User changed, replacing data", {
               oldUser: state.currentUserId,
               newUser: newUserId,
             });
@@ -279,7 +280,7 @@ export const useChatStore = create<ChatState>((set) => ({
       });
     } catch (error) {
       if (process.env.NODE_ENV === "development") {
-        console.error("[ChatStore] Hydration processing failed", { error });
+        logError("[ChatStore]", "Hydration processing failed", error);
       }
       set({ hydrated: true });
     }

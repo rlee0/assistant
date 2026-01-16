@@ -8,6 +8,7 @@ import { APIError, ErrorCodes } from "@/lib/api/errors";
 
 import { NextResponse } from "next/server";
 import { gateway } from "@ai-sdk/gateway";
+import { logError } from "@/lib/logging";
 import { validateArray } from "@/lib/api/validation";
 
 /**
@@ -83,8 +84,7 @@ async function fetchGatewayModels(): Promise<Model[]> {
     return models.length > 0 ? models : getDefaultModels();
   } catch (error) {
     // Log error for debugging
-    console.error("Failed to fetch models from AI Gateway:", {
-      error: error instanceof Error ? error.message : String(error),
+    logError("[Models:list]", "Failed to fetch models from AI Gateway", error, {
       url: gatewayUrl,
     });
 
@@ -101,9 +101,7 @@ async function getDefaultModels(): Promise<Model[]> {
     const models = await gateway.getAvailableModels();
     return validateModels(models) ? models : [];
   } catch (error) {
-    console.error("Failed to get default models from gateway:", {
-      error: error instanceof Error ? error.message : String(error),
-    });
+    logError("[Models:list]", "Failed to get default models from gateway", error);
     return [];
   }
 }
@@ -122,8 +120,7 @@ export async function GET(): Promise<NextResponse> {
     return NextResponse.json(models, { status: 200 });
   } catch (error) {
     // Log error for debugging but return gracefully
-    console.error("Models endpoint error:", {
-      error: error instanceof Error ? error.message : String(error),
+    logError("[Models:list]", "Models endpoint error", error, {
       ...(process.env.NODE_ENV === "development" && {
         stack: error instanceof Error ? error.stack : undefined,
       }),

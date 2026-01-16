@@ -1,5 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { logError } from "@/lib/logging";
 
 /**
  * Public routes that don't require authentication
@@ -43,7 +44,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
 
     // Handle auth errors
     if (error) {
-      console.error("[Middleware] Auth verification failed:", error.message);
+      logError("[Middleware]", "Auth verification failed", error.message);
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
@@ -57,7 +58,7 @@ export async function proxy(request: NextRequest): Promise<NextResponse> {
   } catch (error) {
     // Log configuration errors but allow request (page will handle)
     const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("[Middleware] Auth check failed:", message);
+    logError("[Middleware]", "Auth check failed", message);
     return NextResponse.next();
   }
 }

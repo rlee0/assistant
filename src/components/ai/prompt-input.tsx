@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
+import { logError } from "@/lib/logging";
 import {
   Command,
   CommandEmpty,
@@ -711,7 +712,7 @@ export const PromptInput = ({
               })
               .catch((error) => {
                 // Log submission error but don't clear - user may want to retry
-                console.error("[PromptInput] Submission failed", { error });
+                logError("[PromptInput]", "Submission failed", error);
               });
           } else {
             // Sync function completed without throwing, clear attachments
@@ -722,12 +723,12 @@ export const PromptInput = ({
           }
         } catch (error) {
           // Log submission error but don't clear - user may want to retry
-          console.error("[PromptInput] Submission error", { error });
+          logError("[PromptInput]", "Submission error", error);
         }
       })
       .catch((error) => {
         // Log file conversion error but don't clear - user may want to retry
-        console.error("[PromptInput] File conversion failed", { error });
+        logError("[PromptInput]", "File conversion failed", error);
       });
   };
 
@@ -1082,7 +1083,7 @@ export const PromptInputSpeechButton = ({
       };
 
       speechRecognition.onerror = (event) => {
-        console.error("Speech recognition error:", event.error);
+        logError("[PromptInput]", "Speech recognition error", event.error);
         setIsListening(false);
       };
 

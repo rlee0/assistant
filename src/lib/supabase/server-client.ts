@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient } from "@supabase/ssr";
+import { logDebug } from "@/lib/logging";
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -63,8 +64,9 @@ export async function createSupabaseServerClient(options?: CreateClientOptions) 
             // The `setAll` method was called from a Server Component.
             // This is expected and can be ignored if middleware refreshes user sessions.
             if (process.env.NODE_ENV === "development") {
-              console.debug(
-                "[Supabase] Cookie write attempted in Server Component context (expected behavior)"
+              logDebug(
+                "[Supabase]",
+                "Cookie write attempted in Server Component context (expected behavior)"
               );
             }
           }

@@ -338,6 +338,14 @@ pnpm start        # Start production server
 pnpm lint         # Run ESLint
 ```
 
+### Logging
+
+- Use the centralized logger in [src/lib/logging.ts](src/lib/logging.ts): `logError()`, `logWarn()`, `logInfo()`, `logDebug()`.
+- Configure log verbosity with `LOG_LEVEL` (server) or `NEXT_PUBLIC_LOG_LEVEL` (client). Levels: `error`, `warn`, `info`, `debug`.
+- Defaults: `debug` in development, `warn` in production.
+- Avoid logging PII (emails, tokens). Prefer summarized metadata.
+- API routes may emit JSON-formatted logs with environment gating for observability.
+
 ### Adding New Components
 
 UI components are located in:
