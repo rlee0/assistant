@@ -767,7 +767,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   );
 
   const handleRestoreCheckpoint = useCallback(
-    (checkpointId: string): void => {
+    async (checkpointId: string): Promise<void> => {
       if (!selectedId) return;
 
       const conversation = conversations[selectedId];
@@ -795,8 +795,27 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         const restoredMessages = messages.slice(0, checkpoint.messageIndex);
         setMessages(restoredMessages);
 
+        // Filter checkpoints to keep only those before the restored checkpoint
+        const restoredCheckpoints = conversation.checkpoints.filter(
+          (cp) => cp.messageIndex < checkpoint.messageIndex
+        );
+
         setEditingMessageId(null);
         setEditText("");
+
+        // Persist the restoration to Supabase with both restored messages and checkpoints
+        abortControllerRef.current?.abort();
+        abortControllerRef.current = new AbortController();
+
+        await persistConversation(
+          {
+            conversationId: selectedId,
+            title: conversation.title,
+            messages: restoredMessages.map(uiMessageToChatMessage),
+            checkpoints: restoredCheckpoints,
+          },
+          abortControllerRef.current.signal
+        );
 
         toast.success("Conversation restored to checkpoint");
       } catch (error) {
@@ -804,7 +823,15 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         toast.error("Failed to restore checkpoint");
       }
     },
-    [selectedId, conversations, messages, storeRestoreCheckpoint, setMessages]
+    [
+      selectedId,
+      conversations,
+      messages,
+      storeRestoreCheckpoint,
+      setMessages,
+      persistConversation,
+      uiMessageToChatMessage,
+    ]
   );
 
   // ============================================================================
@@ -830,8 +857,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
       candidate instanceof Date
         ? candidate
         : typeof candidate === "string"
-        ? new Date(candidate as string)
-        : null;
+          ? new Date(candidate as string)
+          : null;
 
     if (parsed && !Number.isNaN(parsed.getTime())) {
       return parsed;
