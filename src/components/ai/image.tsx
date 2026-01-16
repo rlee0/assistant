@@ -1,5 +1,6 @@
-import { cn } from "@/lib/utils";
 import type { Experimental_GeneratedImage } from "ai";
+import NextImage from "next/image";
+import { cn } from "@/lib/utils";
 
 export type ImageProps = Experimental_GeneratedImage & {
   readonly className?: string;
@@ -16,10 +17,12 @@ export const Image = ({
   const dataUrl = `data:${mediaType};base64,${base64}`;
 
   return (
-    <img
+    <NextImage
       src={dataUrl}
       alt={alt}
       className={cn("h-auto max-w-full overflow-hidden rounded-md", className)}
+      width={500}
+      height={500}
       {...props}
     />
   );
