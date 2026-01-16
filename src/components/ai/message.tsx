@@ -11,6 +11,20 @@ import { Button } from "@/components/ui/button";
 import NextImage from "next/image";
 import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
+import {
+  LAYOUT,
+  SPACING,
+  SIZE,
+  TEXT,
+  BORDER,
+  BG,
+  POSITION,
+  OVERFLOW,
+  TRANSITION,
+  INTERACTIVE,
+  DISPLAY,
+  ALIGN,
+} from "@/styles/constants";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -19,11 +33,11 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
-      "group flex w-full max-w-[95%] flex-col gap-2",
+      `group ${LAYOUT.flexCol} ${SIZE.wFull} ${SIZE.maxW["95%"]} ${SPACING.gap2}`,
       from === "user"
         ? "is-user ml-auto justify-end"
         : from === "system"
-        ? "is-system w-full justify-center"
+        ? `is-system ${SIZE.wFull} justify-center`
         : "is-assistant",
       className
     )}
@@ -36,10 +50,10 @@ export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 export const MessageContent = ({ children, className, ...props }: MessageContentProps) => (
   <div
     className={cn(
-      "is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-sm",
-      "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
-      "group-[.is-assistant]:text-foreground",
-      "group-[.is-system]:w-full group-[.is-system]:px-3 group-[.is-system]:py-2 group-[.is-system]:rounded-md group-[.is-system]:bg-transparent group-[.is-system]:text-muted-foreground group-[.is-system]:text-xs group-[.is-system]:italic",
+      `is-user:dark ${LAYOUT.flexCol} w-fit max-w-full ${SIZE.minW0} ${SPACING.gap2} ${OVERFLOW.hidden} ${TEXT.sm}`,
+      `group-[.is-user]:ml-auto group-[.is-user]:${BORDER.rounded.lg} group-[.is-user]:${BG.secondary} group-[.is-user]:${SPACING.px4} group-[.is-user]:${SPACING.py3} group-[.is-user]:${TEXT.foreground}`,
+      `group-[.is-assistant]:${TEXT.foreground}`,
+      `group-[.is-system]:${SIZE.wFull} group-[.is-system]:${SPACING.px3} group-[.is-system]:${SPACING.py2} group-[.is-system]:${BORDER.rounded.md} group-[.is-system]:${BG.transparent} group-[.is-system]:${TEXT.muted} group-[.is-system]:${TEXT.xs} group-[.is-system]:${TEXT.italic}`,
       className
     )}
     {...props}>
@@ -52,7 +66,7 @@ export type MessageActionsProps = ComponentProps<"div">;
 export const MessageActions = ({ className, children, ...props }: MessageActionsProps) => (
   <div
     className={cn(
-      "flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100",
+      `${LAYOUT.flexRow} ${SPACING.gap1} opacity-0 ${TRANSITION.opacity} group-hover:opacity-100`,
       className
     )}
     {...props}>
@@ -79,10 +93,10 @@ export const MessageAction = ({
       size={size}
       type="button"
       variant={variant}
-      className={cn("cursor-pointer", className)}
+      className={cn(INTERACTIVE.cursor.pointer, className)}
       {...props}>
       {children}
-      <span className="sr-only">{label || tooltip}</span>
+      <span className={DISPLAY.srOnly}>{label || tooltip}</span>
     </Button>
   );
 
@@ -161,7 +175,10 @@ export const MessageBranch = ({
 
   return (
     <MessageBranchContext.Provider value={contextValue}>
-      <div className={cn("grid w-full gap-2 [&>div]:pb-0", className)} {...props} />
+      <div
+        className={cn(`${LAYOUT.grid} ${SIZE.wFull} ${SPACING.gap2} [&>div]:pb-0`, className)}
+        {...props}
+      />
     </MessageBranchContext.Provider>
   );
 };
@@ -185,8 +202,8 @@ export const MessageBranchContent = ({ children, ...props }: MessageBranchConten
   return childrenArray.map((branch, index) => (
     <div
       className={cn(
-        "grid gap-2 overflow-hidden [&>div]:pb-0",
-        index === currentBranch ? "block" : "hidden"
+        `${LAYOUT.grid} ${SPACING.gap2} ${OVERFLOW.hidden} [&>div]:pb-0`,
+        index === currentBranch ? DISPLAY.block : DISPLAY.hidden
       )}
       key={branch.key}
       {...props}>
@@ -261,7 +278,7 @@ export const MessageBranchPage = ({ className, ...props }: MessageBranchPageProp
 
   return (
     <ButtonGroupText
-      className={cn("border-none bg-transparent text-muted-foreground shadow-none", className)}
+      className={cn(`${BORDER.none} ${BG.transparent} ${TEXT.muted} shadow-none`, className)}
       {...props}>
       {currentBranch + 1} of {totalBranches}
     </ButtonGroupText>
@@ -273,7 +290,7 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
-      className={cn("size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0", className)}
+      className={cn(`${SIZE.full} [&>*:first-child]:mt-0 [&>*:last-child]:mb-0`, className)}
       {...props}
     />
   ),
@@ -295,12 +312,17 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
   const attachmentLabel = filename || (isImage ? "Image" : "Attachment");
 
   return (
-    <div className={cn("group relative size-24 overflow-hidden rounded-lg", className)} {...props}>
+    <div
+      className={cn(
+        `group ${POSITION.relative} ${SIZE.size24} ${OVERFLOW.hidden} ${BORDER.rounded.lg}`,
+        className
+      )}
+      {...props}>
       {isImage ? (
         <>
           <NextImage
             alt={filename || "attachment"}
-            className="size-full object-cover"
+            className={`${SIZE.full} object-cover`}
             height={100}
             src={data.url}
             width={100}
@@ -308,7 +330,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
           {onRemove && (
             <Button
               aria-label="Remove attachment"
-              className="absolute top-2 right-2 size-6 rounded-full bg-background/80 p-0 opacity-0 backdrop-blur-sm transition-opacity hover:bg-background group-hover:opacity-100 [&>svg]:size-3"
+              className={`${POSITION.absolute} top-2 right-2 ${SIZE.size6} ${BORDER.rounded.full} bg-background/80 p-0 opacity-0 backdrop-blur-sm ${TRANSITION.opacity} ${INTERACTIVE.hover.accent} group-hover:opacity-100 [&>svg]:size-3`}
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
@@ -316,7 +338,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
               type="button"
               variant="ghost">
               <XIcon />
-              <span className="sr-only">Remove</span>
+              <span className={DISPLAY.srOnly}>Remove</span>
             </Button>
           )}
         </>
@@ -324,8 +346,9 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
         <>
           <DelayedTooltip>
             <TooltipTrigger asChild>
-              <div className="flex size-full shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                <PaperclipIcon className="size-4" />
+              <div
+                className={`${LAYOUT.containerCentered} ${SIZE.full} shrink-0 ${BORDER.rounded.lg} ${BG.muted} ${TEXT.muted}`}>
+                <PaperclipIcon className={SIZE.size4} />
               </div>
             </TooltipTrigger>
             <TooltipContent>
@@ -335,7 +358,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
           {onRemove && (
             <Button
               aria-label="Remove attachment"
-              className="size-6 shrink-0 rounded-full p-0 opacity-0 transition-opacity hover:bg-accent group-hover:opacity-100 [&>svg]:size-3"
+              className={`${SIZE.size6} shrink-0 ${BORDER.rounded.full} p-0 opacity-0 ${TRANSITION.opacity} ${INTERACTIVE.hover.accent} group-hover:opacity-100 [&>svg]:size-3`}
               onClick={(e) => {
                 e.stopPropagation();
                 onRemove();
@@ -343,7 +366,7 @@ export function MessageAttachment({ data, className, onRemove, ...props }: Messa
               type="button"
               variant="ghost">
               <XIcon />
-              <span className="sr-only">Remove</span>
+              <span className={DISPLAY.srOnly}>Remove</span>
             </Button>
           )}
         </>
@@ -360,7 +383,9 @@ export function MessageAttachments({ children, className, ...props }: MessageAtt
   }
 
   return (
-    <div className={cn("ml-auto flex w-fit flex-wrap items-start gap-2", className)} {...props}>
+    <div
+      className={cn(`ml-auto flex w-fit flex-wrap ${ALIGN.itemsStart} ${SPACING.gap2}`, className)}
+      {...props}>
       {children}
     </div>
   );
@@ -369,7 +394,12 @@ export function MessageAttachments({ children, className, ...props }: MessageAtt
 export type MessageToolbarProps = ComponentProps<"div">;
 
 export const MessageToolbar = ({ className, children, ...props }: MessageToolbarProps) => (
-  <div className={cn("mt-4 flex w-full items-center justify-between gap-4", className)} {...props}>
+  <div
+    className={cn(
+      `${SPACING.mt4} flex ${SIZE.wFull} ${ALIGN.itemsCenter} ${ALIGN.justifyBetween} ${SPACING.gap4}`,
+      className
+    )}
+    {...props}>
     {children}
   </div>
 );

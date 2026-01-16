@@ -148,6 +148,27 @@
   }
 }
 
+@layer components {
+  /* Common flex patterns */
+  .flex-center {
+    @apply flex items-center justify-center;
+  }
+  .flex-between {
+    @apply flex items-center justify-between;
+  }
+  .flex-col-gap {
+    @apply flex flex-col gap-2;
+  }
+
+  /* Common spacing patterns */
+  .p-list {
+    @apply p-2;
+  }
+  .gap-list {
+    @apply gap-1.5;
+  }
+}
+
 /**
  * Fix use-stick-to-bottom viewport height calculation in flexbox.
  * The library's inline height:100% computes to content height in flex contexts.

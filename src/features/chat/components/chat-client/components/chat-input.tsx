@@ -52,6 +52,7 @@ import type { ChatInputProps } from "../types";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { cn } from "@/lib/utils";
 import { memo } from "react";
+import { SIZE, TEXT, LAYOUT, SPACING, ALIGN, OVERFLOW } from "@/styles/constants";
 
 /**
  * Internal component that uses PromptInput attachment hook.
@@ -101,8 +102,8 @@ export const ChatInput = memo<ChatInputProps>(
 
     return (
       <div className={CSS_CLASSES.inputContainer}>
-        <div className={cn("w-full mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
-          <PromptInput onSubmit={onSubmit} className="mt-0" globalDrop multiple>
+        <div className={cn(SIZE.wFull, "mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
+          <PromptInput onSubmit={onSubmit} className={SPACING.mt0} globalDrop multiple>
             <AttachmentHeaderInner />
 
             <PromptInputBody>
@@ -204,18 +205,21 @@ export const ChatInput = memo<ChatInputProps>(
                           <ModelSelectorLogoGroup>
                             <ModelSelectorLogo provider={getModelProvider(model)} />
                           </ModelSelectorLogoGroup>
-                          <div className="flex flex-1 items-baseline gap-2 overflow-hidden">
+                          <div
+                            className={`${LAYOUT.flexRow} flex-1 items-baseline ${SPACING.gap2} ${OVERFLOW.hidden}`}>
                             <ModelSelectorName className="flex-none">
                               {model.name}
                             </ModelSelectorName>
                             <span className={CSS_CLASSES.modelId}>({model.id})</span>
                             {hasReasoning && (
-                              <Badge variant="secondary" className="text-xs font-normal">
+                              <Badge variant="secondary" className={`${TEXT.xs} ${TEXT.normal}`}>
                                 reasoning
                               </Badge>
                             )}
                           </div>
-                          {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}
+                          {isSelected && (
+                            <Check className={`ml-auto ${SIZE.size4} shrink-0 ${TEXT.primary}`} />
+                          )}
                         </ModelSelectorItem>
                       );
                     })}
@@ -224,7 +228,7 @@ export const ChatInput = memo<ChatInputProps>(
               </ModelSelectorList>
             </ModelSelectorContent>
           </ModelSelector>
-          <div className="text-center text-xs text-muted-foreground p-2">
+          <div className={`${TEXT.center} ${TEXT.xs} ${TEXT.muted} ${SPACING.p2}`}>
             AI can make mistakes, so please verify its responses.
           </div>
         </div>

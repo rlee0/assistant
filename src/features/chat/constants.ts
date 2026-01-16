@@ -5,6 +5,8 @@
  * Extracted from chat-client.tsx for better maintainability and reusability.
  */
 
+import { LAYOUT, SPACING, SIZE, TEXT, BORDER, BG, POSITION, ALIGN } from "@/styles/constants";
+
 // ============================================================================
 // Checkpoint Configuration
 // ============================================================================
@@ -17,7 +19,7 @@ export const MAX_CHECKPOINTS = 10 as const;
 // ============================================================================
 
 /** Maximum width for chat container */
-export const CHAT_CONTAINER_MAX_WIDTH = "max-w-3xl" as const;
+export const CHAT_CONTAINER_MAX_WIDTH = SIZE.maxW["3xl"];
 
 /** Default provider logo when provider is unknown */
 export const DEFAULT_PROVIDER = "openai" as const;
@@ -30,18 +32,18 @@ export const SCROLL_ANCHOR_THRESHOLD = 100 as const;
 
 /** CSS class names for chat UI components */
 export const CSS_CLASSES = {
-  image: "max-w-sm rounded-md h-auto",
-  messagesContainer: "flex flex-col flex-1 min-h-0",
+  image: `${SIZE.maxW.sm} ${BORDER.rounded.md} h-auto`,
+  messagesContainer: `${LAYOUT.flexCol} flex-1 ${SIZE.minH0}`,
   messagesInner: "mx-auto py-8 space-y-6",
-  inputContainer: "sticky bottom-0 z-20 bg-background px-4 pb-4",
-  modelButton: "flex items-center gap-2 min-w-max px-2",
-  modelName: "text-sm font-medium truncate",
-  modelId: "text-muted-foreground truncate text-xs",
-  chatContainer: "flex h-svh max-h-svh flex-col",
-  header: "sticky top-0 z-20 border-b bg-background px-4 py-3 flex items-center gap-2",
-  headerTitle: "text-lg font-semibold",
-  sidebar: "flex h-full flex-col p-4",
-  newChatButton: "mb-4",
+  inputContainer: `${POSITION.sticky} ${POSITION.bottom0} ${POSITION.zIndex.z20} ${BG.background} ${SPACING.px4} pb-4`,
+  modelButton: `${LAYOUT.flexRow} ${SPACING.gap2} min-w-max ${SPACING.px2}`,
+  modelName: `${TEXT.sm} ${TEXT.medium} ${TEXT.truncate}`,
+  modelId: `${TEXT.muted} ${TEXT.truncate} ${TEXT.xs}`,
+  chatContainer: `${LAYOUT.container} h-svh max-h-svh`,
+  header: `${POSITION.sticky} ${POSITION.top0} ${POSITION.zIndex.z20} ${BORDER.b} ${BG.background} ${SPACING.px4} ${SPACING.py3} ${LAYOUT.flexRow} ${SPACING.gap2}`,
+  headerTitle: `${TEXT.lg} ${TEXT.semibold}`,
+  sidebar: `${LAYOUT.containerFull} ${SPACING.p4}`,
+  newChatButton: SPACING.mb4,
 } as const;
 
 // ============================================================================

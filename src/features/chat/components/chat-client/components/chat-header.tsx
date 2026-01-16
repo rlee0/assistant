@@ -11,14 +11,16 @@ import type { ChatHeaderProps } from "../types";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { memo } from "react";
+import { POSITION, LAYOUT, SPACING, BORDER, BG, TEXT, TRANSITION, ALIGN } from "@/styles/constants";
 
 /**
  * Chat header with breadcrumb navigation
  */
 export const ChatHeader = memo<ChatHeaderProps>(({ conversationTitle, lastMessageLabel }) => {
   return (
-    <header className="sticky top-0 z-10 flex shrink-0 items-center p-2 gap-2 border-b bg-background transition-[width,height] ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12">
-      <div className="flex items-center gap-2">
+    <header
+      className={`${POSITION.sticky} ${POSITION.top0} ${POSITION.zIndex.z10} ${LAYOUT.flexRow} shrink-0 ${SPACING.p2} ${SPACING.gap2} ${BORDER.b} ${BG.background} ${TRANSITION.all} ease-linear group-has-data-[collapsible=icon]/sidebar-wrapper:h-12`}>
+      <div className={`${LAYOUT.flexRow} ${SPACING.gap2}`}>
         <SidebarTrigger />
         <Separator orientation="vertical" />
         <Breadcrumb>
@@ -29,7 +31,7 @@ export const ChatHeader = memo<ChatHeaderProps>(({ conversationTitle, lastMessag
           </BreadcrumbList>
         </Breadcrumb>
       </div>
-      <div className="text-xs ml-auto text-muted-foreground whitespace-nowrap mr-4">
+      <div className={`${TEXT.xs} ml-auto ${TEXT.muted} whitespace-nowrap mr-4`}>
         {lastMessageLabel}
       </div>
     </header>
