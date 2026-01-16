@@ -6,6 +6,7 @@ import { ErrorBoundary } from "@/components/feedback/error-boundary";
 import type { Metadata } from "next";
 import { ProgressBarProvider } from "@/components/providers/progress-bar-provider";
 import { Toaster } from "sonner";
+import { cn } from "@/lib/utils";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +30,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={cn(geistSans.variable, geistMono.variable, "antialiased")}>
         <ProgressBarProvider>
           <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
             {children}

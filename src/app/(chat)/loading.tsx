@@ -1,6 +1,7 @@
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export default function ChatLoading() {
   return (
@@ -30,7 +31,7 @@ export default function ChatLoading() {
             {Array.from({ length: 5 }).map((_, i) => (
               <div
                 key={i}
-                className={`flex gap-3 ${i % 2 === 0 ? "justify-start" : "justify-end"}`}>
+                className={cn("flex gap-3", i % 2 === 0 ? "justify-start" : "justify-end")}>
                 {i % 2 === 0 && <Skeleton className="h-8 w-8 rounded-full shrink-0" />}
                 <div className="flex flex-col gap-2 max-w-xs">
                   <Skeleton className="h-12 w-64 rounded-lg" />
