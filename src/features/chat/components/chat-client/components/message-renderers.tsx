@@ -50,7 +50,7 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
       partKeys: Object.keys(partAsRecord),
     });
     return (
-      <Reasoning key={index} defaultOpen={true} isStreaming={isStreaming}>
+      <Reasoning key={index} defaultOpen={isStreaming} isStreaming={isStreaming}>
         <ReasoningTrigger />
         <ReasoningContent>{String(partAsRecord.text || "")}</ReasoningContent>
       </Reasoning>

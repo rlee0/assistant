@@ -51,15 +51,18 @@ export const Reasoning = memo(
     className,
     isStreaming = false,
     open,
-    defaultOpen = true,
+    defaultOpen,
     onOpenChange,
     duration: durationProp,
     children,
     ...props
   }: ReasoningProps) => {
+    const isUncontrolled = open === undefined;
+    const initialOpen = open ?? defaultOpen ?? isStreaming ?? false;
+
     const [isOpen, setIsOpen] = useControllableState({
       prop: open,
-      defaultProp: defaultOpen,
+      defaultProp: initialOpen,
       onChange: onOpenChange,
     });
     const [duration, setDuration] = useControllableState({
@@ -68,6 +71,7 @@ export const Reasoning = memo(
     });
 
     const [hasAutoClosed, setHasAutoClosed] = useState(false);
+    const [wasAutoOpened, setWasAutoOpened] = useState(() => initialOpen && isUncontrolled);
     const [startTime, setStartTime] = useState<number | null>(null);
 
     // Track duration when streaming ends
@@ -93,9 +97,18 @@ export const Reasoning = memo(
       }
     }, [isStreaming, handleStreamingStart]);
 
+    // Auto-open when streaming begins
+    useEffect(() => {
+      if (isStreaming && isUncontrolled) {
+        setWasAutoOpened(true);
+        setHasAutoClosed(false);
+        setIsOpen(true);
+      }
+    }, [isStreaming, isUncontrolled, setIsOpen]);
+
     // Auto-open when streaming starts, auto-close when streaming ends (once only)
     useEffect(() => {
-      if (defaultOpen && !isStreaming && isOpen && !hasAutoClosed) {
+      if (!isStreaming && isOpen && isUncontrolled && wasAutoOpened && !hasAutoClosed) {
         // Add a small delay before closing to allow user to see the content
         const timer = setTimeout(() => {
           setIsOpen(false);
@@ -104,7 +117,7 @@ export const Reasoning = memo(
 
         return () => clearTimeout(timer);
       }
-    }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosed]);
+    }, [isStreaming, isOpen, isUncontrolled, wasAutoOpened, setIsOpen, hasAutoClosed]);
 
     const handleOpenChange = (newOpen: boolean) => {
       setIsOpen(newOpen);
