@@ -1,5 +1,6 @@
 "use client";
 
+import { BG, BORDER, LAYOUT, POSITION, SPACING, TEXT, TRANSITION } from "@/styles/constants";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -11,7 +12,6 @@ import type { ChatHeaderProps } from "../types";
 import { Separator } from "@/components/ui/separator";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { memo } from "react";
-import { POSITION, LAYOUT, SPACING, BORDER, BG, TEXT, TRANSITION, ALIGN } from "@/styles/constants";
 
 /**
  * Chat header with breadcrumb navigation
