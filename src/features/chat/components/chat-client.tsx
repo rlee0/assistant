@@ -108,7 +108,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   // ============================================================================
   // useChat Hook
   // ============================================================================
-  const { messages, sendMessage, status, error, regenerate, setMessages } = useChat({
+  const { messages, sendMessage, status, error, regenerate, setMessages, stop } = useChat({
     transport: new DefaultChatTransport({
       api: "/api/chat",
       credentials: "include",
@@ -896,6 +896,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
               text={text}
               onTextChange={setText}
               onSubmit={handlePromptSubmit}
+              onStop={stop}
               status={status}
               selectedModelInfo={selectedModelInfo}
               currentModel={currentModel}

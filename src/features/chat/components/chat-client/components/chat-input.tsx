@@ -1,6 +1,7 @@
 "use client";
 
 import { CHAT_CONTAINER_MAX_WIDTH, CSS_CLASSES } from "@/features/chat/constants";
+import { Check, Square } from "lucide-react";
 import {
   Context,
   ContextCacheUsage,
@@ -48,7 +49,6 @@ import { useGroupedModels, useTextareaKeyboardShortcuts } from "../use-chat-hook
 
 import { Badge } from "@/components/ui/badge";
 import type { ChatInputProps } from "../types";
-import { Check } from "lucide-react";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { cn } from "@/lib/utils";
 import { memo } from "react";
@@ -83,6 +83,7 @@ export const ChatInput = memo<ChatInputProps>(
     text,
     onTextChange,
     onSubmit,
+    onStop,
     status,
     selectedModelInfo,
     currentModel,
@@ -165,7 +166,17 @@ export const ChatInput = memo<ChatInputProps>(
                 </PromptInputButton>
               </PromptInputTools>
 
-              <PromptInputSubmit disabled={!text && status !== "streaming"} status={status} />
+              {status === "streaming" || status === "submitted" ? (
+                <PromptInputButton
+                  onClick={onStop}
+                  aria-label="Stop message generation"
+                  variant="destructive"
+                  type="button">
+                  <Square className="size-4 fill-current" />
+                </PromptInputButton>
+              ) : (
+                <PromptInputSubmit disabled={!text} status={status} />
+              )}
             </PromptInputFooter>
           </PromptInput>
 

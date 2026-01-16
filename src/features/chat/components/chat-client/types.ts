@@ -79,6 +79,7 @@ export interface ChatInputProps {
   readonly text: string;
   readonly onTextChange: (text: string) => void;
   readonly onSubmit: (message: Record<string, unknown>) => void | Promise<void>;
+  readonly onStop: () => void;
   readonly status: ReturnType<typeof useChat>["status"];
   readonly selectedModelInfo: SelectedModelInfo;
   readonly currentModel: string;
