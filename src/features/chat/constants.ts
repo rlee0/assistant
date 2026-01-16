@@ -5,7 +5,7 @@
  * Extracted from chat-client.tsx for better maintainability and reusability.
  */
 
-import { LAYOUT, SPACING, SIZE, TEXT, BORDER, BG, POSITION, ALIGN } from "@/styles/constants";
+import { BG, BORDER, LAYOUT, POSITION, SIZE, SPACING, TEXT } from "@/styles/constants";
 
 // ============================================================================
 // Checkpoint Configuration

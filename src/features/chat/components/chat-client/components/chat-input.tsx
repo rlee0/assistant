@@ -14,6 +14,7 @@ import {
   ContextReasoningUsage,
   ContextTrigger,
 } from "@/components/ai/context";
+import { LAYOUT, OVERFLOW, SIZE, SPACING, TEXT } from "@/styles/constants";
 import {
   ModelSelector,
   ModelSelectorContent,
@@ -52,7 +53,6 @@ import type { ChatInputProps } from "../types";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { cn } from "@/lib/utils";
 import { memo } from "react";
-import { SIZE, TEXT, LAYOUT, SPACING, ALIGN, OVERFLOW } from "@/styles/constants";
 
 /**
  * Internal component that uses PromptInput attachment hook.

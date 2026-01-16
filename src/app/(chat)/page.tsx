@@ -2,12 +2,14 @@ import { ChatClient } from "@/features/chat/components/chat-client";
 import Link from "next/link";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { loadInitialChats } from "@/lib/supabase/loaders";
-import { redirect } from "next/navigation";
 import { logError } from "@/lib/logging";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
 export default async function Page() {
+  let initialChats;
+
   try {
     const supabase = await createSupabaseServerClient();
     const {
@@ -24,8 +26,7 @@ export default async function Page() {
       redirect("/login");
     }
 
-    const initialChats = await loadInitialChats(user.id);
-    return <ChatClient initialData={initialChats} />;
+    initialChats = await loadInitialChats(user.id);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
     logError("[Page]", "Initialization failed", new Error(message));
@@ -42,4 +43,6 @@ export default async function Page() {
       </div>
     );
   }
+
+  return <ChatClient initialData={initialChats} />;
 }

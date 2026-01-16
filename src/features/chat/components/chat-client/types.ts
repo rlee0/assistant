@@ -69,7 +69,7 @@ export interface MessagePartRendererProps {
  * Props for SourcesRenderer component
  */
 export interface SourcesRendererProps {
-  readonly parts: UseChatMessage["parts"];
+  readonly parts: unknown[];
 }
 
 /**

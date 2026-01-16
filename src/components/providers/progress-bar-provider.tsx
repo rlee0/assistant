@@ -50,7 +50,10 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
       isFirstRender.current = false;
       return;
     }
-    complete();
+    const timer = setTimeout(() => {
+      complete();
+    }, 0);
+    return () => clearTimeout(timer);
   }, [pathname, searchParams, complete]);
 
   // Cleanup on unmount

@@ -253,7 +253,8 @@ export async function POST(req: Request): Promise<Response> {
       supportsReasoning = currentModel
         ? isReasoningCapable(currentModel)
         : isReasoningCapable(selectedModel);
-    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (_) {
       // Fallback to string-based check if model fetch fails
       supportsReasoning = isReasoningCapable(selectedModel);
     }
@@ -261,7 +262,8 @@ export async function POST(req: Request): Promise<Response> {
     const modelProvider = extractProvider(selectedModel);
 
     // Configure provider-specific reasoning options
-    const providerOptions: Record<string, Record<string, string | number | unknown>> = {};
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const providerOptions: any = {};
     if (supportsReasoning) {
       if (modelProvider === "openai") {
         providerOptions.openai = {
