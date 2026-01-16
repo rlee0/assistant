@@ -770,6 +770,7 @@ export const PromptInputTextarea = ({
   onChange,
   className,
   placeholder = "What would you like to know?",
+  disabled,
   ...props
 }: PromptInputTextareaProps) => {
   const controller = useOptionalPromptInputController();
@@ -845,6 +846,7 @@ export const PromptInputTextarea = ({
   return (
     <InputGroupTextarea
       className={cn("field-sizing-content max-h-48 min-h-16", className)}
+      disabled={disabled}
       name="message"
       onCompositionEnd={() => setIsComposing(false)}
       onCompositionStart={() => setIsComposing(true)}
@@ -954,6 +956,7 @@ export const PromptInputSubmit = ({
   size = "icon-sm",
   status,
   children,
+  disabled,
   ...props
 }: PromptInputSubmitProps) => {
   let Icon = <CornerDownLeftIcon className="size-4" />;
@@ -964,10 +967,14 @@ export const PromptInputSubmit = ({
     Icon = <XIcon className="size-4" />;
   }
 
+  const isLoading = status === "submitted" || status === "streaming";
+  const isDisabled = disabled || isLoading;
+
   return (
     <InputGroupButton
       aria-label="Submit"
       className={cn(className)}
+      disabled={isDisabled}
       size={size}
       type="submit"
       variant={variant}
@@ -1036,6 +1043,7 @@ export const PromptInputSpeechButton = ({
   className,
   textareaRef,
   onTranscriptionChange,
+  disabled,
   ...props
 }: PromptInputSpeechButtonProps) => {
   const [isListening, setIsListening] = useState(false);
@@ -1113,6 +1121,8 @@ export const PromptInputSpeechButton = ({
     typeof window !== "undefined" &&
     ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
 
+  const isDisabled = disabled || !hasSpeechRecognition;
+
   return (
     <PromptInputButton
       className={cn(
@@ -1120,7 +1130,7 @@ export const PromptInputSpeechButton = ({
         isListening && "animate-pulse bg-accent text-accent-foreground",
         className
       )}
-      disabled={!hasSpeechRecognition}
+      disabled={isDisabled}
       onClick={toggleListening}
       {...props}>
       <MicIcon className="size-4" />

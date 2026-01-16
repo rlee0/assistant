@@ -1,10 +1,11 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type LanguageModelUsage } from "ai";
+import { DefaultChatTransport, type LanguageModelUsage, type UIMessage } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { nanoid } from "nanoid";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/features/chat/components/app-sidebar";
 import { useSettingsStore } from "@/features/settings/store/settings-store";
@@ -35,6 +36,9 @@ import {
   validateRegenerateMessage,
 } from "./chat-client/handlers/message-handlers";
 import type { ChatClientProps } from "./chat-client/types";
+
+// System message constants
+const SYSTEM_MESSAGE_RESPONSE_STOPPED = "Response stopped by user." as const;
 
 /**
  * Main chat interface component using AI SDK UI.
@@ -134,6 +138,21 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           isAbort: result.isAbort,
           isDisconnect: result.isDisconnect,
         });
+      }
+
+      // Add system message when response is aborted
+      if (result.isAbort) {
+        const systemMessage: UIMessage = {
+          id: nanoid(),
+          role: "system",
+          parts: [
+            {
+              type: "text",
+              text: SYSTEM_MESSAGE_RESPONSE_STOPPED,
+            },
+          ],
+        };
+        setMessages((prevMessages) => [...prevMessages, systemMessage]);
       }
 
       // Track usage from the latest message

@@ -20,7 +20,11 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
       "group flex w-full max-w-[95%] flex-col gap-2",
-      from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
+      from === "user"
+        ? "is-user ml-auto justify-end"
+        : from === "system"
+        ? "is-system w-full justify-center"
+        : "is-assistant",
       className
     )}
     {...props}
@@ -35,6 +39,7 @@ export const MessageContent = ({ children, className, ...props }: MessageContent
       "is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-hidden text-sm",
       "group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:bg-secondary group-[.is-user]:px-4 group-[.is-user]:py-3 group-[.is-user]:text-foreground",
       "group-[.is-assistant]:text-foreground",
+      "group-[.is-system]:w-full group-[.is-system]:px-3 group-[.is-system]:py-2 group-[.is-system]:rounded-md group-[.is-system]:bg-transparent group-[.is-system]:text-muted-foreground group-[.is-system]:text-xs group-[.is-system]:italic",
       className
     )}
     {...props}>
