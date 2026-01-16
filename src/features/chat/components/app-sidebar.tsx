@@ -140,20 +140,14 @@ export const AppSidebar = memo<AppSidebarProps>(function AppSidebar({
   return (
     <Sidebar collapsible="offcanvas" {...props}>
       <SidebarHeader>
-        <div className="flex gap-2">
-          <Button
-            variant="ghost"
-            onClick={handleNewChat}
-            className="w-full justify-start"
-            disabled={creatingChat}>
-            {creatingChat ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Edit className="size-4" />
-            )}
-            <span>New chat</span>
-          </Button>
-        </div>
+        <Button
+          variant="ghost"
+          onClick={handleNewChat}
+          className="w-full justify-start"
+          disabled={creatingChat}>
+          {creatingChat ? <Loader2 className="size-4 animate-spin" /> : <Edit className="size-4" />}
+          <span>New chat</span>
+        </Button>
       </SidebarHeader>
       <SidebarSeparator />
       <SidebarContent>

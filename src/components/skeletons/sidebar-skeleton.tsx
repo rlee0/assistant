@@ -28,7 +28,7 @@ export const SidebarConversationsSkeleton = memo<SidebarConversationsSkeletonPro
             {Array.from({ length: count }, (_, i) => (
               <SidebarMenuItem key={`conversation-skeleton-${i}`}>
                 <SidebarMenuButton disabled>
-                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-8 w-full" />
                 </SidebarMenuButton>
               </SidebarMenuItem>
             ))}
