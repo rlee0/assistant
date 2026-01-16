@@ -162,10 +162,10 @@ export const ChatMessages = memo<ChatMessagesProps>(
                     const hasTextToCopy = textParts.trim().length > 0;
 
                     return (
-                      <div key={messageIndex} className="flex flex-col gap-2">
+                      <div key={messageIndex} className="group flex flex-col gap-2">
                         {/* Checkpoint line appears on hover */}
                         {checkpointAtIndex && (
-                          <Checkpoint>
+                          <Checkpoint className="pointer-events-none opacity-0 transition-opacity duration-150 group-hover:pointer-events-auto group-hover:opacity-100">
                             <CheckpointIcon />
                             <CheckpointTrigger
                               messageIndex={messageIndex}
