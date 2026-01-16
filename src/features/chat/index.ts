@@ -1,9 +1,31 @@
-// Main export
+/**
+ * Chat Feature Module Exports
+ *
+ * This is the primary export point for the chat feature. Re-exports are organized by category:
+ * - Main component (ChatClient)
+ * - Types (all TypeScript interfaces and types)
+ * - UI Components (Chat UI building blocks)
+ * - Hooks (React hooks for chat logic)
+ * - Utilities (helper functions and handlers)
+ * - Error handling (custom error classes)
+ * - Tools (AI SDK tool definitions)
+ *
+ * All exports are marked with `readonly` where applicable to prevent accidental mutations.
+ */
+
+// ============================================================================
+// Main Component
+// ============================================================================
 export { ChatClient } from "./components/chat-client";
 
+// ============================================================================
 // Types
+// ============================================================================
 export type {
   ChatClientProps,
+  ChatMessage,
+  ChatCheckpoint,
+  ChatSession,
   SelectedModelInfo,
   UseChatMessage,
   ChatMessagesProps,
@@ -12,15 +34,21 @@ export type {
   MessagePartRendererProps,
   SourcesRendererProps,
   UseModelManagementReturn,
+  ScrollToBottomCaptureProps,
 } from "./types";
 
-// Components
+// ============================================================================
+// UI Components
+// ============================================================================
 export { ChatHeader } from "./components/chat-header";
 export { ChatMessages } from "./components/chat-messages";
 export { ChatInput } from "./components/chat-input";
+export { ChatSidebar } from "./components/chat-sidebar";
 export { MessagePartRenderer, SourcesRenderer } from "./components/message-renderers";
 
-// Hooks
+// ============================================================================
+// React Hooks
+// ============================================================================
 export {
   useModelManagement,
   useGroupedModels,
@@ -28,9 +56,12 @@ export {
   useAutoFocusTextarea,
 } from "./hooks/use-chat-hooks";
 export { useConversationManagement } from "./hooks/use-conversation-management";
+export { useConversationPersistence } from "./hooks/use-conversation-persistence";
 export { useMessageEditing } from "./hooks/use-message-editing";
 
-// Message utilities
+// ============================================================================
+// Utilities - Message Handling
+// ============================================================================
 export {
   extractTextFromMessage,
   generateTitleFromText,
@@ -40,7 +71,6 @@ export {
   extractTimestamp,
 } from "./utils/message-utils";
 
-// Message parts (type-safe utilities)
 export {
   extractTextParts,
   extractToolCallParts,
@@ -57,7 +87,40 @@ export {
   type MessagePart,
 } from "./utils/message-parts";
 
-// Error handling
+// ============================================================================
+// Utilities - API & Storage
+// ============================================================================
+export {
+  persistConversation,
+  createConversationRequest,
+  deleteConversationRequest,
+  type PersistConversationParams,
+  type CreateConversationParams,
+  type DeleteConversationParams,
+} from "./handlers/conversation-handlers";
+
+export {
+  findMessageIndex,
+  validateMessageExists,
+  validateMessageRole,
+  extractMessageText,
+  validateEditText,
+  validateRegenerateMessage,
+} from "./handlers/message-handlers";
+
+// ============================================================================
+// Utilities - Browser APIs
+// ============================================================================
+export {
+  isClipboardAvailable,
+  copyToClipboard,
+  readFromClipboard,
+  safeCopyToClipboard,
+} from "./utils/clipboard";
+
+// ============================================================================
+// Error Handling
+// ============================================================================
 export {
   AuthenticationError,
   AuthorizationError,
@@ -75,30 +138,8 @@ export {
   isRetryable,
 } from "./utils/errors";
 
-// Clipboard utilities
-export {
-  isClipboardAvailable,
-  copyToClipboard,
-  readFromClipboard,
-  safeCopyToClipboard,
-} from "./utils/clipboard";
-
-// Conversation handlers
-export {
-  persistConversation,
-  createConversationRequest,
-  deleteConversationRequest,
-  type PersistConversationParams,
-  type CreateConversationParams,
-  type DeleteConversationParams,
-} from "./handlers/conversation-handlers";
-
-// Message handlers
-export {
-  findMessageIndex,
-  validateMessageExists,
-  validateMessageRole,
-  extractMessageText,
-  validateEditText,
-  validateRegenerateMessage,
-} from "./handlers/message-handlers";
+// ============================================================================
+// AI SDK Tools
+// ============================================================================
+export { getDateTime } from "./tools/get-date-time";
+export { getWeather } from "./tools/get-weather";

@@ -80,7 +80,8 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
 
   // Image files with runtime validation
   if (isImagePart(part)) {
-    const url = part.image || "";
+    const imagePart = part as { type: "image"; image?: string; mimeType?: string };
+    const url = imagePart.image || "";
     const filename = "Uploaded image";
     return (
       <Image

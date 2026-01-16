@@ -45,6 +45,12 @@ export type ChatSession = {
 };
 
 /**
+ * Type alias for useChat messages
+ * This is the runtime type of individual messages from the useChat hook
+ */
+export type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
+
+/**
  * Selected model information for display
  */
 export interface SelectedModelInfo {
@@ -59,18 +65,6 @@ export type ChatClientProps = {
   readonly initialData: InitialChatData;
   readonly conversationId?: string;
 };
-
-/**
- * Type alias for useChat messages
- */
-export type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
-
-/**
- * Props for SourcesRenderer component
- */
-export interface SourcesRendererProps {
-  readonly parts: unknown[];
-}
 
 /**
  * Props for ChatMessages component

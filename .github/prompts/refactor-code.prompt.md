@@ -1,0 +1,1 @@
+Review the provided code, files, directory, or entire codebase for refactoring. Read all the files and ensure that they're refactored for maximum maintainability, clarity, and organization. Rename files, create files, update them, delete them if needed.

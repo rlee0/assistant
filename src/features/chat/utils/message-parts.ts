@@ -3,9 +3,7 @@
  * Replaces unsafe `as Record<string, unknown>` patterns with proper discriminated unions
  */
 
-import type { useChat } from "@ai-sdk/react";
-
-export type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
+import type { UseChatMessage } from "@/features/chat/types";
 
 /**
  * Discriminated union type for all message part types
@@ -27,6 +25,7 @@ export type MessagePart =
     }
   | { readonly type: "image"; readonly image?: string; readonly mimeType?: string }
   | { readonly type: "reasoning"; readonly text?: string }
+  | { readonly type: "source-url"; readonly url: string; readonly title?: string }
   | Record<string, unknown>;
 
 /**
@@ -80,12 +79,9 @@ export function isToolResultPart(
 export function isImagePart(
   part: unknown
 ): part is { type: "image"; image?: string; mimeType?: string } {
-  return (
-    typeof part === "object" &&
-    part !== null &&
-    "type" in part &&
-    (part as Record<string, unknown>).type === "image"
-  );
+  if (typeof part !== "object" || part === null) return false;
+  const p = part as Record<string, unknown>;
+  return p.type === "image" && (typeof p.image === "string" || p.image === undefined);
 }
 
 /**
