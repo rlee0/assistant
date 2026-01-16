@@ -1,11 +1,11 @@
 "use client";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertTriangle, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCallback, useEffect, useState } from "react";
 
 import { API_ROUTES } from "@/lib/api/routes";
+import { AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { logError } from "@/lib/logging";
@@ -71,8 +71,7 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
       <div className="mx-auto max-w-2xl">
         <div className="mb-8">
-          <Button variant="link" onClick={() => router.back()} className="mb-4">
-            <ArrowLeft />
+          <Button variant="outline" onClick={() => router.back()} className="mb-4">
             Back
           </Button>
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
