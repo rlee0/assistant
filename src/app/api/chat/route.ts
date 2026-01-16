@@ -8,11 +8,12 @@ import { logError, logDebug } from "@/lib/logging";
 import {
   convertToModelMessages,
   streamText,
+  createGateway,
   type UIMessage,
   type Tool,
   type LanguageModelUsage,
 } from "ai";
-import { createOpenAI } from "@ai-sdk/openai";
+import { isReasoningCapable, extractProvider, fetchModels } from "@/lib/models";
 import * as toolFactories from "@/features/chat/tools";
 
 /**
@@ -230,30 +231,76 @@ export async function POST(req: Request): Promise<Response> {
     // Build tools per-request to allow per-request configuration
     const tools = buildTools();
 
-    // Create custom OpenAI-compatible provider for AI Gateway
-    const provider = createOpenAI({
-      name: "ai-gateway",
-      baseURL: config.baseURL,
+    // Create AI Gateway provider instance
+    const gatewayConfig: { apiKey: string; baseURL?: string } = {
       apiKey: config.apiKey,
-    });
-    const model = provider.chat(selectedModel as Parameters<typeof provider.chat>[0]);
+    };
+
+    // Only set baseURL if using a custom gateway (not Vercel's)
+    if (config.baseURL && !config.baseURL.includes("ai-gateway.vercel.sh")) {
+      gatewayConfig.baseURL = config.baseURL;
+    }
+    // If using Vercel AI Gateway, don't override baseURL - let it use defaults
+
+    const gateway = createGateway(gatewayConfig);
+    const model = gateway(selectedModel);
+
+    // Fetch model capabilities to determine if reasoning is supported
+    let supportsReasoning = false;
+    try {
+      const models = await fetchModels();
+      const currentModel = models.find((m) => m.id === selectedModel);
+      supportsReasoning = currentModel
+        ? isReasoningCapable(currentModel)
+        : isReasoningCapable(selectedModel);
+    } catch (error) {
+      // Fallback to string-based check if model fetch fails
+      supportsReasoning = isReasoningCapable(selectedModel);
+    }
+
+    const modelProvider = extractProvider(selectedModel);
+
+    // Configure provider-specific reasoning options
+    const providerOptions: Record<string, Record<string, string | number | unknown>> = {};
+    if (supportsReasoning) {
+      if (modelProvider === "openai") {
+        providerOptions.openai = {
+          reasoningSummary: "detailed",
+        };
+      }
+      if (modelProvider === "deepseek") {
+        providerOptions.deepseek = {
+          thinkingBudget: 10000,
+        };
+      }
+      if (modelProvider === "anthropic") {
+        providerOptions.anthropic = {
+          thinking: { type: "enabled", budgetTokens: 12000 },
+        };
+      }
+    }
 
     // Use AI SDK streamText for proper streaming via chat/completions
     const result = streamText({
       model,
       messages: [{ role: "system", content: systemMessage }, ...modelMessages],
-      temperature: 0.7,
+      temperature: supportsReasoning ? undefined : 0.7, // Reasoning models don't support temperature
       tools,
       stopWhen: [],
+      providerOptions,
       onStepFinish: (step) => {
-        logDebug("[Chat]", "Step finished", {
+        const debugInfo: Record<string, unknown> = {
           requestId,
           toolCallsCount: step.toolCalls?.length ?? 0,
           toolResultsCount: step.toolResults?.length ?? 0,
           finishReason: step.finishReason,
           hasText: step.text !== undefined && step.text.length > 0,
           textLength: step.text?.length ?? 0,
-        });
+          hasReasoning: step.reasoning !== undefined && step.reasoning.length > 0,
+          reasoningLength: step.reasoning?.length ?? 0,
+        };
+
+        logDebug("[Chat]", "Step finished", debugInfo);
       },
     });
 
@@ -263,15 +310,31 @@ export async function POST(req: Request): Promise<Response> {
       userId,
       model: selectedModel,
       messageCount: messages.length,
+      sendReasoning: true,
+      supportsReasoning,
+      modelProvider,
+      hasProviderOptions: Object.keys(providerOptions).length > 0,
+      providerOptions: Object.keys(providerOptions).length > 0 ? providerOptions : undefined,
     });
 
     // Return UIMessageStream response expected by DefaultChatTransport/useChat
     return result.toUIMessageStreamResponse({
+      sendReasoning: true,
       headers: {
         "x-vercel-ai-ui-message-stream": "v1",
         "x-request-id": requestId,
       },
       messageMetadata: ({ part }): MessageMetadata | undefined => {
+        // Log when reasoning parts are created
+        const partAsRecord = part as Record<string, unknown>;
+        if (partAsRecord.type === "reasoning") {
+          logDebug("[Chat]", "📤 Sending reasoning part to client", {
+            requestId,
+            hasText: !!partAsRecord.text,
+            textLength: typeof partAsRecord.text === "string" ? partAsRecord.text.length : 0,
+          });
+        }
+
         if (part.type === "finish" && part.totalUsage !== undefined) {
           return {
             model: selectedModel,

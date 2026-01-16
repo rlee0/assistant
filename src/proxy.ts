@@ -4,7 +4,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 /**
  * Public routes that don't require authentication
  */
-const PUBLIC_ROUTES = new Set(["/login", "/signup", "/api/auth/callback"]);
+const PUBLIC_ROUTES = new Set(["/login", "/signup", "/api/auth/callback", "/api/models"]);
 
 /**
  * Check if a route is public and doesn't require authentication

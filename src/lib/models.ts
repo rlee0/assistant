@@ -10,6 +10,9 @@ export interface Model {
   readonly name: string;
   readonly provider?: string;
   readonly contextTokens?: number;
+  readonly type?: string; // e.g., 'language', 'embedding', 'image'
+  readonly tags?: readonly string[]; // e.g., ['vision', 'tool-use', 'reasoning']
+  readonly maxTokens?: number;
 }
 
 export interface ModelFetchError extends Error {
@@ -43,6 +46,45 @@ const PROVIDER_DISPLAY_NAMES: Readonly<Record<string, string>> = {
   nvidia: "NVIDIA",
   moonshotai: "Moonshot AI",
 } as const;
+
+/**
+ * @deprecated Reasoning capabilities are now dynamically retrieved from Vercel AI Gateway.
+ * This hardcoded list is only used as a fallback when the API is unavailable.
+ *
+ * Prefer using Model.tags to check for 'reasoning' capability.
+ *
+ * Note: Only includes models that actually exist and support reasoning.
+ *
+ * @see {@link ../components/ai/reasoning.tsx}
+ * @see REASONING.md for usage documentation
+ */
+const REASONING_CAPABLE_MODELS_FALLBACK = [
+  "deepseek/deepseek-r1",
+  "deepseek/deepseek-reasoner",
+  "openai/o1",
+  "openai/o1-mini",
+  "openai/o1-preview",
+] as const;
+
+/**
+ * Checks if a model supports reasoning/thinking mode
+ * @param modelIdOrModel - Model identifier string or Model object to check
+ * @returns True if model supports reasoning
+ */
+export function isReasoningCapable(modelIdOrModel: string | Model): boolean {
+  // If Model object with tags, check for 'reasoning' tag
+  if (typeof modelIdOrModel === "object" && modelIdOrModel.tags) {
+    return modelIdOrModel.tags.includes("reasoning");
+  }
+
+  // Otherwise use model ID string with fallback list
+  const modelId = typeof modelIdOrModel === "string" ? modelIdOrModel : modelIdOrModel.id;
+
+  // Fallback to hardcoded list only when tags are not available
+  return REASONING_CAPABLE_MODELS_FALLBACK.some(
+    (model) => modelId === model || modelId.includes(model)
+  );
+}
 
 // ============================================================================
 // Validation & Type Guards
@@ -146,9 +188,14 @@ function createModelFetchError(
   code: ModelFetchError["code"],
   status?: number
 ): ModelFetchError {
-  const error = new Error(message) as unknown as ModelFetchError;
-  Object.assign(error, { code, status });
-  return error;
+  const error = new Error(message);
+  return {
+    ...error,
+    code,
+    status,
+    name: error.name,
+    message: error.message,
+  } as ModelFetchError;
 }
 
 /**
@@ -158,7 +205,12 @@ function createModelFetchError(
  */
 export async function fetchModels(): Promise<Model[]> {
   try {
-    const response = await fetch(API_ROUTES.MODELS, {
+    // Construct absolute URL for server-side fetches
+    const isServer = typeof window === "undefined";
+    const baseUrl = isServer ? `http://localhost:${process.env.PORT || 3000}` : "";
+    const url = `${baseUrl}${API_ROUTES.MODELS}`;
+
+    const response = await fetch(url, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",

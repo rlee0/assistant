@@ -223,9 +223,21 @@ export const ChatMessages = memo<ChatMessagesProps>(
                               </PromptInput>
                             ) : (
                               <>
-                                {parts.map((part, index) => (
-                                  <MessagePartRenderer key={index} part={part} index={index} />
-                                ))}
+                                {parts.map((part, index) => {
+                                  // Determine if this part is actively streaming
+                                  const isStreaming =
+                                    status === "streaming" &&
+                                    index === parts.length - 1 &&
+                                    message.id === messages.at(-1)?.id;
+                                  return (
+                                    <MessagePartRenderer
+                                      key={index}
+                                      part={part}
+                                      index={index}
+                                      isStreaming={isStreaming}
+                                    />
+                                  );
+                                })}
                                 <SourcesRenderer parts={parts} />
                               </>
                             )}

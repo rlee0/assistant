@@ -46,6 +46,7 @@ import {
 import { formatProviderName, getModelProvider } from "@/lib/models";
 import { useGroupedModels, useTextareaKeyboardShortcuts } from "../use-chat-hooks";
 
+import { Badge } from "@/components/ui/badge";
 import type { ChatInputProps } from "../types";
 import { Check } from "lucide-react";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
@@ -177,6 +178,7 @@ export const ChatInput = memo<ChatInputProps>(
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => {
                       const isSelected = model.id === currentModel;
+                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
                       return (
                         <ModelSelectorItem
                           key={model.id}
@@ -192,6 +194,11 @@ export const ChatInput = memo<ChatInputProps>(
                               {model.name}
                             </ModelSelectorName>
                             <span className={CSS_CLASSES.modelId}>({model.id})</span>
+                            {hasReasoning && (
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                reasoning
+                              </Badge>
+                            )}
                           </div>
                           {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}
                         </ModelSelectorItem>

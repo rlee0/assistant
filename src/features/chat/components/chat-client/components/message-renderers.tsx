@@ -17,8 +17,22 @@ import { memo } from "react";
 export const MessagePartRenderer = memo(function MessagePartRenderer({
   part,
   index,
+  isStreaming = false,
 }: MessagePartRendererProps) {
   const partAsRecord = part as Record<string, unknown>;
+
+  // Debug logging - Enhanced to track reasoning parts
+  if (typeof window !== "undefined") {
+    console.log("[MessagePartRenderer]", {
+      index,
+      type: partAsRecord.type,
+      isStreaming,
+      hasText: !!partAsRecord.text,
+      textLength: typeof partAsRecord.text === 'string' ? partAsRecord.text.length : 0,
+      allKeys: Object.keys(partAsRecord),
+      isReasoning: partAsRecord.type === MESSAGE_PART_TYPE.REASONING,
+    });
+  }
 
   // Text content
   if (partAsRecord.type === MESSAGE_PART_TYPE.TEXT) {
@@ -27,8 +41,15 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
 
   // Reasoning/thinking content
   if (partAsRecord.type === MESSAGE_PART_TYPE.REASONING) {
+    console.log("[MessagePartRenderer] 🧠 Rendering reasoning part", { 
+      isStreaming,
+      hasText: !!partAsRecord.text,
+      textLength: typeof partAsRecord.text === 'string' ? partAsRecord.text.length : 0,
+      textPreview: typeof partAsRecord.text === 'string' ? partAsRecord.text.slice(0, 100) : null,
+      partKeys: Object.keys(partAsRecord),
+    });
     return (
-      <Reasoning key={index} defaultOpen={true}>
+      <Reasoning key={index} defaultOpen={true} isStreaming={isStreaming}>
         <ReasoningTrigger />
         <ReasoningContent>{String(partAsRecord.text || "")}</ReasoningContent>
       </Reasoning>

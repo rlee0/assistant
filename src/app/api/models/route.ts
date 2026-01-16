@@ -13,6 +13,9 @@ interface Model {
   name: string;
   provider?: string;
   contextTokens?: number;
+  type?: string; // e.g., 'language', 'embedding', 'image'
+  tags?: string[]; // e.g., ['vision', 'tool-use', 'reasoning']
+  maxTokens?: number;
 }
 
 /**
@@ -24,6 +27,10 @@ interface RawGatewayModel {
   provider?: string;
   contextTokens?: number;
   context_tokens?: number;
+  context_window?: number;
+  type?: string;
+  tags?: string[];
+  max_tokens?: number;
   [key: string]: unknown;
 }
 
@@ -168,19 +175,105 @@ function normalizeModel(raw: RawGatewayModel): Model | null {
   const provider = raw.provider?.trim() || extractProviderFromId(id);
 
   // Handle both naming conventions for context tokens
-  const contextTokens = raw.contextTokens ?? raw.context_tokens;
+  const contextTokens = raw.contextTokens ?? raw.context_tokens ?? raw.context_window;
 
   return {
     id,
     name,
     provider,
     contextTokens: typeof contextTokens === "number" ? contextTokens : undefined,
+    type: raw.type?.trim(),
+    tags: Array.isArray(raw.tags)
+      ? raw.tags.filter((tag): tag is string => typeof tag === "string")
+      : undefined,
+    maxTokens: typeof raw.max_tokens === "number" ? raw.max_tokens : undefined,
   };
 }
 
 // ============================================================================
 // Gateway Fetchers
 // ============================================================================
+
+/**
+ * Fetches model capabilities from Vercel AI Gateway /v1/models endpoint.
+ * Returns enhanced models with capability tags.
+ */
+async function fetchCapabilitiesFromVercel(
+  correlationId?: string
+): Promise<
+  Map<string, { type?: string; tags?: string[]; contextWindow?: number; maxTokens?: number }>
+> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), GATEWAY_TIMEOUT_MS);
+  const capabilities = new Map<
+    string,
+    { type?: string; tags?: string[]; contextWindow?: number; maxTokens?: number }
+  >();
+
+  try {
+    const response = await fetch("https://ai-gateway.vercel.sh/v1/models", {
+      signal: controller.signal,
+    });
+
+    if (!response.ok) {
+      structuredLog({
+        level: "warn",
+        source: "custom-gateway",
+        timestamp: new Date().toISOString(),
+        correlationId,
+        message: "Failed to fetch capabilities from Vercel AI Gateway",
+        details: { status: response.status },
+      });
+      return capabilities;
+    }
+
+    const data = await response.json();
+
+    if (data && Array.isArray(data.data)) {
+      for (const model of data.data) {
+        if (model.id) {
+          capabilities.set(model.id, {
+            type: model.type,
+            tags: Array.isArray(model.tags) ? model.tags : undefined,
+            contextWindow:
+              typeof model.context_window === "number" ? model.context_window : undefined,
+            maxTokens: typeof model.max_tokens === "number" ? model.max_tokens : undefined,
+          });
+        }
+      }
+    }
+
+    const reasoningModels = Array.from(capabilities.entries())
+      .filter(([_, cap]) => cap.tags?.includes("reasoning"))
+      .map(([id]) => id);
+
+    structuredLog({
+      level: "info",
+      source: "custom-gateway",
+      timestamp: new Date().toISOString(),
+      correlationId,
+      message: "Successfully fetched model capabilities from Vercel AI Gateway",
+      details: {
+        totalModels: capabilities.size,
+        reasoningModels: reasoningModels.length,
+        sampleReasoningModels: reasoningModels.slice(0, 5),
+      },
+    });
+  } catch (error) {
+    structuredLog({
+      level: "warn",
+      source: "custom-gateway",
+      timestamp: new Date().toISOString(),
+      correlationId,
+      message: "Error fetching capabilities from Vercel AI Gateway",
+      details: { error: error instanceof Error ? error.message : String(error) },
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  return capabilities;
+}
 
 /**
  * Attempts to fetch models from the custom AI Gateway endpoint.
@@ -376,32 +469,42 @@ export async function GET(request?: NextRequest): Promise<NextResponse<Model[]>>
     const gatewayUrl = process.env.AI_GATEWAY_URL?.trim();
     const apiKey = process.env.AI_GATEWAY_API_KEY?.trim();
 
+    // Fetch capabilities from Vercel AI Gateway in parallel
+    const capabilitiesPromise = fetchCapabilitiesFromVercel(correlationId);
+
     // Try custom gateway first
+    let models: Model[] | null = null;
     if (gatewayUrl && apiKey) {
-      const customModels = await fetchFromCustomGateway(gatewayUrl, apiKey, correlationId);
-      if (customModels && customModels.length > 0) {
-        return NextResponse.json(customModels, {
-          status: 200,
-          headers: {
-            "cache-control": `public, max-age=${CACHE_DURATION_SECONDS}`,
-          },
-        });
+      models = await fetchFromCustomGateway(gatewayUrl, apiKey, correlationId);
+    }
+
+    // Fallback to SDK gateway if custom gateway failed
+    if (!models || models.length === 0) {
+      models = await fetchFromSdkGateway(correlationId);
+    }
+
+    // Fallback to default models if all sources failed
+    if (!models || models.length === 0) {
+      models = FALLBACK_MODELS;
+    }
+
+    // Merge capabilities from Vercel AI Gateway
+    const capabilities = await capabilitiesPromise;
+    const enhancedModels = models.map((model) => {
+      const capability = capabilities.get(model.id);
+      if (capability) {
+        return {
+          ...model,
+          type: model.type || capability.type,
+          tags: model.tags || capability.tags,
+          contextTokens: model.contextTokens || capability.contextWindow,
+          maxTokens: model.maxTokens || capability.maxTokens,
+        };
       }
-    }
+      return model;
+    });
 
-    // Fallback to SDK gateway
-    const sdkModels = await fetchFromSdkGateway(correlationId);
-    if (sdkModels.length > 0) {
-      return NextResponse.json(sdkModels, {
-        status: 200,
-        headers: {
-          "cache-control": `public, max-age=${CACHE_DURATION_SECONDS}`,
-        },
-      });
-    }
-
-    // Final fallback
-    return NextResponse.json(FALLBACK_MODELS, {
+    return NextResponse.json(enhancedModels, {
       status: 200,
       headers: {
         "cache-control": `public, max-age=${CACHE_DURATION_SECONDS}`,

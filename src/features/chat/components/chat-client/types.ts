@@ -26,6 +26,13 @@ export type ChatClientProps = {
 export type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
 
 /**
+ * Props for SourcesRenderer component
+ */
+export interface SourcesRendererProps {
+  readonly parts: unknown[];
+}
+
+/**
  * Props for ChatMessages component
  */
 export interface ChatMessagesProps {
@@ -50,6 +57,22 @@ export interface ChatMessagesProps {
 }
 
 /**
+ * Props for MessagePartRenderer component
+ */
+export interface MessagePartRendererProps {
+  readonly part: UseChatMessage["parts"][number];
+  readonly index: number;
+  readonly isStreaming?: boolean;
+}
+
+/**
+ * Props for SourcesRenderer component
+ */
+export interface SourcesRendererProps {
+  readonly parts: UseChatMessage["parts"];
+}
+
+/**
  * Props for ChatInput component
  */
 export interface ChatInputProps {
@@ -67,21 +90,6 @@ export interface ChatInputProps {
   readonly textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   readonly totalUsedTokens: number;
   readonly totalUsage: LanguageModelUsage;
-}
-
-/**
- * Props for MessagePartRenderer component
- */
-export interface MessagePartRendererProps {
-  readonly part: UseChatMessage["parts"][number];
-  readonly index: number;
-}
-
-/**
- * Props for SourcesRenderer component
- */
-export interface SourcesRendererProps {
-  readonly parts: UseChatMessage["parts"];
 }
 
 /**
