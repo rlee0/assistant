@@ -1,11 +1,10 @@
 import {
   DEFAULT_DENSITY,
-  DEFAULT_MODEL,
-  DEFAULT_TEMPERATURE,
   DEFAULT_THEME,
   DEFAULT_USER_DISPLAY_NAME,
   DEFAULT_USER_EMAIL,
-} from "@/lib/constants";
+} from "@/lib/constants/settings";
+import { DEFAULT_MODEL, DEFAULT_TEMPERATURE } from "@/lib/constants/models";
 
 import { defaultToolSettings } from "@/features/chat/tools";
 import { z } from "zod";

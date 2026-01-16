@@ -37,8 +37,8 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
       from === "user"
         ? "is-user ml-auto justify-end"
         : from === "system"
-        ? `is-system ${SIZE.wFull} justify-center`
-        : "is-assistant",
+          ? `is-system ${SIZE.wFull} justify-center`
+          : "is-assistant",
       className
     )}
     {...props}
@@ -50,7 +50,7 @@ export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 export const MessageContent = ({ children, className, ...props }: MessageContentProps) => (
   <div
     className={cn(
-      `is-user:dark ${LAYOUT.flexCol} w-fit max-w-full ${SIZE.minW0} ${SPACING.gap2} ${OVERFLOW.hidden} ${TEXT.sm}`,
+      `is-user:dark ${LAYOUT.flexCol} w-fit max-w-full ${SIZE.minW0} ${SPACING.gap2} *:data-[slot=input-group]:overflow-visible ${TEXT.sm}`,
       `group-[.is-user]:ml-auto group-[.is-user]:${BORDER.rounded.lg} group-[.is-user]:${BG.secondary} group-[.is-user]:${SPACING.px4} group-[.is-user]:${SPACING.py3} group-[.is-user]:${TEXT.foreground}`,
       `group-[.is-assistant]:${TEXT.foreground}`,
       `group-[.is-system]:${SIZE.wFull} group-[.is-system]:${SPACING.px3} group-[.is-system]:${SPACING.py2} group-[.is-system]:${BORDER.rounded.md} group-[.is-system]:${BG.transparent} group-[.is-system]:${TEXT.muted} group-[.is-system]:${TEXT.xs} group-[.is-system]:${TEXT.italic}`,

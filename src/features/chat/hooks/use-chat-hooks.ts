@@ -143,19 +143,17 @@ export function useTextareaKeyboardShortcuts(): (e: KeyboardEvent<HTMLTextAreaEl
  *
  * @remarks
  * Improves UX by allowing users to start typing immediately.
- * Uses a flag to skip focus on initial hydration render.
+ * Focuses after hydration completes to avoid React hydration mismatch.
  */
 export function useAutoFocusTextarea(
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
 ): void {
-  const isFirstRenderRef = useRef(true);
-
   useEffect(() => {
-    if (isFirstRenderRef.current) {
-      isFirstRenderRef.current = false;
-      return;
-    }
-    // Only focus after initial mount (skip hydration)
-    textareaRef.current?.focus();
+    // Focus after hydration completes (next tick)
+    const timer = setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 0);
+
+    return () => clearTimeout(timer);
   }, [textareaRef]);
 }

@@ -2,7 +2,7 @@ import "server-only";
 
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { type ChatSession, type ChatMessage, type ChatCheckpoint } from "@/features/chat/types";
-import { DEFAULT_MODEL } from "@/lib/constants";
+import { DEFAULT_MODEL } from "@/lib/constants/models";
 
 export type InitialChatData = {
   chats: Record<string, ChatSession>;

@@ -1,7 +1,7 @@
 import { logError, logWarn } from "@/lib/logging";
 
 import { API_ROUTES } from "@/lib/api/routes";
-import { DEFAULT_FALLBACK_MODELS } from "@/lib/constants";
+import { DEFAULT_FALLBACK_MODELS } from "@/lib/constants/models";
 
 // ============================================================================
 // Types

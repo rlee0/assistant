@@ -202,6 +202,7 @@ export const ChatMessages = memo<ChatMessagesProps>(
                                     ref={editTextareaRef}
                                     value={editText}
                                     onChange={(e) => onEditTextChange(e.target.value)}
+                                    onBlur={onCancelEdit}
                                     placeholder={EDIT_PLACEHOLDER}
                                     onKeyDown={(e) => {
                                       if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {

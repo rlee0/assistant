@@ -1,7 +1,7 @@
 import { APIError, handleAPIError, ErrorCodes } from "@/lib/api/errors";
 import { NextRequest } from "next/server";
 import { validateArray, validateObject, validateString } from "@/lib/api/validation";
-import { DEFAULT_MODEL } from "@/lib/constants";
+import { DEFAULT_MODEL } from "@/lib/constants/models";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { parseRequestBody } from "@/lib/api/middleware";
 import { logError, logDebug } from "@/lib/logging";

@@ -113,16 +113,13 @@ export const ChatInput = memo<ChatInputProps>(
                 value={text}
                 onKeyDown={handleKeyDown}
                 placeholder="Type your message..."
-                disabled={status === "streaming" || status === "submitted"}
               />
             </PromptInputBody>
 
             <PromptInputFooter>
               <PromptInputTools>
                 <PromptInputActionMenu>
-                  <PromptInputActionMenuTrigger
-                    disabled={status === "streaming" || status === "submitted"}
-                  />
+                  <PromptInputActionMenuTrigger />
                   <PromptInputActionMenuContent>
                     <PromptInputActionAddAttachments />
                   </PromptInputActionMenuContent>
@@ -131,7 +128,6 @@ export const ChatInput = memo<ChatInputProps>(
                 <PromptInputSpeechButton
                   onTranscriptionChange={onTextChange}
                   textareaRef={textareaRef}
-                  disabled={status === "streaming" || status === "submitted"}
                 />
 
                 <Context
@@ -156,7 +152,7 @@ export const ChatInput = memo<ChatInputProps>(
                   variant="ghost"
                   onClick={() => onSelectorOpenChange(true)}
                   className={CSS_CLASSES.modelButton}
-                  disabled={modelsLoading || status === "streaming" || status === "submitted"}
+                  disabled={modelsLoading}
                   aria-label="Select model">
                   {modelsLoading ? (
                     <ModelSelectorSkeleton />
