@@ -170,6 +170,9 @@ export const ChatMessages = memo<ChatMessagesProps>(
 
                     const hasTextToCopy = textParts.trim().length > 0;
 
+                    // Check if this is the last message in the array
+                    const isLastMessage = messageIndex === messages.length - 1;
+
                     return (
                       <div key={messageIndex} className="group flex flex-col gap-2">
                         {/* Checkpoint line appears on hover */}
@@ -278,83 +281,138 @@ export const ChatMessages = memo<ChatMessagesProps>(
                                 <Copy className="size-3" />
                               </MessageAction>
 
-                              {/* Regenerate with confirmation */}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <MessageAction
-                                    label="Regenerate"
-                                    tooltip="Regenerate from here"
-                                    disabled={!(status === "ready" || status === "error")}>
-                                    <RefreshCcw className="size-3" />
-                                  </MessageAction>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Regenerate from this message?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will delete all messages after this assistant message,
-                                      then regenerate the response for this message. This action
-                                      cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => {
-                                        onRegenerateFromMessage(message.id);
-                                      }}>
-                                      Regenerate
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              {/* Regenerate with confirmation - bypass if last message */}
+                              {isLastMessage ? (
+                                <MessageAction
+                                  onClick={() => onRegenerateFromMessage(message.id)}
+                                  label="Regenerate"
+                                  tooltip="Regenerate from here"
+                                  disabled={!(status === "ready" || status === "error")}>
+                                  <RefreshCcw className="size-3" />
+                                </MessageAction>
+                              ) : (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <MessageAction
+                                      label="Regenerate"
+                                      tooltip="Regenerate from here"
+                                      disabled={!(status === "ready" || status === "error")}>
+                                      <RefreshCcw className="size-3" />
+                                    </MessageAction>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Regenerate from this message?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will delete all messages after this assistant message,
+                                        then regenerate the response for this message. This action
+                                        cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => {
+                                          onRegenerateFromMessage(message.id);
+                                        }}>
+                                        Regenerate
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
                             </MessageActions>
                           )}
 
                           {!isEditing && message.role === "user" && (
                             <MessageActions className="ml-auto">
-                              <MessageAction
-                                onClick={() => {
-                                  onEditMessage(message.id, textParts);
-                                }}
-                                label="Edit"
-                                tooltip="Edit message"
-                                disabled={!(status === "ready" || status === "error")}>
-                                <Edit2 className="size-3" />
-                              </MessageAction>
+                              {/* Edit with confirmation - bypass if last message */}
+                              {isLastMessage ? (
+                                <MessageAction
+                                  onClick={() => {
+                                    onEditMessage(message.id, textParts);
+                                  }}
+                                  label="Edit"
+                                  tooltip="Edit message"
+                                  disabled={!(status === "ready" || status === "error")}>
+                                  <Edit2 className="size-3" />
+                                </MessageAction>
+                              ) : (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <MessageAction
+                                      label="Edit"
+                                      tooltip="Edit message"
+                                      disabled={!(status === "ready" || status === "error")}>
+                                      <Edit2 className="size-3" />
+                                    </MessageAction>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Edit this message?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will delete all messages after this user message and
+                                        allow you to edit it. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => {
+                                          onEditMessage(message.id, textParts);
+                                        }}>
+                                        Edit
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
 
-                              {/* Delete with confirmation */}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <MessageAction
-                                    label="Delete"
-                                    tooltip="Delete message"
-                                    disabled={!(status === "ready" || status === "error")}>
-                                    <Trash2 className="size-3" />
-                                  </MessageAction>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>Delete this message?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will delete this user message and all subsequent
-                                      messages. This action cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => {
-                                        onDeleteMessage(message.id);
-                                        toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
-                                      }}>
-                                      Delete
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              {/* Delete with confirmation - bypass if last message */}
+                              {isLastMessage ? (
+                                <MessageAction
+                                  onClick={() => {
+                                    onDeleteMessage(message.id);
+                                    toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+                                  }}
+                                  label="Delete"
+                                  tooltip="Delete message"
+                                  disabled={!(status === "ready" || status === "error")}>
+                                  <Trash2 className="size-3" />
+                                </MessageAction>
+                              ) : (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <MessageAction
+                                      label="Delete"
+                                      tooltip="Delete message"
+                                      disabled={!(status === "ready" || status === "error")}>
+                                      <Trash2 className="size-3" />
+                                    </MessageAction>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Delete this message?</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will delete this user message and all subsequent
+                                        messages. This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => {
+                                          onDeleteMessage(message.id);
+                                          toast.success(TOAST_MESSAGES.MESSAGE_DELETED);
+                                        }}>
+                                        Delete
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
                             </MessageActions>
                           )}
                         </Message>
