@@ -24,6 +24,23 @@ function getToolProperty<T>(part: unknown, key: string, defaultValue: T): T {
 }
 
 /**
+ * Shared image renderer for both image and file parts
+ */
+function renderImage(url: string, filename: string, index: number) {
+  return (
+    <Image
+      key={index}
+      src={url}
+      alt={filename}
+      width={384}
+      height={384}
+      className={CSS_CLASSES.image}
+      unoptimized={url.startsWith("data:")}
+    />
+  );
+}
+
+/**
  * Renders a message part based on its type with exhaustive type checking
  *
  * Uses type guards for type-safe rendering without unsafe casts.
@@ -83,17 +100,7 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
     const imagePart = part as { type: "image"; image?: string; mimeType?: string };
     const url = imagePart.image || "";
     const filename = "Uploaded image";
-    return (
-      <Image
-        key={index}
-        src={url}
-        alt={filename}
-        width={384}
-        height={384}
-        className={CSS_CLASSES.image}
-        unoptimized={url.startsWith("data:")}
-      />
-    );
+    return renderImage(url, filename, index);
   }
 
   // File attachments (non-image)
@@ -102,20 +109,13 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
     
     // Check if it's an image media type - render as image
     if (filePart.mediaType?.startsWith("image/") && filePart.url) {
-      return (
-        <Image
-          key={index}
-          src={filePart.url}
-          alt={filePart.filename || "Uploaded image"}
-          width={384}
-          height={384}
-          className={CSS_CLASSES.image}
-          unoptimized={filePart.url.startsWith("data:")}
-        />
-      );
+      return renderImage(filePart.url, filePart.filename || "Uploaded image", index);
     }
     
     // For non-image files, display file info
+    // Only allow downloads for non-data URLs (actual file URLs)
+    const canDownload = filePart.url && !filePart.url.startsWith("data:");
+    
     return (
       <div key={index} className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3">
         <div className="flex size-8 items-center justify-center rounded bg-background">
@@ -143,7 +143,7 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
             </div>
           )}
         </div>
-        {filePart.url && (
+        {canDownload && (
           <a
             href={filePart.url}
             download={filePart.filename}
