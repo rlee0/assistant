@@ -167,99 +167,172 @@
   .gap-list {
     @apply gap-1.5;
   }
+
+  /* Markdown content styling - GitHub-inspired design */
+  .markdown-body {
+    @apply text-sm leading-relaxed;
+    font-family: var(--font-geist-sans);
+
+    & * {
+      word-break: break-word;
+    }
+
+    & > *:first-child {
+      @apply mt-0;
+    }
+
+    & > *:last-child {
+      @apply mb-0;
+    }
+
+    & h1,
+    & h2,
+    & h3,
+    & h4,
+    & h5,
+    & h6 {
+      @apply font-semibold leading-tight mt-6 mb-3;
+    }
+
+    & h1 {
+      @apply text-2xl;
+    }
+
+    & h2 {
+      @apply text-xl pb-2 border-b border-border;
+    }
+
+    & h3 {
+      @apply text-lg;
+    }
+
+    & h4 {
+      @apply text-base;
+    }
+
+    & h5,
+    & h6 {
+      @apply text-sm;
+    }
+
+    & p {
+      @apply my-3;
+    }
+
+    & ul,
+    & ol {
+      @apply my-3 pl-6 space-y-2;
+      list-style-position: outside;
+    }
+
+    & ul {
+      list-style-type: disc;
+    }
+
+    & ol {
+      list-style-type: decimal;
+    }
+
+    & li > ul,
+    & li > ol {
+      @apply my-2;
+    }
+
+    & li > ul {
+      list-style-type: circle;
+    }
+
+    & li > ul > li > ul {
+      list-style-type: square;
+    }
+
+    & blockquote {
+      @apply my-4 pl-4 border-l-4 border-border italic;
+    }
+
+    & blockquote > *:first-child {
+      @apply mt-0;
+    }
+
+    & blockquote > *:last-child {
+      @apply mb-0;
+    }
+
+    & code {
+      @apply font-mono text-sm;
+      font-family: var(--font-geist-mono);
+    }
+
+    & :not(pre) > code {
+      @apply px-1.5 py-0.5 bg-muted rounded;
+    }
+
+    & pre {
+      @apply my-4 p-4 bg-muted rounded-md overflow-x-auto border border-border;
+    }
+
+    & pre > code {
+      @apply bg-transparent p-0;
+    }
+
+    & table {
+      @apply my-4 w-full border-collapse border border-border;
+    }
+
+    & thead {
+      @apply bg-muted;
+    }
+
+    & th {
+      @apply px-3 py-2 text-left text-sm font-semibold border-b border-border;
+    }
+
+    & td {
+      @apply px-3 py-2 text-sm border-b border-border;
+    }
+
+    & tbody tr:hover {
+      @apply bg-muted/50;
+    }
+
+    & hr {
+      @apply my-6 border-0 border-t border-border;
+    }
+
+    & a {
+      @apply underline hover:no-underline;
+    }
+
+    & img {
+      @apply max-w-full rounded;
+    }
+
+    & strong {
+      @apply font-semibold;
+    }
+
+    & em {
+      @apply italic;
+    }
+
+    & del,
+    & s {
+      @apply line-through;
+    }
+
+    & input[type="checkbox"] {
+      @apply mr-2 rounded;
+    }
+  }
 }
 
 /**
  * Fix use-stick-to-bottom viewport height calculation in flexbox.
  * The library's inline height:100% computes to content height in flex contexts.
  * Grid with 1fr properly constrains the child to the parent's available space.
- * Apply grid to both the parent and child to prevent height growth.
  */
 [role="log"],
 [role="log"] > div {
   display: grid;
   grid-template-rows: 1fr;
-}
-
-/**
- * Markdown rendering styles for Streamdown
- * Provides proper spacing and alignment for markdown elements in chat messages
- */
-@layer components {
-  /* Unordered lists - fix bullet alignment and spacing */
-  [data-streamdown="unordered-list"] {
-    @apply my-3 space-y-2 pl-6;
-    list-style-position: outside;
-  }
-
-  /* Ordered lists - fix number alignment and spacing */
-  [data-streamdown="ordered-list"] {
-    @apply my-3 space-y-2 pl-6;
-    list-style-position: outside;
-  }
-
-  /* List items - proper vertical spacing */
-  [data-streamdown="list-item"] {
-    @apply leading-relaxed;
-  }
-
-  /* Nested lists - reduce spacing */
-  [data-streamdown="list-item"] [data-streamdown="unordered-list"],
-  [data-streamdown="list-item"] [data-streamdown="ordered-list"] {
-    @apply my-2 pl-6;
-  }
-
-  /* Paragraphs - consistent spacing */
-  [data-streamdown] p {
-    @apply my-3 leading-relaxed;
-  }
-
-  /* First and last elements - remove extra margins */
-  [data-streamdown] > *:first-child {
-    @apply mt-0;
-  }
-
-  [data-streamdown] > *:last-child {
-    @apply mb-0;
-  }
-
-  /* Headings - proper spacing */
-  [data-streamdown="heading-1"],
-  [data-streamdown="heading-2"],
-  [data-streamdown="heading-3"],
-  [data-streamdown="heading-4"],
-  [data-streamdown="heading-5"],
-  [data-streamdown="heading-6"] {
-    @apply mt-6 mb-3 leading-tight;
-  }
-
-  /* Blockquotes - better spacing */
-  [data-streamdown="blockquote"] {
-    @apply my-4 py-1;
-  }
-
-  /* Code blocks - spacing */
-  [data-streamdown="mermaid-block"] {
-    @apply my-4;
-  }
-
-  /* Inline code - better readability */
-  [data-streamdown="inline-code"] {
-    @apply break-words;
-  }
-
-  /* Tables - proper spacing */
-  [data-streamdown="table-wrapper"] {
-    @apply my-4;
-  }
-
-  /* Horizontal rules - spacing */
-  [data-streamdown="horizontal-rule"] {
-    @apply my-6;
-  }
-
-  /* Links - break long URLs */
-  [data-streamdown="link"] {
-    @apply break-words;
-  }
 }
