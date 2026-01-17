@@ -1055,7 +1055,7 @@ export const PromptInputSpeechButton = ({
   useEffect(() => {
     onTranscriptionChangeRef.current = onTranscriptionChange;
     textareaRefRef.current = textareaRef;
-  });
+  }, [onTranscriptionChange, textareaRef]);
 
   useEffect(() => {
     if (
@@ -1125,7 +1125,12 @@ export const PromptInputSpeechButton = ({
     if (isListening) {
       recognitionRef.current.stop();
     } else {
-      recognitionRef.current.start();
+      try {
+        recognitionRef.current.start();
+      } catch (error) {
+        logError("[PromptInput]", "Failed to start speech recognition", error);
+        setIsListening(false);
+      }
     }
   }, [isListening]);
 
