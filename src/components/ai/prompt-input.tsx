@@ -3,7 +3,6 @@
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { logError } from "@/lib/logging";
-import { toast } from "sonner";
 import {
   Command,
   CommandEmpty,
@@ -1035,46 +1034,6 @@ declare global {
   }
 }
 
-const SPEECH_ERROR_MESSAGES: Record<string, string> = {
-  "not-allowed": "Microphone permission was denied. Check your browser settings.",
-  "service-not-allowed": "Microphone permission was denied. Check your browser settings.",
-  network: "Network error while starting speech recognition.",
-  "audio-capture": "No microphone detected. Check your device.",
-  "language-not-supported": "This language is not supported for speech recognition.",
-  "no-speech": "No speech detected. Please try again.",
-  aborted: "Speech recognition was interrupted.",
-};
-
-const appendTranscriptPart = (existing: string, addition: string) => {
-  const clean = addition?.trim();
-  if (!clean) return existing;
-  return existing ? `${existing} ${clean}` : clean;
-};
-
-const buildTranscriptionValue = (
-  base: string,
-  finalTranscript: string,
-  interimTranscript?: string
-) => {
-  const normalizedBase = base ?? "";
-
-  const additions = [finalTranscript, interimTranscript]
-    .map((part) => part?.trim())
-    .filter(Boolean)
-    .join(" ");
-
-  if (!additions) {
-    return normalizedBase;
-  }
-
-  const needsSpace = normalizedBase.length === 0 || normalizedBase.endsWith(" ") ? "" : " ";
-  return `${normalizedBase}${needsSpace}${additions}`;
-};
-
-const getSpeechErrorMessage = (errorCode?: string) =>
-  SPEECH_ERROR_MESSAGES[errorCode ?? ""] ??
-  "Couldn't use your mic. Please check permissions and try again.";
-
 export type PromptInputSpeechButtonProps = ComponentProps<typeof PromptInputButton> & {
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   onTranscriptionChange?: (text: string) => void;
@@ -1090,130 +1049,79 @@ export const PromptInputSpeechButton = ({
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
 
-  const baseValueRef = useRef("");
-  const finalTranscriptRef = useRef("");
-
-  const applyTranscription = useCallback(
-    (value: string) => {
-      if (textareaRef?.current) {
-        textareaRef.current.value = value;
-        if (!onTranscriptionChange) {
-          textareaRef.current.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      }
-
-      onTranscriptionChange?.(value);
-    },
-    [onTranscriptionChange, textareaRef]
-  );
-
-  const resetTranscriptionSession = useCallback(() => {
-    baseValueRef.current = textareaRef?.current?.value ?? "";
-    finalTranscriptRef.current = "";
-  }, [textareaRef]);
-
   useEffect(() => {
     if (
-      typeof window === "undefined" ||
-      (!("SpeechRecognition" in window) && !("webkitSpeechRecognition" in window))
+      typeof window !== "undefined" &&
+      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
     ) {
-      return;
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const speechRecognition = new SpeechRecognition();
+
+      speechRecognition.continuous = true;
+      speechRecognition.interimResults = true;
+      speechRecognition.lang = "en-US";
+
+      speechRecognition.onstart = () => {
+        setIsListening(true);
+      };
+
+      speechRecognition.onend = () => {
+        setIsListening(false);
+      };
+
+      speechRecognition.onresult = (event) => {
+        let finalTranscript = "";
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalTranscript += result[0]?.transcript ?? "";
+          }
+        }
+
+        if (finalTranscript && textareaRef?.current) {
+          const textarea = textareaRef.current;
+          const currentValue = textarea.value;
+          const newValue = currentValue + (currentValue ? " " : "") + finalTranscript;
+
+          textarea.value = newValue;
+          textarea.dispatchEvent(new Event("input", { bubbles: true }));
+          onTranscriptionChange?.(newValue);
+        }
+      };
+
+      speechRecognition.onerror = (event) => {
+        logError("[PromptInput]", "Speech recognition error", event.error);
+        setIsListening(false);
+      };
+
+      recognitionRef.current = speechRecognition;
     }
 
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    const speechRecognition = new SpeechRecognition();
-
-    speechRecognition.continuous = true;
-    speechRecognition.interimResults = true;
-    speechRecognition.lang = "en-US";
-
-    speechRecognition.onstart = () => {
-      resetTranscriptionSession();
-      setIsListening(true);
-    };
-
-    speechRecognition.onend = () => {
-      setIsListening(false);
-    };
-
-    speechRecognition.onresult = (event) => {
-      let interimTranscript = "";
-
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0]?.transcript ?? "";
-        if (result.isFinal) {
-          finalTranscriptRef.current = appendTranscriptPart(finalTranscriptRef.current, transcript);
-        } else {
-          interimTranscript = transcript;
-        }
-      }
-
-      const newValue = buildTranscriptionValue(
-        baseValueRef.current,
-        finalTranscriptRef.current,
-        interimTranscript
-      );
-
-      applyTranscription(newValue);
-    };
-
-    speechRecognition.onerror = (event) => {
-      const errorCode =
-        event.error || (event as SpeechRecognitionErrorEvent & { message?: string }).message;
-
-      logError("[PromptInput]", "Speech recognition error", errorCode ?? "unknown", {
-        errorCode: errorCode ?? "unknown",
-      });
-      toast.error(getSpeechErrorMessage(errorCode));
-      setIsListening(false);
-    };
-
-    recognitionRef.current = speechRecognition;
-
     return () => {
-      speechRecognition.onstart = null;
-      speechRecognition.onend = null;
-      speechRecognition.onresult = null;
-      speechRecognition.onerror = null;
-      speechRecognition.stop();
-      recognitionRef.current = null;
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
     };
-  }, [applyTranscription, resetTranscriptionSession]);
+  }, [textareaRef, onTranscriptionChange]);
 
   const toggleListening = useCallback(() => {
-    const recognition = recognitionRef.current;
-
-    if (!recognition) {
-      toast.error("Speech recognition is not available in this browser.");
+    if (!recognitionRef.current) {
       return;
     }
 
     if (isListening) {
-      recognition.stop();
-      return;
+      recognitionRef.current.stop();
+    } else {
+      recognitionRef.current.start();
     }
-
-    try {
-      resetTranscriptionSession();
-      recognition.start();
-    } catch (error) {
-      logError("[PromptInput]", "Failed to start speech recognition", error);
-      toast.error("Couldn't start the microphone. Check permissions and try again.");
-      setIsListening(false);
-    }
-  }, [isListening, resetTranscriptionSession]);
+  }, [isListening]);
 
   const hasSpeechRecognition =
     typeof window !== "undefined" &&
     ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
 
   const isDisabled = disabled || !hasSpeechRecognition;
-  const title = isListening
-    ? "Stop voice input"
-    : isDisabled
-      ? "Speech recognition not supported"
-      : "Start voice input";
 
   return (
     <PromptInputButton
@@ -1222,10 +1130,8 @@ export const PromptInputSpeechButton = ({
         isListening && "animate-pulse bg-accent text-accent-foreground",
         className
       )}
-      aria-pressed={isListening}
       disabled={isDisabled}
       onClick={toggleListening}
-      title={title}
       {...props}>
       <MicIcon className="size-4" />
     </PromptInputButton>
