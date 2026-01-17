@@ -1039,6 +1039,10 @@ export type PromptInputSpeechButtonProps = ComponentProps<typeof PromptInputButt
   onTranscriptionChange?: (text: string) => void;
 };
 
+// Regex patterns - compiled once at module level for performance
+const PUNCTUATION_NO_SPACE_REGEX = /^[.,!?;:\)}\]]/;
+const TRAILING_SPACE_REGEX = /\s$/;
+
 export const PromptInputSpeechButton = ({
   className,
   textareaRef,
@@ -1081,10 +1085,25 @@ export const PromptInputSpeechButton = ({
 
         if (finalTranscript && textareaRef?.current) {
           const textarea = textareaRef.current;
-          const currentValue = textarea.value;
-          const newValue = currentValue + (currentValue ? " " : "") + finalTranscript;
+          const cursorPosition = textarea.selectionStart;
+          const beforeCursor = textarea.value.slice(0, cursorPosition);
+          const afterCursor = textarea.value.slice(cursorPosition);
+
+          // Determine if we need a space before the transcription
+          const endsWithSpace = TRAILING_SPACE_REGEX.test(beforeCursor);
+          const startsWithPunctuation = PUNCTUATION_NO_SPACE_REGEX.test(finalTranscript);
+
+          let spacer = "";
+          if (beforeCursor && !endsWithSpace && !startsWithPunctuation) {
+            spacer = " ";
+          }
+
+          const insertText = spacer + finalTranscript.trimStart();
+          const newValue = beforeCursor + insertText + afterCursor;
+          const newCursorPosition = cursorPosition + insertText.length;
 
           textarea.value = newValue;
+          textarea.setSelectionRange(newCursorPosition, newCursorPosition);
           textarea.dispatchEvent(new Event("input", { bubbles: true }));
           onTranscriptionChange?.(newValue);
         }
@@ -1106,7 +1125,7 @@ export const PromptInputSpeechButton = ({
   }, [textareaRef, onTranscriptionChange]);
 
   const toggleListening = useCallback(() => {
-    if (!recognitionRef.current) {
+    if (!recognitionRef.current || !textareaRef?.current) {
       return;
     }
 
@@ -1114,8 +1133,12 @@ export const PromptInputSpeechButton = ({
       recognitionRef.current.stop();
     } else {
       recognitionRef.current.start();
+      // Focus textarea and move cursor to end
+      const textarea = textareaRef.current;
+      textarea.focus();
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
     }
-  }, [isListening]);
+  }, [isListening, textareaRef]);
 
   const hasSpeechRecognition =
     typeof window !== "undefined" &&
