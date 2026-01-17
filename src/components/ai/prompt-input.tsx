@@ -1048,6 +1048,14 @@ export const PromptInputSpeechButton = ({
 }: PromptInputSpeechButtonProps) => {
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const onTranscriptionChangeRef = useRef(onTranscriptionChange);
+  const textareaRefRef = useRef(textareaRef);
+
+  // Keep refs up to date
+  useEffect(() => {
+    onTranscriptionChangeRef.current = onTranscriptionChange;
+    textareaRefRef.current = textareaRef;
+  });
 
   useEffect(() => {
     if (
@@ -1079,14 +1087,14 @@ export const PromptInputSpeechButton = ({
           }
         }
 
-        if (finalTranscript && textareaRef?.current) {
-          const textarea = textareaRef.current;
+        if (finalTranscript && textareaRefRef.current?.current) {
+          const textarea = textareaRefRef.current.current;
           const currentValue = textarea.value;
           const newValue = currentValue + (currentValue ? " " : "") + finalTranscript;
 
           textarea.value = newValue;
           textarea.dispatchEvent(new Event("input", { bubbles: true }));
-          onTranscriptionChange?.(newValue);
+          onTranscriptionChangeRef.current?.(newValue);
         }
       };
 
@@ -1100,10 +1108,14 @@ export const PromptInputSpeechButton = ({
 
     return () => {
       if (recognitionRef.current) {
-        recognitionRef.current.stop();
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // Ignore errors when stopping recognition during cleanup
+        }
       }
     };
-  }, [textareaRef, onTranscriptionChange]);
+  }, []);
 
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) {
