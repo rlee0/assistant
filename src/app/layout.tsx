@@ -31,14 +31,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        <link
-          rel="stylesheet"
-          href="https://cdn.jsdelivr.net/npm/katex@0.16.27/dist/katex.min.css"
-          integrity="sha384-efPmOJxZqckYj7Q/rX4wLRDRdONbTSQxf8CiQCDJGTWUq4M2r/bhuF8qNvTiK+8H"
-          crossOrigin="anonymous"
-        />
-      </head>
       <body className={cn(geistSans.variable, geistMono.variable, "antialiased")}>
         <Suspense fallback={null}>
           <ProgressBarProvider>
