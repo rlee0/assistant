@@ -1110,8 +1110,9 @@ export const PromptInputSpeechButton = ({
       if (recognitionRef.current) {
         try {
           recognitionRef.current.stop();
-        } catch {
-          // Ignore errors when stopping recognition during cleanup
+        } catch (error) {
+          // Ignore errors when stopping recognition during cleanup, but log for debugging
+          logError("[PromptInput]", "Error stopping speech recognition during cleanup", error);
         }
       }
     };
