@@ -41,25 +41,28 @@ type ChatState = {
   reset: () => void;
 };
 
-function getLastUserMessageMs(conversation: Conversation | undefined): number {
+function getUpdatedMs(conversation: Conversation | undefined): number {
   if (!conversation) return 0;
-  const timestamp = Date.parse(conversation.lastUserMessageAt);
+  const timestamp = Date.parse(conversation.updatedAt);
   return Number.isFinite(timestamp) ? timestamp : 0;
 }
 
-function sortOrderByLastUserMessage(
+function sortOrderByUpdatedAt(
   order: string[],
   conversations: Record<string, Conversation>
 ): string[] {
   const originalIndex = new Map(order.map((id, index) => [id, index]));
+  const normalized = normalizeOrder(order).filter((id) => id in conversations);
+  const updatedMsCache = new Map<string, number>();
+  for (const id of normalized) {
+    updatedMsCache.set(id, getUpdatedMs(conversations[id]));
+  }
 
-  return normalizeOrder(order)
-    .filter((id) => id in conversations)
-    .sort((a, b) => {
-      const diff = getLastUserMessageMs(conversations[b]) - getLastUserMessageMs(conversations[a]);
-      if (diff !== 0) return diff;
-      return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
-    });
+  return normalized.sort((a, b) => {
+    const diff = (updatedMsCache.get(b) ?? 0) - (updatedMsCache.get(a) ?? 0);
+    if (diff !== 0) return diff;
+    return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
+  });
 }
 
 function areMessagesEqual(a: UIMessage[] | undefined, b: UIMessage[]): boolean {
@@ -256,7 +259,7 @@ export const useChatStore = create<ChatState>((set) => ({
         statuses[id] = "idle";
       }
 
-      const order = sortOrderByLastUserMessage(validated.order, conversations);
+      const order = sortOrderByUpdatedAt(validated.order, conversations);
       const selectedId = validated.selectedId ?? order[0] ?? null;
 
       set((state) => {
@@ -304,7 +307,7 @@ export const useChatStore = create<ChatState>((set) => ({
         [conversation.id]: updatedConversation,
       };
 
-      const order = sortOrderByLastUserMessage([...state.order, conversation.id], conversations);
+      const order = sortOrderByUpdatedAt([...state.order, conversation.id], conversations);
 
       return {
         conversations,
@@ -318,33 +321,21 @@ export const useChatStore = create<ChatState>((set) => ({
       const conversation = state.conversations[id];
       if (!conversation) return state;
 
-      // Skip updates when messages are unchanged to avoid resorting on selection.
+      // Skip updates when messages are unchanged (e.g., on selection/navigation)
       if (areMessagesEqual(conversation.messages, messages)) {
         return state;
       }
 
-      const now = new Date().toISOString();
-      const lastMessage = messages[messages.length - 1];
-      const isNewUserMessage =
-        lastMessage?.role === "user" && messages.length > conversation.messages.length;
-
+      // Only update messages. updatedAt is managed by explicit actions (upsert, updateTitle, etc.)
       const updatedConversation: Conversation = {
         ...conversation,
         messages,
-        updatedAt: now,
-        lastUserMessageAt: isNewUserMessage ? now : conversation.lastUserMessageAt,
       };
 
       const conversations = { ...state.conversations, [id]: updatedConversation };
 
-      // Only resort order when a new user message is added
-      const order = isNewUserMessage
-        ? sortOrderByLastUserMessage(state.order, conversations)
-        : state.order;
-
       return {
         conversations,
-        order,
       };
     }),
 
@@ -366,8 +357,8 @@ export const useChatStore = create<ChatState>((set) => ({
 
       return {
         conversations,
-        // Don't resort order when only updating title
-        order: state.order,
+        // Resort order since updatedAt changes on title edits
+        order: sortOrderByUpdatedAt(state.order, conversations),
       };
     }),
 
