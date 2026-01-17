@@ -24,6 +24,7 @@ export type MessagePart =
       readonly result?: unknown;
     }
   | { readonly type: "image"; readonly image?: string; readonly mimeType?: string }
+  | { readonly type: "file"; readonly url?: string; readonly mediaType?: string; readonly filename?: string }
   | { readonly type: "reasoning"; readonly text?: string }
   | { readonly type: "source-url"; readonly url: string; readonly title?: string }
   | Record<string, unknown>;
@@ -94,6 +95,17 @@ export function isReasoningPart(part: unknown): part is { type: "reasoning"; tex
     "type" in part &&
     (part as Record<string, unknown>).type === "reasoning"
   );
+}
+
+/**
+ * Type guard for file parts
+ */
+export function isFilePart(
+  part: unknown
+): part is { type: "file"; url?: string; mediaType?: string; filename?: string } {
+  if (typeof part !== "object" || part === null) return false;
+  const p = part as Record<string, unknown>;
+  return p.type === "file";
 }
 
 /**
@@ -169,6 +181,27 @@ export function extractReasoningParts(message: UseChatMessage): string[] {
   }
 
   return reasoning;
+}
+
+/**
+ * Safely extracts all file parts from a message
+ */
+export function extractFileParts(message: UseChatMessage): Array<{
+  type: "file";
+  url?: string;
+  mediaType?: string;
+  filename?: string;
+}> {
+  const parts = Array.isArray(message.parts) ? message.parts : [];
+  const files: Array<{ type: "file"; url?: string; mediaType?: string; filename?: string }> = [];
+
+  for (const part of parts) {
+    if (isFilePart(part)) {
+      files.push(part);
+    }
+  }
+
+  return files;
 }
 
 /**
