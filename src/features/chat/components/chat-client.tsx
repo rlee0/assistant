@@ -1,7 +1,7 @@
 "use client";
 
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport, type LanguageModelUsage, type UIMessage } from "ai";
+import { DefaultChatTransport, type FileUIPart, type LanguageModelUsage, type UIMessage } from "ai";
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -662,13 +662,14 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           }
         }
 
-        const messageToSend: Record<string, unknown> = {
+        // Build message with text and optionally files
+        const messageToSend: { text: string; files?: FileUIPart[] } = {
           text: ((message.text as string) ?? "").trim() || "[File attachment]",
         };
 
         // Include file attachments if present
         if (hasAttachments) {
-          messageToSend.files = message.files;
+          messageToSend.files = message.files as FileUIPart[];
         }
 
         sendMessage(messageToSend, {
