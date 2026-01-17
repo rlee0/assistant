@@ -1131,6 +1131,7 @@ export const PromptInputSpeechButton = ({
         className
       )}
       disabled={isDisabled}
+      onMouseDown={(e) => e.preventDefault()}
       onClick={toggleListening}
       {...props}>
       <MicIcon className="size-4" />
