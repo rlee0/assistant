@@ -36,9 +36,15 @@ function isPublicRoute(pathname: string): boolean {
 export async function middleware(request: NextRequest): Promise<NextResponse> {
   const { pathname } = request.nextUrl;
 
+  // Create response with security headers
+  const response = NextResponse.next();
+
+  // Enable microphone for speech recognition
+  response.headers.set("Permissions-Policy", "microphone=(self)");
+
   // Allow public routes without authentication
   if (isPublicRoute(pathname)) {
-    return NextResponse.next();
+    return response;
   }
 
   // Check authentication for protected routes
@@ -52,21 +58,25 @@ export async function middleware(request: NextRequest): Promise<NextResponse> {
     // Handle auth errors
     if (error) {
       logError("[Middleware]", "Auth verification failed", error.message);
-      return NextResponse.redirect(new URL("/login", request.url));
+      const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
+      redirectResponse.headers.set("Permissions-Policy", "microphone=(self)");
+      return redirectResponse;
     }
 
     // Redirect unauthenticated users
     if (!user) {
-      return NextResponse.redirect(new URL("/login", request.url));
+      const redirectResponse = NextResponse.redirect(new URL("/login", request.url));
+      redirectResponse.headers.set("Permissions-Policy", "microphone=(self)");
+      return redirectResponse;
     }
 
     // User authenticated, proceed with request
-    return NextResponse.next();
+    return response;
   } catch (error) {
     // Log configuration errors but allow request (page will handle)
     const message = error instanceof Error ? error.message : "Unknown error";
     logError("[Middleware]", "Auth check failed", message);
-    return NextResponse.next();
+    return response;
   }
 }
 

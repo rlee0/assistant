@@ -1065,6 +1065,8 @@ export const PromptInputSpeechButton = ({
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const onTranscriptionChangeRef = useRef(onTranscriptionChange);
   const textareaRefRef = useRef(textareaRef);
+  const shouldRestartRef = useRef(false);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
 
   // Keep refs up to date
   useEffect(() => {
@@ -1089,7 +1091,18 @@ export const PromptInputSpeechButton = ({
       };
 
       speechRecognition.onend = () => {
-        setIsListening(false);
+        // If we should keep listening (user didn't manually stop), restart
+        if (shouldRestartRef.current && recognitionRef.current) {
+          try {
+            recognitionRef.current.start();
+          } catch (error) {
+            // If restart fails, stop listening
+            shouldRestartRef.current = false;
+            setIsListening(false);
+          }
+        } else {
+          setIsListening(false);
+        }
       };
 
       speechRecognition.onresult = (event) => {
@@ -1104,31 +1117,61 @@ export const PromptInputSpeechButton = ({
 
         if (finalTranscript && textareaRefRef.current?.current) {
           const textarea = textareaRefRef.current.current;
-          const currentValue = textarea.value;
-          const newValue = currentValue + (currentValue ? " " : "") + finalTranscript;
 
+          // Save the current cursor position
+          const cursorStart = textarea.selectionStart ?? textarea.value.length;
+          const cursorEnd = textarea.selectionEnd ?? textarea.value.length;
+
+          // Get the text before and after the cursor
+          const beforeCursor = textarea.value.substring(0, cursorStart);
+          const afterCursor = textarea.value.substring(cursorEnd);
+
+          // Insert transcript at cursor position with appropriate spacing
+          const needsSpaceBefore = beforeCursor.length > 0 && !beforeCursor.endsWith(" ");
+          const needsSpaceAfter = afterCursor.length > 0 && !afterCursor.startsWith(" ");
+          const transcriptToInsert =
+            (needsSpaceBefore ? " " : "") + finalTranscript + (needsSpaceAfter ? " " : "");
+
+          // Build the new value with transcript inserted at cursor position
+          const newValue = beforeCursor + transcriptToInsert + afterCursor;
+
+          // Update the textarea value
           textarea.value = newValue;
+
+          // Restore cursor position after the inserted text
+          const newCursorPosition = cursorStart + transcriptToInsert.length;
+          textarea.setSelectionRange(newCursorPosition, newCursorPosition);
+
+          // Keep focus on the textarea
+          textarea.focus();
+
+          // Dispatch events
           textarea.dispatchEvent(new Event("input", { bubbles: true }));
           onTranscriptionChangeRef.current?.(newValue);
         }
       };
 
       speechRecognition.onerror = (event) => {
-        const errorCode =
-          event.error || (event as SpeechRecognitionErrorEvent & { message?: string }).message;
+        // Extract error code - event.error should be a string according to Web Speech API spec
+        const errorCode = event.error || "unknown";
 
-        // Log the full event for debugging
-        console.log("[PromptInput] Speech recognition error event:", {
-          error: event.error,
+        // Enhanced debug logging to diagnose the issue
+        console.log("[PromptInput] Speech recognition error details:", {
+          errorCode,
+          errorValue: event.error,
           errorType: typeof event.error,
-          message: (event as any).message,
+          hasMessage: "message" in event,
           eventType: event.type,
+          fullEvent: event,
         });
 
-        logError("[PromptInput]", "Speech recognition error", errorCode ?? "unknown", {
-          errorCode: errorCode ?? "unknown",
+        // Log error with proper serialization
+        const errorMessage = `Speech recognition error: ${errorCode}`;
+        logError("[PromptInput]", errorMessage, new Error(errorCode), {
+          errorCode,
           errorType: typeof event.error,
         });
+
         toast.error(getSpeechErrorMessage(errorCode));
         setIsListening(false);
       };
@@ -1139,30 +1182,70 @@ export const PromptInputSpeechButton = ({
     return () => {
       if (recognitionRef.current) {
         try {
+          shouldRestartRef.current = false;
           recognitionRef.current.stop();
         } catch (error) {
           // Ignore errors when stopping recognition during cleanup, but log for debugging
           logError("[PromptInput]", "Error stopping speech recognition during cleanup", error);
         }
       }
+
+      // Stop all media stream tracks to release the microphone
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
     };
   }, []);
 
-  const toggleListening = useCallback(() => {
+  const toggleListening = useCallback(async () => {
     if (!recognitionRef.current) {
       toast.error("Speech recognition is not available in this browser.");
       return;
     }
 
     if (isListening) {
+      // User manually stopped - don't restart
+      shouldRestartRef.current = false;
       recognitionRef.current.stop();
+
+      // Stop all media stream tracks to release the microphone
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+
+      // Restore focus to textarea after stopping
+      textareaRefRef.current?.current?.focus();
     } else {
       try {
+        // Request microphone permission explicitly first
+        // This is necessary in some browsers even if permission was granted previously
+        if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
+        }
+
+        // User manually started - keep restarting on auto-stop
+        shouldRestartRef.current = true;
         recognitionRef.current.start();
+        // Keep focus on textarea so user can type while speaking
+        textareaRefRef.current?.current?.focus();
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
         logError("[PromptInput]", "Failed to start speech recognition", error);
-        toast.error("Couldn't start speech recognition. Please try again.");
+
+        if (errorMessage.includes("Permission") || errorMessage.includes("denied")) {
+          toast.error(
+            "Microphone permission was denied. Please allow microphone access and try again."
+          );
+        } else {
+          toast.error("Couldn't start speech recognition. Please try again.");
+        }
+        shouldRestartRef.current = false;
         setIsListening(false);
+        // Restore focus even on error
+        textareaRefRef.current?.current?.focus();
       }
     }
   }, [isListening]);
