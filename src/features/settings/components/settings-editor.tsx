@@ -1,11 +1,8 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import Editor from "@monaco-editor/react";
-import type { editor } from "monaco-editor";
+import { useCallback, useState } from "react";
 import { useSettingsStore } from "@/features/settings/store/settings-store";
 import { settingsSchema } from "@/lib/settings";
-import { zodToJsonSchema } from "zod-to-json-schema";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -14,14 +11,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useTheme } from "next-themes";
+import { Textarea } from "@/components/ui/textarea";
 
 /**
  * Configuration-based settings editor with Monaco integration
  * 
  * Features:
  * - Split view: Form UI and JSON editor
- * - Monaco editor with JSON schema hints
+ * - JSON editor with real-time validation
  * - Last writer wins strategy for conflict resolution
  * - Real-time validation
  */
@@ -29,43 +26,16 @@ export function SettingsEditor() {
   const settings = useSettingsStore((state) => state.settings);
   const updateBatch = useSettingsStore((state) => state.updateBatch);
   const update = useSettingsStore((state) => state.update);
-  const { theme } = useTheme();
   
   const [jsonError, setJsonError] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  
-  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   
   // Compute JSON value from settings - always reflect current settings
   // "Last writer wins" is automatic: both UI and JSON update the same store
   const jsonValue = JSON.stringify(settings, null, 2);
 
-  // Handle Monaco editor mount
-  const handleEditorDidMount = useCallback((editor: editor.IStandaloneCodeEditor) => {
-    editorRef.current = editor;
-
-    // Configure JSON schema for the editor
-    const jsonSchema = zodToJsonSchema(settingsSchema, "settingsSchema");
-    
-    // Set up Monaco JSON defaults with schema
-    if (window.monaco) {
-      window.monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
-        validate: true,
-        schemas: [
-          {
-            uri: "http://myserver/settings-schema.json",
-            fileMatch: ["*"],
-            schema: jsonSchema,
-          },
-        ],
-      });
-    }
-  }, []);
-
   // Handle JSON editor changes
-  const handleJsonChange = useCallback((value: string | undefined) => {
-    if (!value) return;
-    
+  const handleJsonChange = useCallback((value: string) => {
     setJsonError(null);
     
     // Try to parse and validate
@@ -96,9 +66,10 @@ export function SettingsEditor() {
 
   // Format JSON - re-formats the current settings JSON
   const handleFormat = useCallback(() => {
-    // The editor value is always in sync with settings
-    // This is a no-op for now since jsonValue is always formatted
-    // Keeping for potential future use
+    // The jsonValue is always formatted from settings
+    // But we can trigger a re-render by updating status
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus("idle"), 1000);
   }, []);
 
   return (
@@ -142,7 +113,7 @@ export function SettingsEditor() {
                 <div>
                   <CardTitle>JSON Configuration</CardTitle>
                   <CardDescription>
-                    Edit settings as JSON with schema validation and autocomplete
+                    Edit settings as JSON with real-time validation
                   </CardDescription>
                 </div>
                 <Button onClick={handleFormat} variant="outline" size="sm">
@@ -151,25 +122,13 @@ export function SettingsEditor() {
               </div>
             </CardHeader>
             <CardContent>
-              <div className="border rounded-md overflow-hidden">
-                <Editor
-                  height="500px"
-                  defaultLanguage="json"
-                  value={jsonValue}
-                  onChange={handleJsonChange}
-                  onMount={handleEditorDidMount}
-                  theme={theme === "dark" ? "vs-dark" : "light"}
-                  options={{
-                    minimap: { enabled: false },
-                    fontSize: 14,
-                    lineNumbers: "on",
-                    scrollBeyondLastLine: false,
-                    automaticLayout: true,
-                    formatOnPaste: true,
-                    formatOnType: true,
-                  }}
-                />
-              </div>
+              <Textarea
+                value={jsonValue}
+                onChange={(e) => handleJsonChange(e.target.value)}
+                className="font-mono text-sm min-h-[500px]"
+                placeholder="JSON configuration..."
+                spellCheck={false}
+              />
             </CardContent>
           </Card>
         </TabsContent>
