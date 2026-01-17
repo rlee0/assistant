@@ -44,7 +44,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai/prompt-input";
-import { memo, useEffect, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
 import type { ChatMessagesProps } from "../types";
@@ -113,6 +113,15 @@ export const ChatMessages = memo<ChatMessagesProps>(
       }
     }, [editingMessageId, editText]);
 
+    const lastAssistantIndex = useMemo(() => {
+      for (let i = messages.length - 1; i >= 0; i -= 1) {
+        if (messages[i]?.role === "assistant") {
+          return i;
+        }
+      }
+      return -1;
+    }, [messages]);
+
     return (
       <div className={CSS_CLASSES.messagesContainer} ref={messagesContainerRef}>
         <Conversation>
@@ -169,6 +178,9 @@ export const ChatMessages = memo<ChatMessagesProps>(
                       .join("\n");
 
                     const hasTextToCopy = textParts.trim().length > 0;
+                    const canAct = status === "ready" || status === "error";
+                    const isLastAssistant =
+                      message.role === "assistant" && messageIndex === lastAssistantIndex;
 
                     return (
                       <div key={messageIndex} className="group flex flex-col gap-2">
@@ -278,38 +290,50 @@ export const ChatMessages = memo<ChatMessagesProps>(
                                 <Copy className="size-3" />
                               </MessageAction>
 
-                              {/* Regenerate with confirmation */}
-                              <AlertDialog>
-                                <AlertDialogTrigger asChild>
-                                  <MessageAction
-                                    label="Regenerate"
-                                    tooltip="Regenerate from here"
-                                    disabled={!(status === "ready" || status === "error")}>
-                                    <RefreshCcw className="size-3" />
-                                  </MessageAction>
-                                </AlertDialogTrigger>
-                                <AlertDialogContent>
-                                  <AlertDialogHeader>
-                                    <AlertDialogTitle>
-                                      Regenerate from this message?
-                                    </AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                      This will delete all messages after this assistant message,
-                                      then regenerate the response for this message. This action
-                                      cannot be undone.
-                                    </AlertDialogDescription>
-                                  </AlertDialogHeader>
-                                  <AlertDialogFooter>
-                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                    <AlertDialogAction
-                                      onClick={() => {
-                                        onRegenerateFromMessage(message.id);
-                                      }}>
-                                      Regenerate
-                                    </AlertDialogAction>
-                                  </AlertDialogFooter>
-                                </AlertDialogContent>
-                              </AlertDialog>
+                              {/* Regenerate (confirmation for earlier messages) */}
+                              {isLastAssistant ? (
+                                <MessageAction
+                                  label="Regenerate"
+                                  tooltip="Regenerate from here"
+                                  disabled={!canAct}
+                                  onClick={() => {
+                                    onRegenerateFromMessage(message.id);
+                                  }}>
+                                  <RefreshCcw className="size-3" />
+                                </MessageAction>
+                              ) : (
+                                <AlertDialog>
+                                  <AlertDialogTrigger asChild>
+                                    <MessageAction
+                                      label="Regenerate"
+                                      tooltip="Regenerate from here"
+                                      disabled={!canAct}>
+                                      <RefreshCcw className="size-3" />
+                                    </MessageAction>
+                                  </AlertDialogTrigger>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>
+                                        Regenerate from this message?
+                                      </AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        This will delete all messages after this assistant message,
+                                        then regenerate the response for this message. This action
+                                        cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => {
+                                          onRegenerateFromMessage(message.id);
+                                        }}>
+                                        Regenerate
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              )}
                             </MessageActions>
                           )}
 
@@ -321,7 +345,7 @@ export const ChatMessages = memo<ChatMessagesProps>(
                                 }}
                                 label="Edit"
                                 tooltip="Edit message"
-                                disabled={!(status === "ready" || status === "error")}>
+                                disabled={!canAct}>
                                 <Edit2 className="size-3" />
                               </MessageAction>
 
@@ -331,7 +355,7 @@ export const ChatMessages = memo<ChatMessagesProps>(
                                   <MessageAction
                                     label="Delete"
                                     tooltip="Delete message"
-                                    disabled={!(status === "ready" || status === "error")}>
+                                    disabled={!canAct}>
                                     <Trash2 className="size-3" />
                                   </MessageAction>
                                 </AlertDialogTrigger>

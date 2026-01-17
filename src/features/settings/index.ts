@@ -10,6 +10,7 @@
 // Components
 // ============================================================================
 export { SettingsModal } from "./components/settings-modal";
+export { SettingsEditor } from "./components/settings-editor";
 
 // ============================================================================
 // Hooks

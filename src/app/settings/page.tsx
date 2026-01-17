@@ -11,6 +11,8 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { logError } from "@/lib/logging";
 import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useRouter } from "next/navigation";
+import { SettingsEditor } from "@/features/settings/components/settings-editor";
+import { Separator } from "@/components/ui/separator";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -69,7 +71,7 @@ export default function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-zinc-50 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-2xl">
+      <div className="mx-auto max-w-4xl">
         <div className="mb-8">
           <Button variant="outline" onClick={() => router.back()} className="mb-4">
             Back
@@ -77,6 +79,13 @@ export default function SettingsPage() {
           <h1 className="text-3xl font-bold tracking-tight">Settings</h1>
           <p className="text-sm text-zinc-600">Manage your account and preferences</p>
         </div>
+
+        {/* Configuration Editor */}
+        <div className="mb-8">
+          <SettingsEditor />
+        </div>
+
+        <Separator className="my-8" />
 
         {/* Account Section */}
         <Card className="mb-6">
