@@ -180,3 +180,86 @@
   display: grid;
   grid-template-rows: 1fr;
 }
+
+/**
+ * Markdown rendering styles for Streamdown
+ * Provides proper spacing and alignment for markdown elements in chat messages
+ */
+@layer components {
+  /* Unordered lists - fix bullet alignment and spacing */
+  [data-streamdown="unordered-list"] {
+    @apply my-3 space-y-2 pl-6;
+    list-style-position: outside;
+  }
+
+  /* Ordered lists - fix number alignment and spacing */
+  [data-streamdown="ordered-list"] {
+    @apply my-3 space-y-2 pl-6;
+    list-style-position: outside;
+  }
+
+  /* List items - proper vertical spacing */
+  [data-streamdown="list-item"] {
+    @apply leading-relaxed;
+  }
+
+  /* Nested lists - reduce spacing */
+  [data-streamdown="list-item"] [data-streamdown="unordered-list"],
+  [data-streamdown="list-item"] [data-streamdown="ordered-list"] {
+    @apply my-2 pl-6;
+  }
+
+  /* Paragraphs - consistent spacing */
+  [data-streamdown] p {
+    @apply my-3 leading-relaxed;
+  }
+
+  /* First and last elements - remove extra margins */
+  [data-streamdown] > *:first-child {
+    @apply mt-0;
+  }
+
+  [data-streamdown] > *:last-child {
+    @apply mb-0;
+  }
+
+  /* Headings - proper spacing */
+  [data-streamdown="heading-1"],
+  [data-streamdown="heading-2"],
+  [data-streamdown="heading-3"],
+  [data-streamdown="heading-4"],
+  [data-streamdown="heading-5"],
+  [data-streamdown="heading-6"] {
+    @apply mt-6 mb-3 leading-tight;
+  }
+
+  /* Blockquotes - better spacing */
+  [data-streamdown="blockquote"] {
+    @apply my-4 py-1;
+  }
+
+  /* Code blocks - spacing */
+  [data-streamdown="mermaid-block"] {
+    @apply my-4;
+  }
+
+  /* Inline code - better readability */
+  [data-streamdown="inline-code"] {
+    @apply break-words;
+  }
+
+  /* Tables - proper spacing */
+  [data-streamdown="table-wrapper"] {
+    @apply my-4;
+  }
+
+  /* Horizontal rules - spacing */
+  [data-streamdown="horizontal-rule"] {
+    @apply my-6;
+  }
+
+  /* Links - break long URLs */
+  [data-streamdown="link"] {
+    @apply break-words;
+  }
+}
