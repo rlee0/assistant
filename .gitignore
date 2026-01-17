@@ -42,3 +42,6 @@ next-env.d.ts
 
 # playwright
 /.playwright-mcp/
+
+# monaco editor (copied from node_modules)
+/public/monaco-editor/
