@@ -664,6 +664,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
         const messageToSend = {
           text: ((message.text as string) ?? "").trim() || "[File attachment]",
+          experimental_attachments: hasAttachments ? message.files : undefined,
         };
 
         sendMessage(messageToSend, {
