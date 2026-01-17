@@ -3,15 +3,8 @@
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import type { ComponentProps, ReactNode } from "react";
-import {
-  createContext,
-  memo,
-  useCallback,
-  useContext,
-  useEffect,
-  useLayoutEffect,
-  useState,
-} from "react";
+import { createContext, memo, useContext, useEffect, useRef } from "react";
+import { rehypePlugins, remarkPlugins } from "@/lib/markdown";
 
 import { Shimmer } from "./shimmer";
 import { Streamdown } from "streamdown";
@@ -27,10 +20,10 @@ type ReasoningContextValue = {
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
 
-export const useReasoning = () => {
+export const useReasoning = (): ReasoningContextValue => {
   const context = useContext(ReasoningContext);
   if (!context) {
-    throw new Error("Reasoning components must be used within Reasoning");
+    throw new Error("useReasoning must be used within a <Reasoning> component");
   }
   return context;
 };
@@ -70,64 +63,69 @@ export const Reasoning = memo(
       defaultProp: undefined,
     });
 
-    const [hasAutoClosed, setHasAutoClosed] = useState(false);
-    const [wasAutoOpened, setWasAutoOpened] = useState(() => initialOpen && isUncontrolled);
-    const [startTime, setStartTime] = useState<number | null>(null);
+    const startTimeRef = useRef<number | null>(null);
+    const wasAutoOpenedRef = useRef(initialOpen && isUncontrolled);
+    const hasAutoClosedRef = useRef(false);
+
+    // Reset auto-open state when transitioning between controlled/uncontrolled
+    useEffect(() => {
+      wasAutoOpenedRef.current = initialOpen && isUncontrolled;
+      hasAutoClosedRef.current = false;
+    }, [isUncontrolled, initialOpen]);
+
+    // Cleanup refs on unmount
+    useEffect(() => {
+      return () => {
+        startTimeRef.current = null;
+      };
+    }, []);
 
     // Track duration when streaming ends
     useEffect(() => {
-      if (!isStreaming && startTime !== null) {
-        setDuration(Math.ceil((Date.now() - startTime) / MS_IN_S));
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setStartTime(null);
+      if (!isStreaming && startTimeRef.current !== null) {
+        setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
+        startTimeRef.current = null;
       }
-    }, [isStreaming, startTime, setDuration]);
-
-    // Start timer when streaming begins via callback
-    const handleStreamingStart = useCallback(() => {
-      if (startTime === null) {
-        setStartTime(Date.now());
-      }
-    }, [startTime]);
-
-    useLayoutEffect(() => {
-      if (isStreaming) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        handleStreamingStart();
-      }
-    }, [isStreaming, handleStreamingStart]);
+    }, [isStreaming, setDuration]);
 
     // Auto-open when streaming begins
     useEffect(() => {
       if (isStreaming && isUncontrolled) {
-        setWasAutoOpened(true);
-        setHasAutoClosed(false);
+        if (!wasAutoOpenedRef.current) {
+          wasAutoOpenedRef.current = true;
+          hasAutoClosedRef.current = false;
+        }
         setIsOpen(true);
+
+        if (startTimeRef.current === null) {
+          startTimeRef.current = Date.now();
+        }
       }
     }, [isStreaming, isUncontrolled, setIsOpen]);
 
-    // Auto-open when streaming starts, auto-close when streaming ends (once only)
+    // Auto-close when streaming ends
     useEffect(() => {
-      if (!isStreaming && isOpen && isUncontrolled && wasAutoOpened && !hasAutoClosed) {
-        // Add a small delay before closing to allow user to see the content
+      if (
+        !isStreaming &&
+        isOpen &&
+        isUncontrolled &&
+        wasAutoOpenedRef.current &&
+        !hasAutoClosedRef.current
+      ) {
         const timer = setTimeout(() => {
           setIsOpen(false);
-          setHasAutoClosed(true);
+          hasAutoClosedRef.current = true;
         }, AUTO_CLOSE_DELAY);
 
         return () => clearTimeout(timer);
       }
-    }, [isStreaming, isOpen, isUncontrolled, wasAutoOpened, setIsOpen, hasAutoClosed]);
-
-    const handleOpenChange = (newOpen: boolean) => {
-      setIsOpen(newOpen);
-    };
+    }, [isStreaming, isOpen, isUncontrolled, setIsOpen]);
 
     return (
       <ReasoningContext.Provider value={{ isStreaming, isOpen, setIsOpen, duration }}>
         <Collapsible
           className={cn("not-prose mb-4", className)}
-          onOpenChange={handleOpenChange}
+          onOpenChange={setIsOpen}
           open={isOpen}
           {...props}>
           {children}
@@ -185,15 +183,19 @@ export type ReasoningContentProps = ComponentProps<typeof CollapsibleContent> & 
   children: string;
 };
 
-export const ReasoningContent = memo(({ className, children, ...props }: ReasoningContentProps) => (
+export const ReasoningContent = memo(({ className, children }: ReasoningContentProps) => (
   <CollapsibleContent
     className={cn(
       "mt-4 text-sm",
       "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground outline-none data-[state=closed]:animate-out data-[state=open]:animate-in",
       className
-    )}
-    {...props}>
-    <Streamdown {...props}>{children}</Streamdown>
+    )}>
+    <Streamdown
+      className="markdown-body"
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}>
+      {children}
+    </Streamdown>
   </CollapsibleContent>
 ));
 

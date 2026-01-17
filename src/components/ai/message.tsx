@@ -1,30 +1,31 @@
 "use client";
 
+import {
+  ALIGN,
+  BG,
+  BORDER,
+  DISPLAY,
+  INTERACTIVE,
+  LAYOUT,
+  OVERFLOW,
+  POSITION,
+  SIZE,
+  SPACING,
+  TEXT,
+  TRANSITION,
+} from "@/styles/constants";
 import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { ChevronLeftIcon, ChevronRightIcon, PaperclipIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes, ReactElement } from "react";
 import { DelayedTooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { FileUIPart, UIMessage } from "ai";
 import { createContext, memo, useContext, useEffect, useMemo, useState } from "react";
+import { rehypePlugins, remarkPlugins } from "@/lib/markdown";
 
 import { Button } from "@/components/ui/button";
 import NextImage from "next/image";
 import { Streamdown } from "streamdown";
 import { cn } from "@/lib/utils";
-import {
-  LAYOUT,
-  SPACING,
-  SIZE,
-  TEXT,
-  BORDER,
-  BG,
-  POSITION,
-  OVERFLOW,
-  TRANSITION,
-  INTERACTIVE,
-  DISPLAY,
-  ALIGN,
-} from "@/styles/constants";
 
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
@@ -290,7 +291,12 @@ export type MessageResponseProps = ComponentProps<typeof Streamdown>;
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <Streamdown
-      className={cn(`${SIZE.full} [&>*:first-child]:mt-0 [&>*:last-child]:mb-0`, className)}
+      className={cn(
+        `markdown-body ${SIZE.full} [&>*:first-child]:mt-0 [&>*:last-child]:mb-0`,
+        className
+      )}
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePlugins}
       {...props}
     />
   ),
