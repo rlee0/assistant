@@ -328,47 +328,15 @@ export const ChatMessages = memo<ChatMessagesProps>(
 
                           {!isEditing && message.role === "user" && (
                             <MessageActions className="ml-auto">
-                              {/* Edit with confirmation - bypass if last message */}
-                              {isLastMessage ? (
-                                <MessageAction
-                                  onClick={() => {
-                                    onEditMessage(message.id, textParts);
-                                  }}
-                                  label="Edit"
-                                  tooltip="Edit message"
-                                  disabled={!(status === "ready" || status === "error")}>
-                                  <Edit2 className="size-3" />
-                                </MessageAction>
-                              ) : (
-                                <AlertDialog>
-                                  <AlertDialogTrigger asChild>
-                                    <MessageAction
-                                      label="Edit"
-                                      tooltip="Edit message"
-                                      disabled={!(status === "ready" || status === "error")}>
-                                      <Edit2 className="size-3" />
-                                    </MessageAction>
-                                  </AlertDialogTrigger>
-                                  <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Edit this message?</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        This will delete all messages after this user message and
-                                        allow you to edit it. This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => {
-                                          onEditMessage(message.id, textParts);
-                                        }}>
-                                        Edit
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
-                                  </AlertDialogContent>
-                                </AlertDialog>
-                              )}
+                              <MessageAction
+                                onClick={() => {
+                                  onEditMessage(message.id, textParts);
+                                }}
+                                label="Edit"
+                                tooltip="Edit message"
+                                disabled={!(status === "ready" || status === "error")}>
+                                <Edit2 className="size-3" />
+                              </MessageAction>
 
                               {/* Delete with confirmation - bypass if last message */}
                               {isLastMessage ? (
