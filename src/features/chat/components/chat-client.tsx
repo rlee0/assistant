@@ -662,9 +662,14 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           }
         }
 
-        const messageToSend = {
+        const messageToSend: Record<string, unknown> = {
           text: ((message.text as string) ?? "").trim() || "[File attachment]",
         };
+
+        // Include file attachments if present
+        if (hasAttachments) {
+          messageToSend.files = message.files;
+        }
 
         sendMessage(messageToSend, {
           body: {
