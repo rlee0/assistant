@@ -45,7 +45,6 @@ import {
   XIcon,
 } from "lucide-react";
 import { nanoid } from "nanoid";
-import { toast } from "sonner";
 import {
   type ChangeEvent,
   type ChangeEventHandler,
@@ -1053,11 +1052,19 @@ const appendTranscriptPart = (existing: string, addition: string) => {
 };
 
 const buildTranscriptionValue = (base: string, finalTranscript: string, interimTranscript?: string) => {
-  return [base, finalTranscript, interimTranscript]
+  const normalizedBase = base ?? "";
+
+  const additions = [finalTranscript, interimTranscript]
     .map((part) => part?.trim())
     .filter(Boolean)
-    .join(" ")
-    .trim();
+    .join(" ");
+
+  if (!additions) {
+    return normalizedBase;
+  }
+
+  const needsSpace = normalizedBase.length === 0 || normalizedBase.endsWith(" ") ? "" : " ";
+  return `${normalizedBase}${needsSpace}${additions}`;
 };
 
 const getSpeechErrorMessage = (errorCode?: string) =>
