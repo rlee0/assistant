@@ -202,9 +202,9 @@ export function LoginForm({ className, ...props }: React.ComponentProps<"div">) 
             <Field>
               <div className="flex items-center justify-between">
                 <FieldLabel htmlFor="password">Password</FieldLabel>
-                <a href="#" className="text-sm text-blue-600 hover:underline">
+                <Link href="/forgot-password" className="text-sm text-blue-600 hover:underline">
                   Forgot password?
-                </a>
+                </Link>
               </div>
               <Input
                 id="password"
