@@ -2,10 +2,9 @@
 
 import { useCallback, useState } from "react";
 import { useSettingsStore } from "@/features/settings/store/settings-store";
-import { settingsSchema } from "@/lib/settings";
+import { settingsSchema, type Settings } from "@/lib/settings";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertTriangle, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 
 /**
- * Configuration-based settings editor with Monaco integration
+ * Configuration-based settings editor
  * 
  * Features:
  * - Split view: Form UI and JSON editor
@@ -64,14 +63,6 @@ export function SettingsEditor() {
     setTimeout(() => setSaveStatus("idle"), 2000);
   }, [update]);
 
-  // Format JSON - re-formats the current settings JSON
-  const handleFormat = useCallback(() => {
-    // The jsonValue is always formatted from settings
-    // But we can trigger a re-render by updating status
-    setSaveStatus("saved");
-    setTimeout(() => setSaveStatus("idle"), 1000);
-  }, []);
-
   return (
     <div className="space-y-4">
       {/* Save Status */}
@@ -109,17 +100,10 @@ export function SettingsEditor() {
         <TabsContent value="json" className="space-y-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle>JSON Configuration</CardTitle>
-                  <CardDescription>
-                    Edit settings as JSON with real-time validation
-                  </CardDescription>
-                </div>
-                <Button onClick={handleFormat} variant="outline" size="sm">
-                  Format
-                </Button>
-              </div>
+              <CardTitle>JSON Configuration</CardTitle>
+              <CardDescription>
+                Edit settings as JSON with real-time validation
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Textarea
@@ -144,7 +128,7 @@ function SettingsForm({
   settings,
   onChange,
 }: {
-  settings: typeof settingsSchema._type;
+  settings: Settings;
   onChange: (path: string[], value: unknown) => void;
 }) {
   return (
