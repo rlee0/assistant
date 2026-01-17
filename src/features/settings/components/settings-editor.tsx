@@ -12,6 +12,9 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 
+/** Save status reset delay in milliseconds */
+const SAVE_STATUS_RESET_DELAY_MS = 2000;
+
 /**
  * Configuration-based settings editor
  * 
@@ -19,7 +22,6 @@ import { Textarea } from "@/components/ui/textarea";
  * - Split view: Form UI and JSON editor
  * - JSON editor with real-time validation
  * - Last writer wins strategy for conflict resolution
- * - Real-time validation
  */
 export function SettingsEditor() {
   const settings = useSettingsStore((state) => state.settings);
@@ -47,12 +49,16 @@ export function SettingsEditor() {
         setSaveStatus("saved");
         setTimeout(() => {
           setSaveStatus("idle");
-        }, 2000);
+        }, SAVE_STATUS_RESET_DELAY_MS);
       } else {
-        setJsonError(validated.error.errors[0]?.message || "Invalid settings");
+        const firstError = validated.error.errors[0];
+        const errorMsg = firstError 
+          ? `${firstError.path.join('.')}: ${firstError.message}`
+          : "Configuration validation failed";
+        setJsonError(errorMsg);
       }
     } catch {
-      setJsonError("Invalid JSON");
+      setJsonError("Invalid JSON syntax");
     }
   }, [updateBatch]);
 
@@ -60,7 +66,7 @@ export function SettingsEditor() {
   const handleUiChange = useCallback((path: string[], value: unknown) => {
     update(path, value);
     setSaveStatus("saved");
-    setTimeout(() => setSaveStatus("idle"), 2000);
+    setTimeout(() => setSaveStatus("idle"), SAVE_STATUS_RESET_DELAY_MS);
   }, [update]);
 
   return (
@@ -234,7 +240,7 @@ function SettingsForm({
             <Input
               id="apiKey"
               type="password"
-              value={settings.models.apiKey || ""}
+              value={settings.models.apiKey ?? ""}
               onChange={(e) => onChange(["models", "apiKey"], e.target.value)}
               placeholder="Enter your API key"
             />
