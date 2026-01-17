@@ -1051,7 +1051,11 @@ const appendTranscriptPart = (existing: string, addition: string) => {
   return existing ? `${existing} ${clean}` : clean;
 };
 
-const buildTranscriptionValue = (base: string, finalTranscript: string, interimTranscript?: string) => {
+const buildTranscriptionValue = (
+  base: string,
+  finalTranscript: string,
+  interimTranscript?: string
+) => {
   const normalizedBase = base ?? "";
 
   const additions = [finalTranscript, interimTranscript]
