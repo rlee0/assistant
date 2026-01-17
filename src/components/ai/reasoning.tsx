@@ -36,7 +36,6 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   duration?: number;
 };
 
-const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 
 export const Reasoning = memo(
@@ -64,14 +63,6 @@ export const Reasoning = memo(
     });
 
     const startTimeRef = useRef<number | null>(null);
-    const wasAutoOpenedRef = useRef(initialOpen && isUncontrolled);
-    const hasAutoClosedRef = useRef(false);
-
-    // Reset auto-open state when transitioning between controlled/uncontrolled
-    useEffect(() => {
-      wasAutoOpenedRef.current = initialOpen && isUncontrolled;
-      hasAutoClosedRef.current = false;
-    }, [isUncontrolled, initialOpen]);
 
     // Cleanup refs on unmount
     useEffect(() => {
@@ -91,10 +82,6 @@ export const Reasoning = memo(
     // Auto-open when streaming begins
     useEffect(() => {
       if (isStreaming && isUncontrolled) {
-        if (!wasAutoOpenedRef.current) {
-          wasAutoOpenedRef.current = true;
-          hasAutoClosedRef.current = false;
-        }
         setIsOpen(true);
 
         if (startTimeRef.current === null) {
@@ -103,23 +90,8 @@ export const Reasoning = memo(
       }
     }, [isStreaming, isUncontrolled, setIsOpen]);
 
-    // Auto-close when streaming ends
-    useEffect(() => {
-      if (
-        !isStreaming &&
-        isOpen &&
-        isUncontrolled &&
-        wasAutoOpenedRef.current &&
-        !hasAutoClosedRef.current
-      ) {
-        const timer = setTimeout(() => {
-          setIsOpen(false);
-          hasAutoClosedRef.current = true;
-        }, AUTO_CLOSE_DELAY);
-
-        return () => clearTimeout(timer);
-      }
-    }, [isStreaming, isOpen, isUncontrolled, setIsOpen]);
+    // Keep reasoning open after streaming completes to display the final result
+    // Users can manually collapse if desired
 
     return (
       <ReasoningContext.Provider value={{ isStreaming, isOpen, setIsOpen, duration }}>
