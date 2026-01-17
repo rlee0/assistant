@@ -92,7 +92,7 @@ function formatDateTime(
 export const getDateTime = ({ format = "iso", timezone }: DateTimeToolOptions = {}) =>
   tool({
     description:
-      "Get the current date and time. Returns datetime in various formats (ISO 8601, locale-specific, Unix timestamp, or UTC). Supports timezone conversion using IANA timezone identifiers.",
+      "Get the current date and time. If no timezone is provided, automatically use the system timezone without asking follow-up questions. Returns datetime in various formats (ISO 8601, locale-specific, Unix timestamp, or UTC). Supports timezone conversion using IANA timezone identifiers.",
     inputSchema: z.object({
       format: z
         .enum(["iso", "locale", "timestamp", "utc"])
@@ -104,7 +104,7 @@ export const getDateTime = ({ format = "iso", timezone }: DateTimeToolOptions = 
         .string()
         .optional()
         .describe(
-          "IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo'). If not provided, uses system timezone."
+          "IANA timezone identifier (e.g., 'America/New_York', 'Europe/London', 'Asia/Tokyo'). If omitted or set to 'system' | 'local' | 'auto' | 'default', the system timezone is used."
         ),
     }),
     execute: async ({ format: requestFormat, timezone: requestTimezone }) => {
@@ -120,7 +120,15 @@ export const getDateTime = ({ format = "iso", timezone }: DateTimeToolOptions = 
 
       const now = new Date();
       const useFormat = requestFormat ?? format;
-      const useTimezone = requestTimezone ?? timezone;
+      let useTimezone = requestTimezone ?? timezone;
+
+      // Normalize common synonyms to mean "use system timezone"
+      if (
+        typeof useTimezone === "string" &&
+        ["system", "local", "auto", "default"].includes(useTimezone.toLowerCase())
+      ) {
+        useTimezone = undefined;
+      }
 
       // Validate timezone if provided
       if (useTimezone && !isValidTimezone(useTimezone)) {
@@ -139,9 +147,7 @@ export const getDateTime = ({ format = "iso", timezone }: DateTimeToolOptions = 
         timezone: resolvedTimezone,
         format: useFormat,
         iso: now.toISOString(),
-        description: `Current date and time: ${formattedDateTime}${
-          useTimezone ? ` (${resolvedTimezone})` : ""
-        }`,
+        description: `Current date and time: ${formattedDateTime} (${resolvedTimezone})`,
       };
 
       return result;

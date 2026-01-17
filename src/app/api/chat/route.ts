@@ -224,9 +224,12 @@ export async function POST(req: Request): Promise<Response> {
       throw new APIError("No valid messages after conversion", 400, ErrorCodes.VALIDATION_ERROR);
     }
 
-    // Prepare system message
+    // Prepare system message with light tool usage guidance
+    const toolGuidance =
+      "You are a helpful assistant. Use available tools when they directly answer a request. For any date or time request, call the 'getDateTime' tool immediately with sensible defaults rather than asking clarifying questions; if no timezone is provided, assume the user's system timezone.";
+
     const systemMessage =
-      context !== undefined ? `Context: ${context}` : "You are a helpful assistant.";
+      context !== undefined ? `Context: ${context}\n\n${toolGuidance}` : toolGuidance;
 
     // Build tools per-request to allow per-request configuration
     const tools = buildTools();
