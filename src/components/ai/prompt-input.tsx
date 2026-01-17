@@ -1117,8 +1117,17 @@ export const PromptInputSpeechButton = ({
         const errorCode =
           event.error || (event as SpeechRecognitionErrorEvent & { message?: string }).message;
 
+        // Log the full event for debugging
+        console.log("[PromptInput] Speech recognition error event:", {
+          error: event.error,
+          errorType: typeof event.error,
+          message: (event as any).message,
+          eventType: event.type,
+        });
+
         logError("[PromptInput]", "Speech recognition error", errorCode ?? "unknown", {
           errorCode: errorCode ?? "unknown",
+          errorType: typeof event.error,
         });
         toast.error(getSpeechErrorMessage(errorCode));
         setIsListening(false);
