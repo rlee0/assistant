@@ -64,14 +64,7 @@ export const Reasoning = memo(
     });
 
     const startTimeRef = useRef<number | null>(null);
-    const wasAutoOpenedRef = useRef(initialOpen && isUncontrolled);
-    const hasAutoClosedRef = useRef(false);
-
-    // Reset auto-open state when transitioning between controlled/uncontrolled
-    useEffect(() => {
-      wasAutoOpenedRef.current = initialOpen && isUncontrolled;
-      hasAutoClosedRef.current = false;
-    }, [isUncontrolled, initialOpen]);
+    const wasStreamingRef = useRef(false);
 
     // Cleanup refs on unmount
     useEffect(() => {
@@ -82,39 +75,25 @@ export const Reasoning = memo(
 
     // Track duration when streaming ends
     useEffect(() => {
-      if (!isStreaming && startTimeRef.current !== null) {
+      if (isStreaming) {
+        // Streaming started, begin timing
+        if (startTimeRef.current === null) {
+          startTimeRef.current = Date.now();
+        }
+        wasStreamingRef.current = true;
+      } else if (wasStreamingRef.current && startTimeRef.current !== null) {
+        // Streaming ended, calculate duration
         setDuration(Math.ceil((Date.now() - startTimeRef.current) / MS_IN_S));
         startTimeRef.current = null;
       }
     }, [isStreaming, setDuration]);
 
-    // Auto-open when streaming begins
+    // Auto-close when streaming ends (only if uncontrolled)
     useEffect(() => {
-      if (isStreaming && isUncontrolled) {
-        if (!wasAutoOpenedRef.current) {
-          wasAutoOpenedRef.current = true;
-          hasAutoClosedRef.current = false;
-        }
-        setIsOpen(true);
-
-        if (startTimeRef.current === null) {
-          startTimeRef.current = Date.now();
-        }
-      }
-    }, [isStreaming, isUncontrolled, setIsOpen]);
-
-    // Auto-close when streaming ends
-    useEffect(() => {
-      if (
-        !isStreaming &&
-        isOpen &&
-        isUncontrolled &&
-        wasAutoOpenedRef.current &&
-        !hasAutoClosedRef.current
-      ) {
+      if (!isStreaming && wasStreamingRef.current && isUncontrolled && isOpen) {
         const timer = setTimeout(() => {
           setIsOpen(false);
-          hasAutoClosedRef.current = true;
+          wasStreamingRef.current = false;
         }, AUTO_CLOSE_DELAY);
 
         return () => clearTimeout(timer);
