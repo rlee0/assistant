@@ -100,6 +100,7 @@ export const Reasoning = memo(
     // Auto-open when streaming begins
     useEffect(() => {
       if (isStreaming && isUncontrolled) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setWasAutoOpened(true);
         setHasAutoClosed(false);
         setIsOpen(true);
