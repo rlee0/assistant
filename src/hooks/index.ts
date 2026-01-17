@@ -33,3 +33,10 @@ export * from "./use-loading-toast";
 // Responsive Design Hooks
 // ============================================================================
 export * from "./use-mobile";
+
+// ============================================================================
+// Input & Form Hooks
+// ============================================================================
+export * from "./use-speech-recognition";
+export * from "./use-prompt-input-keyboard";
+export * from "./use-prompt-input-paste";

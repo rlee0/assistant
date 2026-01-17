@@ -34,6 +34,9 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import type { ChatStatus, FileUIPart } from "ai";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { usePromptInputKeyboard } from "@/hooks/use-prompt-input-keyboard";
+import { usePromptInputPaste } from "@/hooks/use-prompt-input-paste";
 import {
   CornerDownLeftIcon,
   ImageIcon,
@@ -48,14 +51,12 @@ import {
   type ChangeEvent,
   type ChangeEventHandler,
   Children,
-  type ClipboardEventHandler,
   type ComponentProps,
   createContext,
   type FormEvent,
   type FormEventHandler,
   Fragment,
   type HTMLAttributes,
-  type KeyboardEventHandler,
   type PropsWithChildren,
   type ReactNode,
   type RefObject,
@@ -777,59 +778,22 @@ export const PromptInputTextarea = ({
   const attachments = usePromptInputAttachments();
   const [isComposing, setIsComposing] = useState(false);
 
-  const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
-    if (e.key === "Enter") {
-      if (isComposing || e.nativeEvent.isComposing) {
-        return;
-      }
-      if (e.shiftKey) {
-        return;
-      }
-      e.preventDefault();
-
-      // Check if the submit button is disabled before submitting
-      const form = e.currentTarget.form;
-      const submitButton = form?.querySelector('button[type="submit"]') as HTMLButtonElement | null;
-      if (submitButton?.disabled) {
-        return;
-      }
-
-      form?.requestSubmit();
-    }
-
-    // Remove last attachment when Backspace is pressed and textarea is empty
-    if (e.key === "Backspace" && e.currentTarget.value === "" && attachments.files.length > 0) {
-      e.preventDefault();
-      const lastAttachment = attachments.files.at(-1);
+  const handleKeyDown = usePromptInputKeyboard({
+    onSubmit: () => {},
+    onBackspace: () => {
+      const lastAttachment = attachments.files[attachments.files.length - 1];
       if (lastAttachment) {
         attachments.remove(lastAttachment.id);
       }
-    }
-  };
+    },
+    isComposing,
+  });
 
-  const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = (event) => {
-    const items = event.clipboardData?.items;
-
-    if (!items) {
-      return;
-    }
-
-    const files: File[] = [];
-
-    for (const item of items) {
-      if (item.kind === "file") {
-        const file = item.getAsFile();
-        if (file) {
-          files.push(file);
-        }
-      }
-    }
-
-    if (files.length > 0) {
-      event.preventDefault();
+  const handlePaste = usePromptInputPaste({
+    onFilesAdded: (files) => {
       attachments.add(files);
-    }
-  };
+    },
+  });
 
   const controlledProps = controller
     ? {
@@ -984,64 +948,10 @@ export const PromptInputSubmit = ({
   );
 };
 
-interface SpeechRecognition extends EventTarget {
-  continuous: boolean;
-  interimResults: boolean;
-  lang: string;
-  start(): void;
-  stop(): void;
-  onstart: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onend: ((this: SpeechRecognition, ev: Event) => void) | null;
-  onresult: ((this: SpeechRecognition, ev: SpeechRecognitionEvent) => void) | null;
-  onerror: ((this: SpeechRecognition, ev: SpeechRecognitionErrorEvent) => void) | null;
-}
-
-interface SpeechRecognitionEvent extends Event {
-  results: SpeechRecognitionResultList;
-  resultIndex: number;
-}
-
-type SpeechRecognitionResultList = {
-  readonly length: number;
-  item(index: number): SpeechRecognitionResult;
-  [index: number]: SpeechRecognitionResult;
-};
-
-type SpeechRecognitionResult = {
-  readonly length: number;
-  item(index: number): SpeechRecognitionAlternative;
-  [index: number]: SpeechRecognitionAlternative;
-  isFinal: boolean;
-};
-
-type SpeechRecognitionAlternative = {
-  transcript: string;
-  confidence: number;
-};
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
-
-declare global {
-  interface Window {
-    SpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-    webkitSpeechRecognition: {
-      new (): SpeechRecognition;
-    };
-  }
-}
-
 export type PromptInputSpeechButtonProps = ComponentProps<typeof PromptInputButton> & {
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   onTranscriptionChange?: (text: string) => void;
 };
-
-// Regex patterns - compiled once at module level for performance
-const PUNCTUATION_NO_SPACE_REGEX = /^[.,!?;:\)}\]]/;
-const TRAILING_SPACE_REGEX = /\s$/;
 
 export const PromptInputSpeechButton = ({
   className,
@@ -1050,99 +960,10 @@ export const PromptInputSpeechButton = ({
   disabled,
   ...props
 }: PromptInputSpeechButtonProps) => {
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<SpeechRecognition | null>(null);
-
-  useEffect(() => {
-    if (
-      typeof window !== "undefined" &&
-      ("SpeechRecognition" in window || "webkitSpeechRecognition" in window)
-    ) {
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      const speechRecognition = new SpeechRecognition();
-
-      speechRecognition.continuous = true;
-      speechRecognition.interimResults = true;
-      speechRecognition.lang = "en-US";
-
-      speechRecognition.onstart = () => {
-        setIsListening(true);
-      };
-
-      speechRecognition.onend = () => {
-        setIsListening(false);
-      };
-
-      speechRecognition.onresult = (event) => {
-        let finalTranscript = "";
-
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          const result = event.results[i];
-          if (result.isFinal) {
-            finalTranscript += result[0]?.transcript ?? "";
-          }
-        }
-
-        if (finalTranscript && textareaRef?.current) {
-          const textarea = textareaRef.current;
-          const cursorPosition = textarea.selectionStart;
-          const beforeCursor = textarea.value.slice(0, cursorPosition);
-          const afterCursor = textarea.value.slice(cursorPosition);
-
-          // Determine if we need a space before the transcription
-          const endsWithSpace = TRAILING_SPACE_REGEX.test(beforeCursor);
-          const startsWithPunctuation = PUNCTUATION_NO_SPACE_REGEX.test(finalTranscript);
-
-          let spacer = "";
-          if (beforeCursor && !endsWithSpace && !startsWithPunctuation) {
-            spacer = " ";
-          }
-
-          const insertText = spacer + finalTranscript.trimStart();
-          const newValue = beforeCursor + insertText + afterCursor;
-          const newCursorPosition = cursorPosition + insertText.length;
-
-          textarea.value = newValue;
-          textarea.setSelectionRange(newCursorPosition, newCursorPosition);
-          textarea.dispatchEvent(new Event("input", { bubbles: true }));
-          onTranscriptionChange?.(newValue);
-        }
-      };
-
-      speechRecognition.onerror = (event) => {
-        logError("[PromptInput]", "Speech recognition error", event.error);
-        setIsListening(false);
-      };
-
-      recognitionRef.current = speechRecognition;
-    }
-
-    return () => {
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
-    };
-  }, [textareaRef, onTranscriptionChange]);
-
-  const toggleListening = useCallback(() => {
-    if (!recognitionRef.current || !textareaRef?.current) {
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current.stop();
-    } else {
-      recognitionRef.current.start();
-      // Focus textarea and move cursor to end
-      const textarea = textareaRef.current;
-      textarea.focus();
-      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
-    }
-  }, [isListening, textareaRef]);
-
-  const hasSpeechRecognition =
-    typeof window !== "undefined" &&
-    ("SpeechRecognition" in window || "webkitSpeechRecognition" in window);
+  const { isListening, toggleListening, hasSpeechRecognition } = useSpeechRecognition({
+    textareaRef,
+    onTranscriptionChange,
+  });
 
   const isDisabled = disabled || !hasSpeechRecognition;
 
