@@ -5,7 +5,7 @@ import { Reasoning, ReasoningContent, ReasoningTrigger } from "@/components/ai/r
 import { Source, Sources, SourcesContent, SourcesTrigger } from "@/components/ai/sources";
 import { Tool, ToolContent, ToolHeader, ToolInput, ToolOutput } from "@/components/ai/tool";
 import { getToolName, isToolUIPart } from "ai";
-import { isImagePart, isReasoningPart, isTextPart } from "../utils/message-parts";
+import { isFilePart, isImagePart, isReasoningPart, isTextPart } from "../utils/message-parts";
 
 import { CSS_CLASSES } from "@/features/chat/constants";
 import Image from "next/image";
@@ -21,6 +21,23 @@ function getToolProperty<T>(part: unknown, key: string, defaultValue: T): T {
     return (value !== undefined ? value : defaultValue) as T;
   }
   return defaultValue;
+}
+
+/**
+ * Shared image renderer for both image and file parts
+ */
+function renderImage(url: string, filename: string, index: number) {
+  return (
+    <Image
+      key={index}
+      src={url}
+      alt={filename}
+      width={384}
+      height={384}
+      className={CSS_CLASSES.image}
+      unoptimized={url.startsWith("data:")}
+    />
+  );
 }
 
 /**
@@ -83,16 +100,60 @@ export const MessagePartRenderer = memo(function MessagePartRenderer({
     const imagePart = part as { type: "image"; image?: string; mimeType?: string };
     const url = imagePart.image || "";
     const filename = "Uploaded image";
+    return renderImage(url, filename, index);
+  }
+
+  // File attachments (non-image)
+  if (isFilePart(part)) {
+    const filePart = part as { type: "file"; url?: string; mediaType?: string; filename?: string };
+    
+    // Check if it's an image media type - render as image
+    if (filePart.mediaType?.startsWith("image/") && filePart.url) {
+      return renderImage(filePart.url, filePart.filename || "Uploaded image", index);
+    }
+    
+    // For non-image files, display file info
+    // Only allow downloads for non-data URLs (actual file URLs)
+    const canDownload = filePart.url && !filePart.url.startsWith("data:");
+    
     return (
-      <Image
-        key={index}
-        src={url}
-        alt={filename}
-        width={384}
-        height={384}
-        className={CSS_CLASSES.image}
-        unoptimized={url.startsWith("data:")}
-      />
+      <div key={index} className="flex items-center gap-2 rounded-md border border-border bg-muted/50 p-3">
+        <div className="flex size-8 items-center justify-center rounded bg-background">
+          <svg
+            className="size-5 text-muted-foreground"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+            xmlns="http://www.w3.org/2000/svg">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+            />
+          </svg>
+        </div>
+        <div className="min-w-0 flex-1">
+          <div className="truncate font-medium text-sm">
+            {filePart.filename || "Attached file"}
+          </div>
+          {filePart.mediaType && (
+            <div className="truncate font-mono text-muted-foreground text-xs">
+              {filePart.mediaType}
+            </div>
+          )}
+        </div>
+        {canDownload && (
+          <a
+            href={filePart.url}
+            download={filePart.filename}
+            className="text-primary hover:underline text-sm"
+            target="_blank"
+            rel="noopener noreferrer">
+            Download
+          </a>
+        )}
+      </div>
     );
   }
 
