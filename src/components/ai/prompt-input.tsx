@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { logError } from "@/lib/logging";
+import { toast } from "sonner";
 import {
   Command,
   CommandEmpty,
@@ -1034,6 +1035,20 @@ declare global {
   }
 }
 
+const SPEECH_ERROR_MESSAGES: Record<string, string> = {
+  "not-allowed": "Microphone permission was denied. Check your browser settings.",
+  "service-not-allowed": "Microphone permission was denied. Check your browser settings.",
+  network: "Network error while starting speech recognition.",
+  "audio-capture": "No microphone detected. Check your device.",
+  "language-not-supported": "This language is not supported for speech recognition.",
+  "no-speech": "No speech detected. Please try again.",
+  aborted: "Speech recognition was interrupted.",
+};
+
+const getSpeechErrorMessage = (errorCode?: string) =>
+  SPEECH_ERROR_MESSAGES[errorCode ?? ""] ??
+  "Couldn't use your mic. Please check permissions and try again.";
+
 export type PromptInputSpeechButtonProps = ComponentProps<typeof PromptInputButton> & {
   textareaRef?: RefObject<HTMLTextAreaElement | null>;
   onTranscriptionChange?: (text: string) => void;
@@ -1099,7 +1114,13 @@ export const PromptInputSpeechButton = ({
       };
 
       speechRecognition.onerror = (event) => {
-        logError("[PromptInput]", "Speech recognition error", event.error);
+        const errorCode =
+          event.error || (event as SpeechRecognitionErrorEvent & { message?: string }).message;
+
+        logError("[PromptInput]", "Speech recognition error", errorCode ?? "unknown", {
+          errorCode: errorCode ?? "unknown",
+        });
+        toast.error(getSpeechErrorMessage(errorCode));
         setIsListening(false);
       };
 
@@ -1120,6 +1141,7 @@ export const PromptInputSpeechButton = ({
 
   const toggleListening = useCallback(() => {
     if (!recognitionRef.current) {
+      toast.error("Speech recognition is not available in this browser.");
       return;
     }
 
@@ -1130,6 +1152,7 @@ export const PromptInputSpeechButton = ({
         recognitionRef.current.start();
       } catch (error) {
         logError("[PromptInput]", "Failed to start speech recognition", error);
+        toast.error("Couldn't start speech recognition. Please try again.");
         setIsListening(false);
       }
     }
