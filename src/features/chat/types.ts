@@ -84,6 +84,7 @@ export interface Conversation {
   model: string;
   context?: string;
   suggestions: string[];
+  suggestionsLoading: boolean;
   messages: UIMessage[];
   checkpoints: ChatCheckpoint[];
 }
@@ -182,6 +183,7 @@ export interface ChatInputProps {
   readonly totalUsedTokens: number;
   readonly totalUsage: LanguageModelUsage;
   readonly suggestions: readonly string[];
+  readonly suggestionsLoading: boolean;
   readonly onSuggestionClick: (suggestion: string) => void;
   readonly editingMessageId: string | null;
 }

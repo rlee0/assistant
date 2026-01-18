@@ -112,6 +112,7 @@ export function useConversationManagement(
           lastUserMessageAt: new Date().toISOString(),
           model: currentModel,
           suggestions: [],
+          suggestionsLoading: false,
         });
 
         onSelectConversation(conversationId);

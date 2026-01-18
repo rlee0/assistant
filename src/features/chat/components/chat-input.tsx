@@ -45,9 +45,9 @@ import {
   PromptInputTools,
   usePromptInputAttachments,
 } from "@/components/ai/prompt-input";
-import { Suggestion, Suggestions } from "@/components/ai/suggestion";
+import { Suggestion, Suggestions, SuggestionsSkeleton } from "@/components/ai/suggestion";
 import { formatProviderName, getModelProvider } from "@/lib/models";
-import { memo, useEffect, useRef, useState } from "react";
+import { memo, startTransition, useEffect, useMemo, useRef, useState } from "react";
 import { useGroupedModels, useTextareaKeyboardShortcuts } from "../hooks/use-chat-hooks";
 
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +55,12 @@ import type { ChatInputProps } from "../types";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { cn } from "@/lib/utils";
 import { mapUseChatStatus } from "../utils/message-utils";
+
+/**
+ * Maximum context window size for the model selector.
+ * This is a conservative default that works across most models.
+ */
+const DEFAULT_MAX_CONTEXT_TOKENS = 128_000 as const;
 
 /**
  * Internal component that uses PromptInput attachment hook.
@@ -99,6 +105,7 @@ export const ChatInput = memo<ChatInputProps>(
     totalUsedTokens,
     totalUsage,
     suggestions,
+    suggestionsLoading,
     onSuggestionClick,
     editingMessageId,
   }) => {
@@ -106,42 +113,72 @@ export const ChatInput = memo<ChatInputProps>(
     const groupedModels = useGroupedModels(models);
     const [searchValue, setSearchValue] = useState("");
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // When the selector opens, set the search to the current provider name and select all text
+    // Memoize derived state to avoid redundant calculations
+    const mappedStatus = useMemo(() => mapUseChatStatus(status), [status]);
+    const isIdle = mappedStatus === "idle";
+    const showSuggestions = isIdle && !editingMessageId;
+
+    /**
+     * When the selector opens, populate search with current provider name and select all text.
+     * Uses startTransition for non-urgent state updates to avoid blocking the UI.
+     */
     useEffect(() => {
+      // Clear any pending timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+
       if (selectorOpen) {
-        // Use setTimeout to ensure the input is rendered and can be selected
-        setTimeout(() => {
-          setSearchValue(formatProviderName(selectedModelInfo.provider));
+        // Defer state update to allow DOM to settle
+        timeoutRef.current = setTimeout(() => {
+          startTransition(() => {
+            setSearchValue(formatProviderName(selectedModelInfo.provider));
+          });
+          // Selection must happen after render cycle
           if (searchInputRef.current) {
             searchInputRef.current.select();
           }
         }, 0);
       } else {
-        setTimeout(() => setSearchValue(""), 0);
+        startTransition(() => {
+          setSearchValue("");
+        });
       }
+
+      // Cleanup function to prevent memory leaks
+      return () => {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+      };
     }, [selectorOpen, selectedModelInfo.provider]);
 
     return (
       <div className={CSS_CLASSES.inputContainer}>
         <div className={cn(SIZE.wFull, "mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
+          {/* Show suggestions skeleton when loading */}
+          {showSuggestions && suggestionsLoading && (
+            <div className="w-full pb-4">
+              <SuggestionsSkeleton />
+            </div>
+          )}
+
           {/* Show suggestions when idle and not editing */}
-          {mapUseChatStatus(status) === "idle" &&
-            !editingMessageId &&
-            suggestions &&
-            suggestions.length > 0 && (
-              <div className="w-full pb-4">
-                <Suggestions>
-                  {suggestions.map((suggestion) => (
-                    <Suggestion
-                      key={suggestion}
-                      suggestion={suggestion}
-                      onClick={onSuggestionClick}
-                    />
-                  ))}
-                </Suggestions>
-              </div>
-            )}
+          {showSuggestions && !suggestionsLoading && suggestions.length > 0 && (
+            <div className="w-full pb-4">
+              <Suggestions>
+                {suggestions.map((suggestion) => (
+                  <Suggestion
+                    key={suggestion}
+                    suggestion={suggestion}
+                    onClick={onSuggestionClick}
+                  />
+                ))}
+              </Suggestions>
+            </div>
+          )}
 
           <PromptInput onSubmit={onSubmit} className={SPACING.mt0} globalDrop multiple>
             <AttachmentHeaderInner />
@@ -172,7 +209,7 @@ export const ChatInput = memo<ChatInputProps>(
 
                 <Context
                   usedTokens={totalUsedTokens}
-                  maxTokens={128000}
+                  maxTokens={DEFAULT_MAX_CONTEXT_TOKENS}
                   usage={totalUsage}
                   modelId={currentModel}>
                   <ContextTrigger />
@@ -235,7 +272,6 @@ export const ChatInput = memo<ChatInputProps>(
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => {
                       const isSelected = model.id === currentModel;
-                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
                       return (
                         <ModelSelectorItem
                           key={model.id}
@@ -247,19 +283,31 @@ export const ChatInput = memo<ChatInputProps>(
                             <ModelSelectorLogo provider={getModelProvider(model)} />
                           </ModelSelectorLogoGroup>
                           <div
-                            className={`${LAYOUT.flexRow} flex-1 items-baseline ${SPACING.gap2} ${OVERFLOW.hidden}`}>
+                            className={cn(
+                              LAYOUT.flexRow,
+                              "flex-1 items-baseline",
+                              SPACING.gap2,
+                              OVERFLOW.hidden
+                            )}>
                             <ModelSelectorName className="flex-none">
                               {model.name}
                             </ModelSelectorName>
                             <span className={CSS_CLASSES.modelId}>({model.id})</span>
-                            {hasReasoning && (
-                              <Badge variant="secondary" className={`${TEXT.xs} ${TEXT.normal}`}>
-                                reasoning
-                              </Badge>
+                            {model.tags && model.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {model.tags.map((tag) => (
+                                  <Badge
+                                    key={tag}
+                                    variant="secondary"
+                                    className={cn(TEXT.xs, TEXT.normal)}>
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
                             )}
                           </div>
                           {isSelected && (
-                            <Check className={`ml-auto ${SIZE.size4} shrink-0 ${TEXT.primary}`} />
+                            <Check className={cn("ml-auto shrink-0", SIZE.size4, TEXT.primary)} />
                           )}
                         </ModelSelectorItem>
                       );
@@ -269,7 +317,7 @@ export const ChatInput = memo<ChatInputProps>(
               </ModelSelectorList>
             </ModelSelectorContent>
           </ModelSelector>
-          <div className={`${TEXT.center} ${TEXT.xs} ${TEXT.muted} ${SPACING.p2}`}>
+          <div className={cn(TEXT.center, TEXT.xs, TEXT.muted, SPACING.p2)}>
             AI can make mistakes, so please verify its responses.
           </div>
         </div>

@@ -305,6 +305,12 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     [selectedId, conversations]
   );
 
+  // Get suggestions loading state from store
+  const suggestionsLoading = useMemo(
+    () => (selectedId ? (conversations[selectedId]?.suggestionsLoading ?? false) : false),
+    [selectedId, conversations]
+  );
+
   // Map status for suggestions hook
   const mappedStatus = useMemo(() => mapUseChatStatus(status), [status]);
 
@@ -1027,6 +1033,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
               totalUsedTokens={totalUsedTokens}
               totalUsage={totalUsage}
               suggestions={currentSuggestions}
+              suggestionsLoading={suggestionsLoading}
               onSuggestionClick={handleSuggestionClick}
               editingMessageId={editingMessageId}
             />

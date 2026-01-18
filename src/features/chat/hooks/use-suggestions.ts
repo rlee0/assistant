@@ -53,6 +53,7 @@ export function useSuggestions(
   status: string
 ) {
   const setSuggestions = useChatStore((state) => state.setSuggestions);
+  const setSuggestionsLoading = useChatStore((state) => state.setSuggestionsLoading);
   const clearSuggestions = useChatStore((state) => state.clearSuggestions);
   const settingsLoaded = useSettingsStore((state) => state.isLoaded);
   const suggestionsEnabled = useSettingsStore((state) => state.settings.suggestions.enabled);
@@ -81,6 +82,7 @@ export function useSuggestions(
       }
 
       isGeneratingRef.current = true;
+      setSuggestionsLoading(convId, true);
 
       try {
         // Cancel any in-flight request
@@ -137,9 +139,10 @@ export function useSuggestions(
         }
       } finally {
         isGeneratingRef.current = false;
+        setSuggestionsLoading(convId, false);
       }
     },
-    [setSuggestions]
+    [setSuggestions, setSuggestionsLoading]
   );
 
   /**

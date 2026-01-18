@@ -29,6 +29,7 @@ type ChatState = {
   updateTitle: (id: string, title: string) => void;
   setStatus: (id: string, status: ConversationStatus) => void;
   setSuggestions: (id: string, suggestions: string[]) => void;
+  setSuggestionsLoading: (id: string, loading: boolean) => void;
   clearSuggestions: (id: string) => void;
   addCheckpoint: (id: string, messageIndex: number) => void;
   restoreCheckpoint: (id: string, checkpointId: string) => void;
@@ -174,6 +175,7 @@ export function chatSessionToConversation(session: ChatSession): Conversation {
     model: session.model,
     context: session.context,
     suggestions: session.suggestions ?? [],
+    suggestionsLoading: false,
     messages,
     checkpoints: session.checkpoints ?? [],
   };
@@ -390,6 +392,24 @@ export const useChatStore = create<ChatState>((set) => ({
       const updatedConversation: Conversation = {
         ...conversation,
         suggestions,
+        suggestionsLoading: false,
+      };
+
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
+      return {
+        conversations,
+      };
+    }),
+
+  setSuggestionsLoading: (id, loading) =>
+    set((state) => {
+      const conversation = state.conversations[id];
+      if (!conversation) return state;
+
+      const updatedConversation: Conversation = {
+        ...conversation,
+        suggestionsLoading: loading,
       };
 
       const conversations = { ...state.conversations, [id]: updatedConversation };
@@ -407,6 +427,8 @@ export const useChatStore = create<ChatState>((set) => ({
       const updatedConversation: Conversation = {
         ...conversation,
         suggestions: [],
+        suggestionsLoading: false,
+        suggestionsLoading: false,
       };
 
       const conversations = { ...state.conversations, [id]: updatedConversation };

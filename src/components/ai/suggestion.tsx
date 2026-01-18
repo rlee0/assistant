@@ -4,6 +4,7 @@ import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 import { Button } from "@/components/ui/button";
 import type { ComponentProps } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export type SuggestionsProps = ComponentProps<typeof ScrollArea>;
@@ -46,3 +47,14 @@ export const Suggestion = ({
     </Button>
   );
 };
+
+export const SuggestionsSkeleton = ({ className }: { className?: string }) => (
+  <ScrollArea className="w-full overflow-x-auto whitespace-nowrap">
+    <div className={cn("flex w-max flex-nowrap items-center gap-2", className)}>
+      <Skeleton className="h-8 w-32 rounded-full" />
+      <Skeleton className="h-8 w-40 rounded-full" />
+      <Skeleton className="h-8 w-36 rounded-full" />
+    </div>
+    <ScrollBar className="hidden" orientation="horizontal" />
+  </ScrollArea>
+);
