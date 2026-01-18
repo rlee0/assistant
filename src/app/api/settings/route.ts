@@ -1,152 +1,170 @@
-import { APIError, ErrorCodes, authenticationError, handleAPIError } from "@/lib/api/errors";
 import { NextRequest, NextResponse } from "next/server";
-import { buildDefaultSettings, settingsSchema } from "@/lib/settings";
-
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
-import { loadSettings } from "@/lib/supabase/settings";
+import {
+  settingsSchema,
+  defaultSettings,
+  accountInfoSchema,
+  type Settings,
+  type SettingsApiResponse,
+  type SettingsUpdateResponse,
+  type ApiErrorResponse,
+} from "@/lib/settings/schema";
 import { logError } from "@/lib/logging";
-import { parseRequestBody } from "@/lib/api/middleware";
 
 /**
- * GET /api/settings
- *
- * Retrieve the authenticated user's settings from the database.
- * Returns default settings if no record exists for this user.
- *
- * @requires Authentication via session cookie
- * @returns JSON with success flag and Settings object
- * @throws 401 if user is not authenticated
- * @throws 500 if database query fails
+ * Type for database settings data (unknown from JSONB)
  */
-export async function GET() {
+interface DatabaseSettingsRow {
+  data: unknown;
+}
+
+/**
+ * Safely merges database settings with defaults
+ */
+function mergeSettingsWithDefaults(settingsData: DatabaseSettingsRow | null): Settings {
+  if (!settingsData?.data || typeof settingsData.data !== "object" || settingsData.data === null) {
+    return defaultSettings;
+  }
+
   try {
-    const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    const dbData = settingsData.data as Record<string, unknown>;
 
-    if (!user) {
-      return authenticationError();
-    }
-
-    const settings = await loadSettings(user.id);
-
-    // Return defaults if no settings exist for this user
-    const resolvedSettings = settings ? settingsSchema.parse(settings) : buildDefaultSettings();
-
-    // Always populate account information with actual user data from auth
-    resolvedSettings.account = {
-      email: user.email ?? resolvedSettings.account.email,
-      displayName:
-        user.user_metadata?.display_name ??
-        user.user_metadata?.full_name ??
-        user.email?.split("@")[0] ??
-        resolvedSettings.account.displayName,
-    };
-
-    return NextResponse.json({
-      success: true,
-      settings: resolvedSettings,
+    return settingsSchema.parse({
+      appearance: {
+        ...defaultSettings.appearance,
+        ...(typeof dbData.appearance === "object" && dbData.appearance !== null
+          ? dbData.appearance
+          : {}),
+      },
+      chat: {
+        ...defaultSettings.chat,
+        ...(typeof dbData.chat === "object" && dbData.chat !== null ? dbData.chat : {}),
+      },
+      suggestions: {
+        ...defaultSettings.suggestions,
+        ...(typeof dbData.suggestions === "object" && dbData.suggestions !== null
+          ? dbData.suggestions
+          : {}),
+      },
     });
-  } catch (error) {
-    return handleAPIError(error);
+  } catch (parseError) {
+    logError("API", "Failed to parse settings from database, using defaults", parseError);
+    return defaultSettings;
   }
 }
 
 /**
- * Validate that settings object is complete before persistence
- * Ensures all required nested objects are present
+ * GET /api/settings
+ *
+ * Retrieves the authenticated user's settings from the database.
+ * Returns default settings if no record exists.
  */
-function validateSettingsIntegrity(data: unknown): boolean {
-  if (typeof data !== "object" || data === null) {
-    return false;
+export async function GET(request: NextRequest) {
+  try {
+    const supabase = await createSupabaseServerClient({ allowCookieWrite: true });
+
+    // Get authenticated user
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser();
+
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // Fetch user settings
+    const { data: settingsData, error: settingsError } = await supabase
+      .from("settings")
+      .select("data")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (settingsError) {
+      logError("API", "Error fetching settings", settingsError);
+      return NextResponse.json<ApiErrorResponse>(
+        { error: "Failed to fetch settings" },
+        { status: 500 }
+      );
+    }
+
+    // Merge database settings with defaults and validate
+    const settings = mergeSettingsWithDefaults(settingsData as DatabaseSettingsRow | null);
+
+    // Build account info from auth user
+    const accountInfo = accountInfoSchema.parse({
+      id: user.id,
+      email: user.email,
+      displayName: user.user_metadata?.display_name || user.user_metadata?.full_name || null,
+      createdAt: user.created_at,
+    });
+
+    return NextResponse.json<SettingsApiResponse>({
+      settings,
+      account: accountInfo,
+    });
+  } catch (error) {
+    logError("API", "Error in GET /api/settings", error);
+    return NextResponse.json<ApiErrorResponse>({ error: "Internal server error" }, { status: 500 });
   }
-
-  const settings = data as Record<string, unknown>;
-
-  // Check that all required top-level keys are present and have values
-  const hasAccount = settings.account && typeof settings.account === "object";
-  const hasAppearance = settings.appearance && typeof settings.appearance === "object";
-  const hasModels = settings.models && typeof settings.models === "object";
-  const hasSuggestions = settings.suggestions && typeof settings.suggestions === "object";
-  const hasTools = settings.tools !== undefined && settings.tools !== null;
-
-  return !!(hasAccount && hasAppearance && hasModels && hasSuggestions && hasTools);
 }
 
 /**
  * PUT /api/settings
  *
- * Persist the authenticated user's settings to the database.
- * Validates input against the settings schema before saving.
- * Uses upsert semantics to create or update existing settings.
- *
- * @requires Authentication via session cookie
- * @param request - HTTP request containing settings payload in body
- * @returns JSON with success flag and persisted Settings object
- * @throws 400 if request body is invalid or settings validation fails
- * @throws 401 if user is not authenticated
- * @throws 500 if database operation fails
+ * Updates the authenticated user's settings in the database.
+ * Validates input and uses upsert semantics.
  */
 export async function PUT(request: NextRequest) {
   try {
-    const supabase = await createSupabaseServerClient();
+    const supabase = await createSupabaseServerClient({ allowCookieWrite: true });
+
+    // Get authenticated user
     const {
       data: { user },
+      error: authError,
     } = await supabase.auth.getUser();
 
-    if (!user) {
-      return authenticationError();
+    if (authError || !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const bodyResult = await parseRequestBody(request);
-    if (!bodyResult.ok) {
-      throw bodyResult.error;
-    }
-
-    const body = bodyResult.value;
-
-    // Pre-validate integrity before schema parsing
-    if (!validateSettingsIntegrity(body)) {
-      throw new APIError(
-        "Settings payload is incomplete. Required fields: account, appearance, models, suggestions, tools",
-        400,
-        ErrorCodes.VALIDATION_ERROR
-      );
-    }
-
-    // Validate settings against schema to ensure data integrity
+    // Parse and validate request body
+    const body = await request.json();
     const validatedSettings = settingsSchema.parse(body);
 
-    // Persist to database with upsert semantics
-    // The settings table uses user_id as a required column to link settings to users
-    const { data: upsertData, error: upsertError } = await supabase
-      .from("settings")
-      .upsert(
-        {
-          user_id: user.id,
-          data: validatedSettings,
-        },
-        {
-          onConflict: "user_id",
-        }
-      )
-      .select();
+    // Upsert settings
+    const { error: upsertError } = await supabase.from("settings").upsert(
+      {
+        user_id: user.id,
+        data: validatedSettings,
+        updated_at: new Date().toISOString(),
+      },
+      {
+        onConflict: "user_id",
+      }
+    );
 
     if (upsertError) {
-      logError("[Settings API]", "Settings upsert failed", upsertError, {
-        userId: user.id,
-        code: upsertError.code,
-      });
-
-      throw new APIError("Failed to persist settings to database. Please try again.", 500);
+      logError("API", "Error upserting settings", upsertError);
+      return NextResponse.json({ error: "Failed to save settings" }, { status: 500 });
     }
 
-    return NextResponse.json({
+    return NextResponse.json<SettingsUpdateResponse>({
       success: true,
       settings: validatedSettings,
     });
   } catch (error) {
-    return handleAPIError(error);
+    logError("API", "Error in PUT /api/settings", error);
+
+    // Handle validation errors
+    if (error instanceof Error && error.name === "ZodError") {
+      return NextResponse.json<ApiErrorResponse>(
+        { error: "Invalid settings data", details: error },
+        { status: 400 }
+      );
+    }
+
+    return NextResponse.json<ApiErrorResponse>({ error: "Internal server error" }, { status: 500 });
   }
 }

@@ -3,7 +3,7 @@
 import { useEffect, useRef, useCallback } from "react";
 import { type UIMessage } from "ai";
 import { useChatStore } from "../store/chat-store";
-import { useSettingsStore } from "@/features/settings/store/settings-store";
+import { useSettingsStore } from "@/lib/settings/store";
 import { DEFAULT_SUGGESTIONS_MODEL } from "@/lib/constants/models";
 import { logError, logDebug } from "@/lib/logging";
 import { API_ROUTES } from "@/lib/api/routes";
@@ -54,7 +54,7 @@ export function useSuggestions(
 ) {
   const setSuggestions = useChatStore((state) => state.setSuggestions);
   const clearSuggestions = useChatStore((state) => state.clearSuggestions);
-  const settingsHydrated = useSettingsStore((state) => state.hydrated);
+  const settingsLoaded = useSettingsStore((state) => state.isLoaded);
   const suggestionsEnabled = useSettingsStore((state) => state.settings.suggestions.enabled);
   const suggestionsModel = useSettingsStore((state) => state.settings.suggestions.model);
 
@@ -147,13 +147,13 @@ export function useSuggestions(
    */
   useEffect(() => {
     // Only generate if:
-    // 1. Settings are hydrated
+    // 1. Settings are loaded
     // 2. Suggestions are enabled
     // 3. We have a conversation ID
     // 4. Status is "idle" (ready)
     // 5. We have at least one message
     if (
-      !settingsHydrated ||
+      !settingsLoaded ||
       !suggestionsEnabled ||
       !conversationId ||
       status !== "idle" ||
@@ -176,7 +176,7 @@ export function useSuggestions(
     status,
     suggestionsEnabled,
     suggestionsModel,
-    settingsHydrated,
+    settingsLoaded,
     generateSuggestions,
   ]);
 

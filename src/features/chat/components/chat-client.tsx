@@ -8,9 +8,9 @@ import { toast } from "sonner";
 import { nanoid } from "nanoid";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { ChatSidebar } from "@/features/chat/components/chat-sidebar";
-import { useSettingsStore } from "@/features/settings/store/settings-store";
+import { useSettingsStore } from "@/lib/settings/store";
+import { useSettingsSync } from "@/lib/settings/hooks";
 import { useChatStore } from "@/features/chat/store/chat-store";
-import { useSettingsSync } from "@/features/settings/hooks/use-settings-sync";
 import { logError, logWarn, logDebug } from "@/lib/logging";
 import { CHAT_REQUEST_TIMEOUT_MS } from "@/features/chat/constants";
 import { ChatHeader } from "./chat-header";
@@ -108,7 +108,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
   useSettingsSync();
   const settings = useSettingsStore((state) => state.settings);
-  const updateSettings = useSettingsStore((state) => state.update);
+  const updateSettings = useSettingsStore((state) => state.updateSettings);
 
   // ============================================================================
   // useChat Hook
@@ -199,6 +199,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const [editText, setEditText] = useState("");
   const [creatingChat, setCreatingChat] = useState(false);
   const [deleting, setDeleting] = useState<Record<string, boolean>>({});
+  const [userInfo, setUserInfo] = useState<{ name: string; email: string } | null>(null);
   const [cumulativeUsage, setCumulativeUsage] = useState<LanguageModelUsage>({
     inputTokens: 0,
     outputTokens: 0,
@@ -250,6 +251,31 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     selectConversationId(conversationId);
   }, [conversationId, storeSelectedId, selectConversationId]);
 
+  // Step 2b: Fetch user info for sidebar display
+  useEffect(() => {
+    async function fetchUserInfo() {
+      try {
+        const response = await fetch("/api/settings", {
+          credentials: "include",
+        });
+        if (response.ok) {
+          const json = await response.json();
+          if (json.account) {
+            setUserInfo({
+              name: json.account.displayName || json.account.email.split("@")[0],
+              email: json.account.email,
+            });
+          }
+        }
+      } catch (error) {
+        logError("[ChatClient]", "Failed to fetch user info", error);
+        // Fallback: try to use email from settings account if available
+        // This is acceptable since we're trying to display something
+      }
+    }
+    fetchUserInfo();
+  }, []);
+
   // Use route conversationId if provided, otherwise use store selectedId
   const selectedId = conversationId ?? storeSelectedId;
 
@@ -258,8 +284,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     if (selectedId && conversations[selectedId]?.model) {
       return conversations[selectedId].model;
     }
-    return settings.models.defaultModel;
-  }, [selectedId, conversations, settings.models.defaultModel]);
+    return settings.chat?.model;
+  }, [selectedId, conversations, settings.chat?.model]);
 
   // ============================================================================
   // Hooks
@@ -267,7 +293,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const { models, selectedModelInfo, modelsLoading } = useModelManagement(
     currentModel,
     (modelId) => {
-      updateSettings(["models", "defaultModel"], modelId);
+      updateSettings({ chat: { ...settings.chat, model: modelId } });
     }
   );
 
@@ -424,7 +450,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
   const handleModelSelect = useCallback(
     (modelId: string): void => {
-      updateSettings(["models", "defaultModel"], modelId);
+      updateSettings({ chat: { ...settings.chat, model: modelId } });
       // Update current conversation's model
       if (selectedId && conversations[selectedId]) {
         upsertConversation({
@@ -433,7 +459,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         });
       }
     },
-    [updateSettings, selectedId, conversations, upsertConversation]
+    [updateSettings, settings.chat, selectedId, conversations, upsertConversation]
   );
 
   const handleSelectConversation = useCallback(
@@ -933,8 +959,8 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   }, [cumulativeUsage]);
 
   const user = {
-    name: settings.account.displayName,
-    email: settings.account.email,
+    name: userInfo?.name || "User",
+    email: userInfo?.email || "",
   };
 
   // ============================================================================

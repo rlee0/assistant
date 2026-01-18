@@ -2,23 +2,25 @@
 
 ## Overview
 
-This document outlines the correct order for applying Supabase migrations. The migrations are consolidated and idempotent, designed for clean deployment on fresh databases.
+This document outlines the correct order for applying the consolidated Supabase migrations. The migrations have been refactored from the original accumulation of patches into a clean, linear history based on actual application code usage.
+
+**Last Consolidated:** 2026-01-17
 
 ## Migration Strategy
 
-The database uses a minimal set of well-structured migrations:
+The database now uses a minimal set of consolidated, well-structured migrations:
 
-1. **Initial Schema** - Core tables with all columns
-2. **Settings Table** - User preferences storage
-3. **Account Deletion** - Secure self-service account deletion
+1. **0001_initial_schema.sql** - Core tables (chats, messages, checkpoints, settings)
+2. **0002_security_and_triggers.sql** - RLS policies and automatic timestamp triggers
+3. **0003_app_logic.sql** - Application-specific stored procedures
 
 All migrations include:
 
-- `IF NOT EXISTS` clauses for idempotency
+- `IF NOT EXISTS` / `CREATE OR REPLACE` clauses for idempotency
 - `SECURITY DEFINER` with `SET search_path = public` for security
-- CASCADE DELETE for data integrity
-- Row Level Security (RLS) policies
-- Performance indexes
+- `ON DELETE CASCADE` for all foreign keys
+- Row Level Security (RLS) enabled and configured
+- Performance indexes on all tables
 
 ## Required Schema
 
@@ -73,33 +75,26 @@ All migrations include:
 
 Apply migrations in this exact order:
 
-1. **`20260100000000_create_initial_schema.sql`**
+1. **`0001_initial_schema.sql`**
+   - Creates: chats, messages, checkpoints, settings tables
+   - Includes: All required columns with proper constraints
+   - Sets up: Performance indexes on all tables
+   - Enables: Row Level Security (RLS) on all tables
+   - Foreign Keys: All with ON DELETE CASCADE
+   - Timestamps: All use TIMESTAMPTZ (not TIMESTAMP)
 
-   - Creates: chats, messages, checkpoints tables
-   - Includes: All columns (model, context, etc.)
-   - Sets up: Indexes, RLS policies
-   - Status: Complete base schema
+2. **`0002_security_and_triggers.sql`**
+   - Creates: RLS policies for all tables (16 policies total)
+   - Includes: Full CRUD policies (SELECT, INSERT, UPDATE, DELETE) per table
+   - Sets up: update_settings_updated_at() trigger function
+   - Adds: Automatic timestamp trigger on settings table
+   - Security: All functions use SET search_path = public
 
-2. **`20260112132149_create_settings_table.sql`**
-
-   - Creates: settings table
-   - Includes: JSONB data column, trigger function
-   - Sets up: RLS policies, auto-update trigger
-   - Status: Complete settings system
-
-3. **`20260115220000_add_delete_user_function.sql`**
+3. **`0003_app_logic.sql`**
    - Creates: delete_own_account() function
-   - Security: SECURITY DEFINER with search_path
-   - Purpose: Self-service account deletion
-   - Status: Complete account management
-
-## How to Apply Migrations
-
-### Using Supabase CLI
-
-````bash
-# Login to Supabase
-supabase login
+   - Security: SECURITY DEFINER with SET search_path = public
+   - Purpose: Self-service account deletion with CASCADE
+   - Permissions: Granted to authenticated users only
 
 ## How to Apply Migrations
 
@@ -114,16 +109,16 @@ supabase link --project-ref your-project-ref
 
 # Apply all migrations in order
 supabase db push
-````
+```
 
 ### Using Supabase Dashboard
 
 1. Go to your Supabase project dashboard
 2. Navigate to SQL Editor
 3. Copy and paste migration content in order:
-   - `20260100000000_create_initial_schema.sql`
-   - `20260112132149_create_settings_table.sql`
-   - `20260115220000_add_delete_user_function.sql`
+   - `0001_initial_schema.sql`
+   - `0002_security_and_triggers.sql`
+   - `0003_app_logic.sql`
 4. Execute each migration
 
 ### Quick Development Reset
@@ -244,11 +239,21 @@ Migrations use `IF NOT EXISTS` clauses - safe to re-run if needed.
 
 ### Missing Tables
 
-Run migrations in exact order starting from `20260100000000`.
+Run migrations in exact order starting from `0001_initial_schema.sql`.
 
 ### RLS Policy Conflicts
 
 Drop existing policies before re-running migrations, or use `RESET_AND_SETUP.sql` for clean slate.
+
+## Old Migrations Archived
+
+The following old migrations have been archived to `supabase/migrations/_archive/`:
+
+- `20260100000000_create_initial_schema.sql` → Consolidated into 0001 and 0002
+- `20260112132149_create_settings_table.sql` → Consolidated into 0001 and 0002
+- `20260115220000_add_delete_user_function.sql` → Consolidated into 0003
+
+These files are kept for reference but should not be used for new deployments.
 
 ### Function Already Exists
 

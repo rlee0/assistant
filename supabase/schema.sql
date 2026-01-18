@@ -1,16 +1,9 @@
 -- ============================================================================
--- Database Schema Reference
--- This file provides a complete reference for the database schema
--- ⚠️ DO NOT run this directly - use migrations in migrations/ folder instead
+-- Complete Schema Reference
 -- ============================================================================
---
--- This is a reference document showing the complete final state of the database
--- after all migrations have been applied. Use this for:
--- - Understanding the complete schema structure
--- - Reviewing table relationships and constraints
--- - Reference when writing queries or API code
---
--- To set up the database, use the migration files in migrations/ folder.
+-- This file is a reference dump of the final intended schema.
+-- DO NOT USE FOR EXECUTION - use the numbered migration files instead.
+-- Generated: 2026-01-17
 -- ============================================================================
 
 -- ============================================================================

@@ -5,6 +5,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { ErrorBoundary } from "@/components/feedback/error-boundary";
 import type { Metadata } from "next";
 import { ProgressBarProvider } from "@/components/providers/progress-bar-provider";
+import { ThemeProvider } from "@/components/providers/theme-provider";
 import { Suspense } from "react";
 import { Toaster } from "sonner";
 import { cn } from "@/lib/utils";
@@ -30,16 +31,18 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={cn(geistSans.variable, geistMono.variable, "antialiased")}>
-        <Suspense fallback={null}>
-          <ProgressBarProvider>
-            <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
-              {children}
-            </ErrorBoundary>
-            <Toaster position="top-center" />
-          </ProgressBarProvider>
-        </Suspense>
+        <ThemeProvider>
+          <Suspense fallback={null}>
+            <ProgressBarProvider>
+              <ErrorBoundary showDetails={process.env.NODE_ENV === "development"}>
+                {children}
+              </ErrorBoundary>
+              <Toaster position="top-center" />
+            </ProgressBarProvider>
+          </Suspense>
+        </ThemeProvider>
       </body>
     </html>
   );

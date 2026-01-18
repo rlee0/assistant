@@ -4,7 +4,7 @@ import { API_ROUTES } from "@/lib/api/routes";
 import { toast } from "sonner";
 import { useChatStore } from "@/features/chat/store/chat-store";
 import { useRouter } from "next/navigation";
-import { useSettingsStore } from "@/features/settings/store/settings-store";
+import { useSettingsStore } from "@/lib/settings/store";
 
 /**
  * Hook for handling user logout
