@@ -37,7 +37,7 @@ export const ModelSelectorContent = ({
   ...props
 }: ModelSelectorContentProps) => (
   <DialogContent
-    className={cn("p-0 sm:max-w-2xl", className)}
+    className={cn("p-0", className)}
     suppressHydrationWarning
     aria-describedby={undefined}
     {...props}>

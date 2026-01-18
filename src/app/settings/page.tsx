@@ -528,6 +528,7 @@ export default function SettingsPage() {
                 <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                   {providerModels.map((model) => {
                     const isSelected = model.id === settings.chat.model;
+                    const hasReasoning = model.tags?.includes("reasoning") ?? false;
                     return (
                       <ModelSelectorItem
                         key={model.id}
@@ -543,17 +544,10 @@ export default function SettingsPage() {
                           <span className="truncate text-xs text-muted-foreground">
                             ({model.id})
                           </span>
-                          {model.tags && model.tags.length > 0 && (
-                            <div className="flex flex-wrap gap-1">
-                              {model.tags.map((tag) => (
-                                <Badge
-                                  key={tag}
-                                  variant="secondary"
-                                  className="text-xs font-normal">
-                                  {tag}
-                                </Badge>
-                              ))}
-                            </div>
+                          {hasReasoning && (
+                            <Badge variant="secondary" className="text-xs font-normal">
+                              reasoning
+                            </Badge>
                           )}
                         </div>
                         {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}
@@ -584,6 +578,7 @@ export default function SettingsPage() {
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => {
                       const isSelected = model.id === settings.suggestions.model;
+                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
                       return (
                         <ModelSelectorItem
                           key={model.id}
@@ -603,17 +598,10 @@ export default function SettingsPage() {
                             <span className="truncate text-xs text-muted-foreground">
                               ({model.id})
                             </span>
-                            {model.tags && model.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {model.tags.map((tag) => (
-                                  <Badge
-                                    key={tag}
-                                    variant="secondary"
-                                    className="text-xs font-normal">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
+                            {hasReasoning && (
+                              <Badge variant="secondary" className="text-xs font-normal">
+                                reasoning
+                              </Badge>
                             )}
                           </div>
                           {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}

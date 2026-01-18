@@ -235,6 +235,7 @@ export const ChatInput = memo<ChatInputProps>(
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => {
                       const isSelected = model.id === currentModel;
+                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
                       return (
                         <ModelSelectorItem
                           key={model.id}
@@ -251,17 +252,10 @@ export const ChatInput = memo<ChatInputProps>(
                               {model.name}
                             </ModelSelectorName>
                             <span className={CSS_CLASSES.modelId}>({model.id})</span>
-                            {model.tags && model.tags.length > 0 && (
-                              <div className="flex flex-wrap gap-1">
-                                {model.tags.map((tag) => (
-                                  <Badge
-                                    key={tag}
-                                    variant="secondary"
-                                    className={`${TEXT.xs} ${TEXT.normal}`}>
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
+                            {hasReasoning && (
+                              <Badge variant="secondary" className={`${TEXT.xs} ${TEXT.normal}`}>
+                                reasoning
+                              </Badge>
                             )}
                           </div>
                           {isSelected && (
