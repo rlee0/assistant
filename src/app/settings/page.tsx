@@ -56,6 +56,7 @@ import {
 import { formatProviderName, getModelProvider } from "@/lib/models";
 import { useAccountInfo, useChangePassword, useSettingsSync } from "@/lib/settings/hooks";
 import { useDeleteAccount, useLogout, usePasswordForm, useThemeChange } from "./hooks";
+import { useEffect, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -69,7 +70,6 @@ import { useGroupedModels } from "@/features/chat/hooks/use-chat-hooks";
 import { useModelManagement } from "@/features/chat/hooks/use-chat-hooks";
 import { useRouter } from "next/navigation";
 import { useSettingsStore } from "@/lib/settings/store";
-import { useState } from "react";
 
 export default function SettingsPage() {
   // Initialize settings sync
@@ -82,6 +82,10 @@ export default function SettingsPage() {
   // Model selector states
   const [chatModelSelectorOpen, setChatModelSelectorOpen] = useState(false);
   const [suggestionsModelSelectorOpen, setSuggestionsModelSelectorOpen] = useState(false);
+  const [chatSearchValue, setChatSearchValue] = useState("");
+  const [suggestionsSearchValue, setSuggestionsSearchValue] = useState("");
+  const chatSearchInputRef = useRef<HTMLInputElement>(null);
+  const suggestionsSearchInputRef = useRef<HTMLInputElement>(null);
 
   // Fetch models
   const { models, modelsLoading } = useModelManagement(settings.chat.model, (modelId) =>
@@ -111,6 +115,38 @@ export default function SettingsPage() {
     setConfirmPassword,
     resetForm: resetPasswordForm,
   } = usePasswordForm();
+
+  // When chat model selector opens, set the search to the current model name and select all text
+  useEffect(() => {
+    if (chatModelSelectorOpen) {
+      const currentModel = models.find((m) => m.id === settings.chat.model);
+      const modelName = currentModel?.name || settings.chat.model;
+      setTimeout(() => {
+        setChatSearchValue(modelName);
+        if (chatSearchInputRef.current) {
+          chatSearchInputRef.current.select();
+        }
+      }, 0);
+    } else {
+      setTimeout(() => setChatSearchValue(""), 0);
+    }
+  }, [chatModelSelectorOpen, models, settings.chat.model]);
+
+  // When suggestions model selector opens, set the search to the current model name and select all text
+  useEffect(() => {
+    if (suggestionsModelSelectorOpen) {
+      const currentModel = models.find((m) => m.id === settings.suggestions.model);
+      const modelName = currentModel?.name || settings.suggestions.model;
+      setTimeout(() => {
+        setSuggestionsSearchValue(modelName);
+        if (suggestionsSearchInputRef.current) {
+          suggestionsSearchInputRef.current.select();
+        }
+      }, 0);
+    } else {
+      setTimeout(() => setSuggestionsSearchValue(""), 0);
+    }
+  }, [suggestionsModelSelectorOpen, models, settings.suggestions.model]);
 
   const handlePasswordChange = async (e: React.FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
@@ -480,7 +516,12 @@ export default function SettingsPage() {
         {/* Chat Model Selector Dialog */}
         <ModelSelector open={chatModelSelectorOpen} onOpenChange={setChatModelSelectorOpen}>
           <ModelSelectorContent title="Select Chat Model">
-            <ModelSelectorInput placeholder="Search models..." />
+            <ModelSelectorInput
+              placeholder="Search models..."
+              value={chatSearchValue}
+              onValueChange={setChatSearchValue}
+              ref={chatSearchInputRef}
+            />
             <ModelSelectorList>
               <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
               {Object.entries(groupedModels).map(([provider, providerModels]) => (
@@ -525,7 +566,12 @@ export default function SettingsPage() {
             open={suggestionsModelSelectorOpen}
             onOpenChange={setSuggestionsModelSelectorOpen}>
             <ModelSelectorContent title="Select Suggestions Model">
-              <ModelSelectorInput placeholder="Search models..." />
+              <ModelSelectorInput
+                placeholder="Search models..."
+                value={suggestionsSearchValue}
+                onValueChange={setSuggestionsSearchValue}
+                ref={suggestionsSearchInputRef}
+              />
               <ModelSelectorList>
                 <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
                 {Object.entries(groupedModels).map(([provider, providerModels]) => (

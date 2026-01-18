@@ -47,6 +47,7 @@ import {
 } from "@/components/ai/prompt-input";
 import { Suggestion, Suggestions } from "@/components/ai/suggestion";
 import { formatProviderName, getModelProvider } from "@/lib/models";
+import { memo, useEffect, useRef, useState } from "react";
 import { useGroupedModels, useTextareaKeyboardShortcuts } from "../hooks/use-chat-hooks";
 
 import { Badge } from "@/components/ui/badge";
@@ -54,7 +55,6 @@ import type { ChatInputProps } from "../types";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { cn } from "@/lib/utils";
 import { mapUseChatStatus } from "../utils/message-utils";
-import { memo } from "react";
 
 /**
  * Internal component that uses PromptInput attachment hook.
@@ -104,6 +104,23 @@ export const ChatInput = memo<ChatInputProps>(
   }) => {
     const handleKeyDown = useTextareaKeyboardShortcuts();
     const groupedModels = useGroupedModels(models);
+    const [searchValue, setSearchValue] = useState("");
+    const searchInputRef = useRef<HTMLInputElement>(null);
+
+    // When the selector opens, set the search to the current model name and select all text
+    useEffect(() => {
+      if (selectorOpen) {
+        // Use setTimeout to ensure the input is rendered and can be selected
+        setTimeout(() => {
+          setSearchValue(selectedModelInfo.name);
+          if (searchInputRef.current) {
+            searchInputRef.current.select();
+          }
+        }, 0);
+      } else {
+        setTimeout(() => setSearchValue(""), 0);
+      }
+    }, [selectorOpen, selectedModelInfo.name]);
 
     return (
       <div className={CSS_CLASSES.inputContainer}>
@@ -206,7 +223,12 @@ export const ChatInput = memo<ChatInputProps>(
 
           <ModelSelector open={selectorOpen} onOpenChange={onSelectorOpenChange}>
             <ModelSelectorContent>
-              <ModelSelectorInput placeholder="Search models..." />
+              <ModelSelectorInput
+                placeholder="Search models..."
+                value={searchValue}
+                onValueChange={setSearchValue}
+                ref={searchInputRef}
+              />
               <ModelSelectorList>
                 <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
                 {Object.entries(groupedModels).map(([provider, providerModels]) => (

@@ -9,7 +9,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from "@/components/ui/command";
-import type { ComponentProps, ReactNode } from "react";
+import { forwardRef, type ComponentProps, type ReactNode } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 import Image from "next/image";
@@ -54,9 +54,13 @@ export const ModelSelectorDialog = (props: ModelSelectorDialogProps) => (
 
 export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>;
 
-export const ModelSelectorInput = ({ className, ...props }: ModelSelectorInputProps) => (
-  <CommandInput className={cn("h-auto py-3.5", className)} {...props} />
+export const ModelSelectorInput = forwardRef<HTMLInputElement, ModelSelectorInputProps>(
+  ({ className, ...props }, ref) => (
+    <CommandInput ref={ref} className={cn("h-auto py-3.5", className)} {...props} />
+  )
 );
+
+ModelSelectorInput.displayName = "ModelSelectorInput";
 
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;
 
