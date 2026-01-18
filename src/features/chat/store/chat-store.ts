@@ -269,7 +269,8 @@ export const useChatStore = create<ChatState>((set) => ({
       }
 
       const order = sortOrderByUpdatedAt(validated.order, conversations);
-      const selectedId = validated.selectedId ?? order[0] ?? null;
+      // Only use validated.selectedId if explicitly provided, don't auto-select
+      const selectedId = validated.selectedId ?? null;
 
       set((state) => {
         if (state.currentUserId && state.currentUserId !== newUserId) {

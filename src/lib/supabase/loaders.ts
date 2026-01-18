@@ -105,7 +105,6 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
   return {
     chats,
     order,
-    selectedId: order[0],
     userId, // Include userId for validation
   };
 }

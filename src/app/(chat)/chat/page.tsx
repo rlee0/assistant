@@ -38,11 +38,6 @@ export default async function ChatIndexPage() {
   let initialData;
   try {
     initialData = await loadInitialChats(user.id);
-
-    // If there are chats, redirect to the first one
-    if (initialData.order.length > 0) {
-      redirect(`/chat/${initialData.order[0]}`);
-    }
   } catch (err) {
     // Re-throw Next.js redirects
     if (isRedirectError(err)) {
@@ -52,6 +47,6 @@ export default async function ChatIndexPage() {
     return <ErrorDisplay />;
   }
 
-  // Otherwise, show empty chat interface without an ID
+  // Show chat interface with loaded data (selectedId will be null if not specified)
   return <ChatClient initialData={initialData} />;
 }
