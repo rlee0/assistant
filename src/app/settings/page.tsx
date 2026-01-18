@@ -116,13 +116,13 @@ export default function SettingsPage() {
     resetForm: resetPasswordForm,
   } = usePasswordForm();
 
-  // When chat model selector opens, set the search to the current model name and select all text
+  // When chat model selector opens, set the search to the current provider name and select all text
   useEffect(() => {
     if (chatModelSelectorOpen) {
       const currentModel = models.find((m) => m.id === settings.chat.model);
-      const modelName = currentModel?.name || settings.chat.model;
+      const provider = currentModel ? getModelProvider(currentModel) : "";
       setTimeout(() => {
-        setChatSearchValue(modelName);
+        setChatSearchValue(formatProviderName(provider));
         if (chatSearchInputRef.current) {
           chatSearchInputRef.current.select();
         }
@@ -132,13 +132,13 @@ export default function SettingsPage() {
     }
   }, [chatModelSelectorOpen, models, settings.chat.model]);
 
-  // When suggestions model selector opens, set the search to the current model name and select all text
+  // When suggestions model selector opens, set the search to the current provider name and select all text
   useEffect(() => {
     if (suggestionsModelSelectorOpen) {
       const currentModel = models.find((m) => m.id === settings.suggestions.model);
-      const modelName = currentModel?.name || settings.suggestions.model;
+      const provider = currentModel ? getModelProvider(currentModel) : "";
       setTimeout(() => {
-        setSuggestionsSearchValue(modelName);
+        setSuggestionsSearchValue(formatProviderName(provider));
         if (suggestionsSearchInputRef.current) {
           suggestionsSearchInputRef.current.select();
         }
@@ -528,7 +528,6 @@ export default function SettingsPage() {
                 <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                   {providerModels.map((model) => {
                     const isSelected = model.id === settings.chat.model;
-                    const hasReasoning = model.tags?.includes("reasoning") ?? false;
                     return (
                       <ModelSelectorItem
                         key={model.id}
@@ -544,10 +543,17 @@ export default function SettingsPage() {
                           <span className="truncate text-xs text-muted-foreground">
                             ({model.id})
                           </span>
-                          {hasReasoning && (
-                            <Badge variant="secondary" className="text-xs font-normal">
-                              reasoning
-                            </Badge>
+                          {model.tags && model.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {model.tags.map((tag) => (
+                                <Badge
+                                  key={tag}
+                                  variant="secondary"
+                                  className="text-xs font-normal">
+                                  {tag}
+                                </Badge>
+                              ))}
+                            </div>
                           )}
                         </div>
                         {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}
@@ -578,7 +584,6 @@ export default function SettingsPage() {
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => {
                       const isSelected = model.id === settings.suggestions.model;
-                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
                       return (
                         <ModelSelectorItem
                           key={model.id}
@@ -598,10 +603,17 @@ export default function SettingsPage() {
                             <span className="truncate text-xs text-muted-foreground">
                               ({model.id})
                             </span>
-                            {hasReasoning && (
-                              <Badge variant="secondary" className="text-xs font-normal">
-                                reasoning
-                              </Badge>
+                            {model.tags && model.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {model.tags.map((tag) => (
+                                  <Badge
+                                    key={tag}
+                                    variant="secondary"
+                                    className="text-xs font-normal">
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
                             )}
                           </div>
                           {isSelected && <Check className="ml-auto size-4 shrink-0 text-primary" />}

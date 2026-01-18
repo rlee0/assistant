@@ -33,7 +33,7 @@ export const SCROLL_ANCHOR_THRESHOLD = 100 as const;
 /** CSS class names for chat UI components */
 export const CSS_CLASSES = {
   image: `${SIZE.maxW.sm} ${BORDER.rounded.md} h-auto`,
-  messagesContainer: `${LAYOUT.flexCol} flex-1 ${SIZE.minH0} ${SPACING.px4} ${SPACING.pt4}`,
+  messagesContainer: `${LAYOUT.flexCol} flex-1 ${SIZE.minH0}`,
   messagesInner: "mx-auto py-8 space-y-6",
   inputContainer: `${POSITION.sticky} ${POSITION.bottom0} ${POSITION.zIndex.z20} ${BG.background} ${SPACING.px4} pb-4`,
   modelButton: `${LAYOUT.flexRow} ${SPACING.gap2} min-w-max ${SPACING.px2}`,

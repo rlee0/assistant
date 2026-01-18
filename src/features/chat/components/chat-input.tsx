@@ -107,12 +107,12 @@ export const ChatInput = memo<ChatInputProps>(
     const [searchValue, setSearchValue] = useState("");
     const searchInputRef = useRef<HTMLInputElement>(null);
 
-    // When the selector opens, set the search to the current model name and select all text
+    // When the selector opens, set the search to the current provider name and select all text
     useEffect(() => {
       if (selectorOpen) {
         // Use setTimeout to ensure the input is rendered and can be selected
         setTimeout(() => {
-          setSearchValue(selectedModelInfo.name);
+          setSearchValue(formatProviderName(selectedModelInfo.provider));
           if (searchInputRef.current) {
             searchInputRef.current.select();
           }
@@ -120,7 +120,7 @@ export const ChatInput = memo<ChatInputProps>(
       } else {
         setTimeout(() => setSearchValue(""), 0);
       }
-    }, [selectorOpen, selectedModelInfo.name]);
+    }, [selectorOpen, selectedModelInfo.provider]);
 
     return (
       <div className={CSS_CLASSES.inputContainer}>
@@ -235,7 +235,6 @@ export const ChatInput = memo<ChatInputProps>(
                   <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
                     {providerModels.map((model) => {
                       const isSelected = model.id === currentModel;
-                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
                       return (
                         <ModelSelectorItem
                           key={model.id}
@@ -252,10 +251,17 @@ export const ChatInput = memo<ChatInputProps>(
                               {model.name}
                             </ModelSelectorName>
                             <span className={CSS_CLASSES.modelId}>({model.id})</span>
-                            {hasReasoning && (
-                              <Badge variant="secondary" className={`${TEXT.xs} ${TEXT.normal}`}>
-                                reasoning
-                              </Badge>
+                            {model.tags && model.tags.length > 0 && (
+                              <div className="flex flex-wrap gap-1">
+                                {model.tags.map((tag) => (
+                                  <Badge
+                                    key={tag}
+                                    variant="secondary"
+                                    className={`${TEXT.xs} ${TEXT.normal}`}>
+                                    {tag}
+                                  </Badge>
+                                ))}
+                              </div>
                             )}
                           </div>
                           {isSelected && (
