@@ -28,7 +28,7 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
     await Promise.all([
       supabase
         .from("chats")
-        .select("id,title,is_pinned,updated_at")
+        .select("id,title,model,context,is_pinned,updated_at")
         .eq("user_id", userId)
         .order("updated_at", { ascending: false }),
       supabase
@@ -93,7 +93,8 @@ export async function loadInitialChats(userId: string): Promise<InitialChatData>
       title: row.title,
       pinned: row.is_pinned ?? false,
       updatedAt: row.updated_at ?? new Date().toISOString(),
-      model: DEFAULT_MODEL,
+      model: row.model ?? DEFAULT_MODEL,
+      context: row.context,
       suggestions: [],
       messages,
       checkpoints,

@@ -34,6 +34,8 @@ type ChatState = {
   updateMessages: (id: string, messages: UIMessage[]) => void;
   updateTitle: (id: string, title: string) => void;
   setStatus: (id: string, status: ConversationStatus) => void;
+  setSuggestions: (id: string, suggestions: string[]) => void;
+  clearSuggestions: (id: string) => void;
   addCheckpoint: (id: string, messageIndex: number) => void;
   restoreCheckpoint: (id: string, checkpointId: string) => void;
   removeCheckpoint: (id: string, checkpointId: string) => void;
@@ -114,8 +116,15 @@ export function chatMessageToUIMessage(message: ChatMessage): UIMessage {
         // Not a parts array, treat as plain text
         parts = [{ type: "text", text: message.content }];
       }
-    } catch {
+    } catch (error) {
       // JSON parsing failed, treat as plain text
+      // In development, log this for debugging; in production, silently fallback
+      if (process.env.NODE_ENV === "development") {
+        console.debug("[ChatStore] Failed to parse message content as JSON", {
+          content: message.content.slice(0, 100),
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       parts = [{ type: "text", text: message.content }];
     }
   } else if (Array.isArray(message.content)) {
@@ -363,6 +372,40 @@ export const useChatStore = create<ChatState>((set) => ({
     }),
 
   setStatus: (id, status) => set((state) => ({ status: { ...state.status, [id]: status } })),
+
+  setSuggestions: (id, suggestions) =>
+    set((state) => {
+      const conversation = state.conversations[id];
+      if (!conversation) return state;
+
+      const updatedConversation: Conversation = {
+        ...conversation,
+        suggestions,
+      };
+
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
+      return {
+        conversations,
+      };
+    }),
+
+  clearSuggestions: (id) =>
+    set((state) => {
+      const conversation = state.conversations[id];
+      if (!conversation) return state;
+
+      const updatedConversation: Conversation = {
+        ...conversation,
+        suggestions: [],
+      };
+
+      const conversations = { ...state.conversations, [id]: updatedConversation };
+
+      return {
+        conversations,
+      };
+    }),
 
   addCheckpoint: (id, messageIndex) =>
     set((state) => {

@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { persist, devtools } from "zustand/middleware";
 import { settingsSchema, buildDefaultSettings, type Settings } from "@/lib/settings";
+import { DEFAULT_MODEL, DEFAULT_SUGGESTIONS_MODEL } from "@/lib/constants/models";
 import { logError } from "@/lib/logging";
 
 /**
@@ -36,6 +37,32 @@ function deepMerge(
   }
 
   return result;
+}
+
+/**
+ * Normalize model identifiers in settings to a consistent format
+ * - Trims whitespace
+ * - Adds default provider prefix ("openai/") when missing
+ * - Falls back to safe defaults if values are empty
+ */
+function normalizeModelId(value: unknown, fallback: string, defaultProvider = "openai"): string {
+  if (typeof value !== "string") return fallback;
+  const trimmed = value.trim();
+  if (!trimmed) return fallback;
+  return trimmed.includes("/") ? trimmed : `${defaultProvider}/${trimmed}`;
+}
+
+function normalizeSettingsModels(settings: Settings): Settings {
+  const normalized = structuredClone(settings);
+
+  normalized.models.defaultModel = normalizeModelId(settings.models.defaultModel, DEFAULT_MODEL);
+
+  normalized.suggestions.model = normalizeModelId(
+    settings.suggestions.model,
+    DEFAULT_SUGGESTIONS_MODEL
+  );
+
+  return normalized;
 }
 
 /**
@@ -76,9 +103,16 @@ export const useSettingsStore = create<SettingsState>()(
 
         hydrate: (data: unknown) => {
           try {
-            const validated = settingsSchema.parse(data);
+            // Merge stored data with defaults to handle schema migrations
+            const defaults = buildDefaultSettings();
+            const merged =
+              typeof data === "object" && data !== null
+                ? deepMerge(defaults as Record<string, unknown>, data as Record<string, unknown>)
+                : defaults;
+
+            const validated = settingsSchema.parse(merged);
             set(() => ({
-              settings: validated,
+              settings: normalizeSettingsModels(validated),
               hydrated: true,
             }));
           } catch (error) {
@@ -135,7 +169,7 @@ export const useSettingsStore = create<SettingsState>()(
 
               // Validate entire settings object before persisting
               const validated = settingsSchema.parse(clone);
-              return { settings: validated };
+              return { settings: normalizeSettingsModels(validated) };
             } catch (error) {
               logError("[SettingsStore]", "Update validation failed", error as Error);
               return state; // Return unchanged on validation error
@@ -150,7 +184,7 @@ export const useSettingsStore = create<SettingsState>()(
                 updates as Record<string, unknown>
               );
               const validated = settingsSchema.parse(merged);
-              return { settings: validated };
+              return { settings: normalizeSettingsModels(validated) };
             } catch (error) {
               logError("[SettingsStore]", "Batch update validation failed", error as Error);
               return state; // Return unchanged on validation error
@@ -194,6 +228,25 @@ export const useSettingsStore = create<SettingsState>()(
         }),
         onRehydrateStorage: () => (state) => {
           if (state) {
+            try {
+              // Merge loaded settings with defaults to handle schema migrations
+              // This ensures new fields added to the schema are available even in old stored data
+              const defaults = buildDefaultSettings();
+              const merged = deepMerge(
+                defaults as Record<string, unknown>,
+                state.settings as Record<string, unknown>
+              );
+              const validated = settingsSchema.parse(merged);
+              state.settings = normalizeSettingsModels(validated);
+            } catch (error) {
+              // If validation fails, use defaults
+              logError(
+                "[SettingsStore]",
+                "Settings rehydration validation failed, using defaults",
+                error as Error
+              );
+              state.settings = normalizeSettingsModels(buildDefaultSettings());
+            }
             state.hydrated = true;
           }
         },

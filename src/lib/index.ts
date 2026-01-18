@@ -15,6 +15,7 @@ export * from "./utils";
 export * from "./logging";
 export * from "./models";
 export * from "./settings";
+export { default as environment, getEnv } from "./env";
 
 // ============================================================================
 // Constants

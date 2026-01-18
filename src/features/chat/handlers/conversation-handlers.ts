@@ -15,6 +15,7 @@ import {
 export interface PersistConversationParams {
   conversationId: string;
   title: string;
+  model: string;
   messages: ChatMessage[];
   checkpoints: Conversation["checkpoints"];
 }
@@ -47,6 +48,7 @@ export async function persistConversation(
       body: JSON.stringify({
         id: params.conversationId,
         title: params.title,
+        model: params.model,
         messages: params.messages,
         checkpoints: params.checkpoints,
       }),

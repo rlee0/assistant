@@ -181,6 +181,8 @@ export function useSettingsSync(): { hydrated: boolean } {
     fetchServerSettings(abortControllerRef.current.signal).then((serverSettings) => {
       // Only update if component is still mounted and signal wasn't aborted
       if (isMountedRef.current && !abortControllerRef.current?.signal.aborted && serverSettings) {
+        // Server settings override any localStorage settings
+        // Call hydrate to merge server settings with defaults and trigger persistence
         hydrate(serverSettings);
       }
     });

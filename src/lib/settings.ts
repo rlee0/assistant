@@ -4,7 +4,11 @@ import {
   DEFAULT_USER_DISPLAY_NAME,
   DEFAULT_USER_EMAIL,
 } from "@/lib/constants/settings";
-import { DEFAULT_MODEL, DEFAULT_TEMPERATURE } from "@/lib/constants/models";
+import {
+  DEFAULT_MODEL,
+  DEFAULT_SUGGESTIONS_MODEL,
+  DEFAULT_TEMPERATURE,
+} from "@/lib/constants/models";
 
 import { defaultToolSettings } from "@/features/chat/tools";
 import { z } from "zod";
@@ -39,6 +43,10 @@ export const settingsSchema = z.object({
     temperature: z.number().min(0, "Temperature must be >= 0").max(1, "Temperature must be <= 1"),
     apiKey: z.string().optional(),
   }),
+  suggestions: z.object({
+    enabled: z.boolean(),
+    model: z.string().min(1, "Suggestions model must be specified"),
+  }),
   tools: z.record(z.string(), z.unknown()),
 });
 
@@ -62,6 +70,10 @@ export function buildDefaultSettings(): Settings {
       defaultModel: DEFAULT_MODEL,
       temperature: DEFAULT_TEMPERATURE,
       apiKey: "",
+    },
+    suggestions: {
+      enabled: true,
+      model: DEFAULT_SUGGESTIONS_MODEL,
     },
     tools: defaultToolSettings(),
   });

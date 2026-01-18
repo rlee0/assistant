@@ -68,9 +68,10 @@ function validateSettingsIntegrity(data: unknown): boolean {
   const hasAccount = settings.account && typeof settings.account === "object";
   const hasAppearance = settings.appearance && typeof settings.appearance === "object";
   const hasModels = settings.models && typeof settings.models === "object";
+  const hasSuggestions = settings.suggestions && typeof settings.suggestions === "object";
   const hasTools = settings.tools !== undefined && settings.tools !== null;
 
-  return !!(hasAccount && hasAppearance && hasModels && hasTools);
+  return !!(hasAccount && hasAppearance && hasModels && hasSuggestions && hasTools);
 }
 
 /**
@@ -108,7 +109,7 @@ export async function PUT(request: NextRequest) {
     // Pre-validate integrity before schema parsing
     if (!validateSettingsIntegrity(body)) {
       throw new APIError(
-        "Settings payload is incomplete. Required fields: account, appearance, models, tools",
+        "Settings payload is incomplete. Required fields: account, appearance, models, suggestions, tools",
         400,
         ErrorCodes.VALIDATION_ERROR
       );

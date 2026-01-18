@@ -45,6 +45,7 @@ import {
   PromptInputTools,
   usePromptInputAttachments,
 } from "@/components/ai/prompt-input";
+import { Suggestion, Suggestions } from "@/components/ai/suggestion";
 import { formatProviderName, getModelProvider } from "@/lib/models";
 import { useGroupedModels, useTextareaKeyboardShortcuts } from "../hooks/use-chat-hooks";
 
@@ -52,6 +53,7 @@ import { Badge } from "@/components/ui/badge";
 import type { ChatInputProps } from "../types";
 import { ModelSelectorSkeleton } from "@/components/skeletons/sidebar-skeleton";
 import { cn } from "@/lib/utils";
+import { mapUseChatStatus } from "../utils/message-utils";
 import { memo } from "react";
 
 /**
@@ -96,6 +98,9 @@ export const ChatInput = memo<ChatInputProps>(
     textareaRef,
     totalUsedTokens,
     totalUsage,
+    suggestions,
+    onSuggestionClick,
+    editingMessageId,
   }) => {
     const handleKeyDown = useTextareaKeyboardShortcuts();
     const groupedModels = useGroupedModels(models);
@@ -103,6 +108,24 @@ export const ChatInput = memo<ChatInputProps>(
     return (
       <div className={CSS_CLASSES.inputContainer}>
         <div className={cn(SIZE.wFull, "mx-auto", CHAT_CONTAINER_MAX_WIDTH)}>
+          {/* Show suggestions when idle and not editing */}
+          {mapUseChatStatus(status) === "idle" &&
+            !editingMessageId &&
+            suggestions &&
+            suggestions.length > 0 && (
+              <div className="w-full pb-4">
+                <Suggestions>
+                  {suggestions.map((suggestion) => (
+                    <Suggestion
+                      key={suggestion}
+                      suggestion={suggestion}
+                      onClick={onSuggestionClick}
+                    />
+                  ))}
+                </Suggestions>
+              </div>
+            )}
+
           <PromptInput onSubmit={onSubmit} className={SPACING.mt0} globalDrop multiple>
             <AttachmentHeaderInner />
 

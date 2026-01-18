@@ -44,6 +44,7 @@ import {
   PromptInputTextarea,
   PromptInputTools,
 } from "@/components/ai/prompt-input";
+import { Suggestion, Suggestions } from "@/components/ai/suggestion";
 import { memo, useEffect, useRef } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -51,6 +52,7 @@ import type { ChatMessagesProps } from "../types";
 import { Loader } from "@/components/ai/loader";
 import { cn } from "@/lib/utils";
 import { copyToClipboard } from "../utils/clipboard";
+import { mapUseChatStatus } from "../utils/message-utils";
 import { logError } from "@/lib/logging";
 import { toast } from "sonner";
 import { useStickToBottomContext } from "use-stick-to-bottom";
@@ -89,6 +91,7 @@ export const ChatMessages = memo<ChatMessagesProps>(
     scrollToBottomRef,
     checkpoints,
     selectedId,
+    suggestions,
     onNewChat,
     onEditMessage,
     onCancelEdit,
@@ -97,6 +100,7 @@ export const ChatMessages = memo<ChatMessagesProps>(
     onEditTextChange,
     onRegenerateFromMessage,
     onRestoreCheckpoint,
+    onSuggestionClick,
   }) => {
     const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 

@@ -80,6 +80,7 @@ export interface ChatMessagesProps {
   readonly scrollToBottomRef: React.MutableRefObject<(() => void) | null>;
   readonly checkpoints: ChatCheckpoint[];
   readonly selectedId: string | null;
+  readonly suggestions: string[];
   readonly onNewChat: () => void;
   readonly onEditMessage: (messageId: string, initialText: string) => void;
   readonly onCancelEdit: () => void;
@@ -88,6 +89,7 @@ export interface ChatMessagesProps {
   readonly onEditTextChange: (text: string) => void;
   readonly onRegenerateFromMessage: (messageId: string) => void;
   readonly onRestoreCheckpoint: (checkpointId: string) => void;
+  readonly onSuggestionClick: (suggestion: string) => void;
 }
 
 /**
@@ -125,6 +127,9 @@ export interface ChatInputProps {
   readonly textareaRef: React.RefObject<HTMLTextAreaElement | null>;
   readonly totalUsedTokens: number;
   readonly totalUsage: LanguageModelUsage;
+  readonly suggestions: readonly string[];
+  readonly onSuggestionClick: (suggestion: string) => void;
+  readonly editingMessageId: string | null;
 }
 
 /**

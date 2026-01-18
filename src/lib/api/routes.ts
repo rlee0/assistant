@@ -16,6 +16,8 @@ export const API_ROUTES = {
   SETTINGS: "/api/settings",
   // Models
   MODELS: "/api/models",
+  // Suggestions
+  SUGGESTIONS: "/api/suggestions",
   // Authentication
   AUTH: {
     LOGOUT: "/api/auth/logout",

@@ -4,7 +4,7 @@ import { validateArray, validateObject, validateString } from "@/lib/api/validat
 import { DEFAULT_MODEL } from "@/lib/constants/models";
 import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import { parseRequestBody } from "@/lib/api/middleware";
-import { logError, logDebug } from "@/lib/logging";
+import { logError, logDebug, logWarn } from "@/lib/logging";
 import {
   convertToModelMessages,
   streamText,
@@ -140,7 +140,7 @@ function getAPIConfiguration(): APIConfiguration {
     );
   }
 
-  const defaultModel = process.env.AI_MODEL ?? process.env.AI_GATEWAY_MODEL ?? DEFAULT_MODEL;
+  const defaultModel = DEFAULT_MODEL;
 
   return {
     apiKey,
@@ -256,9 +256,11 @@ export async function POST(req: Request): Promise<Response> {
       supportsReasoning = currentModel
         ? isReasoningCapable(currentModel)
         : isReasoningCapable(selectedModel);
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (_) {
+    } catch (error) {
       // Fallback to string-based check if model fetch fails
+      logWarn("[Chat]", "Failed to fetch model capabilities, using fallback", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       supportsReasoning = isReasoningCapable(selectedModel);
     }
 

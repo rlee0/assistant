@@ -3,6 +3,22 @@
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { useCallback, useEffect, useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  ModelSelector,
+  ModelSelectorContent,
+  ModelSelectorEmpty,
+  ModelSelectorGroup,
+  ModelSelectorInput,
+  ModelSelectorItem,
+  ModelSelectorList,
+  ModelSelectorLogo,
+  ModelSelectorLogoGroup,
+  ModelSelectorName,
+} from "@/components/ai/model-selector";
+import { Badge } from "@/components/ui/badge";
+import { Check } from "lucide-react";
 
 import { API_ROUTES } from "@/lib/api/routes";
 import { AlertTriangle } from "lucide-react";
@@ -11,6 +27,15 @@ import { createSupabaseBrowserClient } from "@/lib/supabase/browser-client";
 import { logError } from "@/lib/logging";
 import { useLogout } from "@/features/auth/hooks/use-logout";
 import { useRouter } from "next/navigation";
+import { useSettingsStore } from "@/features/settings/store/settings-store";
+import {
+  fetchModels,
+  formatProviderName,
+  getModelProvider,
+  groupModelsByProvider,
+  type Model,
+} from "@/lib/models";
+import { LAYOUT, OVERFLOW, SIZE, SPACING, TEXT } from "@/styles/constants";
 
 export default function SettingsPage() {
   const router = useRouter();
@@ -20,6 +45,14 @@ export default function SettingsPage() {
   const [isLoadingDelete, setIsLoadingDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Settings
+  const settings = useSettingsStore((state) => state.settings);
+  const settingsHydrated = useSettingsStore((state) => state.hydrated);
+  const updateSettings = useSettingsStore((state) => state.update);
+  const [models, setModels] = useState<Model[]>([]);
+  const [modelsLoading, setModelsLoading] = useState(true);
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
   // Load user email on mount
   useEffect(() => {
@@ -39,6 +72,21 @@ export default function SettingsPage() {
       }
     }
     loadUser();
+  }, []);
+
+  // Load available models
+  useEffect(() => {
+    async function loadModels() {
+      try {
+        const fetchedModels = await fetchModels();
+        setModels(fetchedModels);
+      } catch (error) {
+        logError("[Settings]", "Failed to load models", error);
+      } finally {
+        setModelsLoading(false);
+      }
+    }
+    loadModels();
   }, []);
 
   // Handle account deletion with memoization
@@ -114,6 +162,108 @@ export default function SettingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Suggestions Section */}
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle>Suggestions</CardTitle>
+            <CardDescription>
+              Configure automatic suggestions that appear after each response
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {/* Enable/Disable Suggestions */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="suggestions-enabled">Enable Suggestions</Label>
+                <p className="text-sm text-zinc-600">
+                  Show contextual suggestions for next prompts after each response
+                </p>
+              </div>
+              <Switch
+                id="suggestions-enabled"
+                checked={settings.suggestions?.enabled ?? false}
+                onCheckedChange={(checked) => {
+                  updateSettings(["suggestions", "enabled"], checked);
+                }}
+                disabled={!settingsHydrated}
+              />
+            </div>
+
+            {/* Model Selection for Suggestions */}
+            {settingsHydrated && (settings.suggestions?.enabled ?? false) && (
+              <div className="space-y-2">
+                <Label htmlFor="suggestions-model">Suggestions Model</Label>
+                <p className="text-sm text-zinc-600">
+                  Choose which model to use for generating suggestions
+                </p>
+                <Button
+                  variant="outline"
+                  onClick={() => setModelSelectorOpen(true)}
+                  className="w-full justify-start"
+                  disabled={modelsLoading}>
+                  {modelsLoading ? (
+                    "Loading models..."
+                  ) : (
+                    <span className="truncate">
+                      {models.find((m) => m.id === settings.suggestions.model)?.name ||
+                        settings.suggestions.model}
+                    </span>
+                  )}
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Model Selector Modal */}
+        {settingsHydrated && (settings.suggestions?.enabled ?? false) && (
+          <ModelSelector open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
+            <ModelSelectorContent>
+              <ModelSelectorInput placeholder="Search models..." />
+              <ModelSelectorList>
+                <ModelSelectorEmpty>No models found.</ModelSelectorEmpty>
+                {Object.entries(groupModelsByProvider(models)).map(([provider, providerModels]) => (
+                  <ModelSelectorGroup key={provider} heading={formatProviderName(provider)}>
+                    {providerModels.map((model) => {
+                      const isSelected = model.id === (settings.suggestions?.model ?? "");
+                      const hasReasoning = model.tags?.includes("reasoning") ?? false;
+                      return (
+                        <ModelSelectorItem
+                          key={model.id}
+                          onSelect={() => {
+                            updateSettings(["suggestions", "model"], model.id);
+                            setModelSelectorOpen(false);
+                          }}>
+                          <ModelSelectorLogoGroup>
+                            <ModelSelectorLogo provider={getModelProvider(model)} />
+                          </ModelSelectorLogoGroup>
+                          <div
+                            className={`${LAYOUT.flexRow} flex-1 items-baseline ${SPACING.gap2} ${OVERFLOW.hidden}`}>
+                            <ModelSelectorName className="flex-none">
+                              {model.name}
+                            </ModelSelectorName>
+                            <span className="truncate text-xs text-muted-foreground">
+                              ({model.id})
+                            </span>
+                            {hasReasoning && (
+                              <Badge variant="secondary" className={`${TEXT.xs} ${TEXT.normal}`}>
+                                reasoning
+                              </Badge>
+                            )}
+                          </div>
+                          {isSelected && (
+                            <Check className={`ml-auto ${SIZE.size4} shrink-0 ${TEXT.primary}`} />
+                          )}
+                        </ModelSelectorItem>
+                      );
+                    })}
+                  </ModelSelectorGroup>
+                ))}
+              </ModelSelectorList>
+            </ModelSelectorContent>
+          </ModelSelector>
+        )}
 
         {/* Danger Zone */}
         <Card className="border-red-200 bg-red-50">

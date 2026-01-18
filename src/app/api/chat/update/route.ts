@@ -19,6 +19,8 @@ type ChatUpdatePayload = {
   updated_at: string;
   title?: string;
   is_pinned?: boolean;
+  model?: string;
+  context?: string;
 };
 
 type MessageRow = {
@@ -43,6 +45,8 @@ interface UpdateChatRequest {
   id: string;
   title?: string;
   pinned?: boolean;
+  model?: string;
+  context?: string;
   messages?: ChatMessage[];
   checkpoints?: ChatCheckpoint[];
 }
@@ -82,7 +86,10 @@ function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
     throw new APIError("Request body must be a JSON object", 400);
   }
 
-  const { id, title, pinned, messages, checkpoints } = body as Record<string, unknown>;
+  const { id, title, pinned, model, context, messages, checkpoints } = body as Record<
+    string,
+    unknown
+  >;
 
   if (!validateUUID(id)) {
     throw new APIError("Chat ID is required and must be a valid UUID", 400);
@@ -102,6 +109,20 @@ function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
       throw new APIError("Pinned must be a boolean", 400);
     }
     request.pinned = pinned;
+  }
+
+  if (model !== undefined) {
+    if (!validateString(model)) {
+      throw new APIError("Model must be a non-empty string", 400);
+    }
+    request.model = model.trim();
+  }
+
+  if (context !== undefined) {
+    if (typeof context !== "string") {
+      throw new APIError("Context must be a string", 400);
+    }
+    request.context = context as string;
   }
 
   if (messages !== undefined) {
@@ -128,6 +149,8 @@ function validateUpdateChatRequest(body: unknown): UpdateChatRequest {
   if (
     title === undefined &&
     pinned === undefined &&
+    model === undefined &&
+    context === undefined &&
     messages === undefined &&
     checkpoints === undefined
   ) {
@@ -153,7 +176,7 @@ export async function PATCH(request: NextRequest) {
       throw bodyResult.error;
     }
 
-    const { id, title, pinned, messages, checkpoints } = validateUpdateChatRequest(
+    const { id, title, pinned, model, context, messages, checkpoints } = validateUpdateChatRequest(
       bodyResult.value
     );
 
@@ -175,6 +198,8 @@ export async function PATCH(request: NextRequest) {
     };
     if (title !== undefined) updatePayload.title = title;
     if (pinned !== undefined) updatePayload.is_pinned = pinned;
+    if (model !== undefined) updatePayload.model = model;
+    if (context !== undefined) updatePayload.context = context;
 
     // Update chat metadata
     const { data: updatedChat, error: updateError } = await supabase

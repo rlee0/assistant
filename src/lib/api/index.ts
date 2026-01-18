@@ -17,6 +17,7 @@ export * from "./errors";
 // ============================================================================
 export * from "./validation";
 export * from "./validators";
+export * from "./schemas";
 
 // ============================================================================
 // Middleware & Request Handling

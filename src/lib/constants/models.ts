@@ -11,7 +11,10 @@
 // ============================================================================
 
 /** Default AI model to use for new conversations */
-export const DEFAULT_MODEL = "gpt-5.2";
+export const DEFAULT_MODEL = "openai/gpt-4o-mini";
+
+/** Default AI model to use for suggestions generation (separate from chat) */
+export const DEFAULT_SUGGESTIONS_MODEL = "openai/gpt-5-nano";
 
 /** Default temperature setting for model responses (0-1 scale) */
 export const DEFAULT_TEMPERATURE = 0.4;
@@ -30,7 +33,14 @@ export const TEMPERATURE_STEP = 0.1;
 export const DEFAULT_FALLBACK_MODELS = [
   { id: "gpt-4o-mini", name: "GPT-4o mini", provider: "ai-gateway" },
   { id: "gpt-4o", name: "GPT-4o", provider: "ai-gateway" },
+  { id: "anthropic/claude-3.5-sonnet", name: "Claude 3.5 Sonnet", provider: "ai-gateway" },
 ] as const;
+
+/**
+ * Models for suggestions generation (smaller, faster models)
+ * Ordered by preference for quick, contextual suggestions
+ */
+export const SUGGESTION_FALLBACK_MODELS = ["openai/gpt-5-nano"] as const;
 
 // ============================================================================
 // Syntax Highlighting

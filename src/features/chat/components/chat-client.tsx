@@ -17,6 +17,7 @@ import { ChatHeader } from "./chat-header";
 import { ChatMessages } from "./chat-messages";
 import { ChatInput } from "./chat-input";
 import { useModelManagement, useAutoFocusTextarea } from "../hooks/use-chat-hooks";
+import { useSuggestions } from "../hooks/use-suggestions";
 import {
   generateTitleFromText,
   mapUseChatStatus,
@@ -99,6 +100,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     updateMessages: updateConversationMessages,
     updateTitle: updateConversationTitle,
     setStatus: setConversationStatus,
+    clearSuggestions: storeClearSuggestions,
     addCheckpoint: storeAddCheckpoint,
     restoreCheckpoint: storeRestoreCheckpoint,
     remove: removeConversation,
@@ -107,7 +109,6 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   useSettingsSync();
   const settings = useSettingsStore((state) => state.settings);
   const updateSettings = useSettingsStore((state) => state.update);
-  const currentModel = settings.models.defaultModel;
 
   // ============================================================================
   // useChat Hook
@@ -225,18 +226,6 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const scrollToBottomRef = useRef<(() => void) | null>(null);
 
   // ============================================================================
-  // Hooks
-  // ============================================================================
-  const { models, selectedModelInfo, modelsLoading } = useModelManagement(
-    currentModel,
-    (modelId) => {
-      updateSettings(["models", "defaultModel"], modelId);
-    }
-  );
-
-  useAutoFocusTextarea(textareaRef);
-
-  // ============================================================================
   // Initialization & Store Sync
   // ============================================================================
 
@@ -263,6 +252,40 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
 
   // Use route conversationId if provided, otherwise use store selectedId
   const selectedId = conversationId ?? storeSelectedId;
+
+  // Use conversation's model if available, fallback to global default
+  const currentModel = useMemo(() => {
+    if (selectedId && conversations[selectedId]?.model) {
+      return conversations[selectedId].model;
+    }
+    return settings.models.defaultModel;
+  }, [selectedId, conversations, settings.models.defaultModel]);
+
+  // ============================================================================
+  // Hooks
+  // ============================================================================
+  const { models, selectedModelInfo, modelsLoading } = useModelManagement(
+    currentModel,
+    (modelId) => {
+      updateSettings(["models", "defaultModel"], modelId);
+    }
+  );
+
+  useAutoFocusTextarea(textareaRef);
+
+  // Get suggestions from store
+  const currentSuggestions = useMemo(
+    () => (selectedId ? (conversations[selectedId]?.suggestions ?? []) : []),
+    [selectedId, conversations]
+  );
+
+  // Map status for suggestions hook
+  const mappedStatus = useMemo(() => mapUseChatStatus(status), [status]);
+
+  // Generate and manage suggestions
+  // Note: Hook automatically triggers generation when conditions are met
+  // The returned methods provide manual control if needed in the future
+  const _suggestionControls = useSuggestions(selectedId, messages, mappedStatus);
 
   // Step 3: Load conversation messages when selectedId or conversations change
   useEffect(() => {
@@ -350,6 +373,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         {
           conversationId,
           title: conversation.title,
+          model: conversation.model,
           messages: messages.map(uiMessageToChatMessage),
           checkpoints: conversation.checkpoints,
         },
@@ -401,8 +425,15 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
   const handleModelSelect = useCallback(
     (modelId: string): void => {
       updateSettings(["models", "defaultModel"], modelId);
+      // Update current conversation's model
+      if (selectedId && conversations[selectedId]) {
+        upsertConversation({
+          ...conversations[selectedId],
+          model: modelId,
+        });
+      }
     },
-    [updateSettings]
+    [updateSettings, selectedId, conversations, upsertConversation]
   );
 
   const handleSelectConversation = useCallback(
@@ -655,6 +686,9 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
         const conversationId = await ensureConversation();
         const conversation = conversations[conversationId];
 
+        // Clear suggestions before sending new message
+        storeClearSuggestions(conversationId);
+
         if (conversation && (!conversation.title || conversation.title === "New chat")) {
           const generatedTitle = generateTitleFromText((message.text as string) ?? "");
           if (generatedTitle && generatedTitle !== conversation.title) {
@@ -701,6 +735,14 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
     setEditingMessageId(null);
     setEditText("");
   }, []);
+
+  const handleSuggestionClick = useCallback(
+    (suggestion: string) => {
+      // Submit suggestion as a message
+      void handlePromptSubmit({ text: suggestion });
+    },
+    [handlePromptSubmit]
+  );
 
   const handleSaveEdit = useCallback(
     (messageId: string, newText: string): void => {
@@ -823,6 +865,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
           {
             conversationId: selectedId,
             title: conversation.title,
+            model: conversation.model,
             messages: restoredMessages.map(uiMessageToChatMessage),
             checkpoints: restoredCheckpoints,
           },
@@ -928,6 +971,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             scrollToBottomRef={scrollToBottomRef}
             checkpoints={currentConversation?.checkpoints ?? []}
             selectedId={selectedId}
+            suggestions={currentSuggestions}
             onNewChat={handleNewChat}
             onEditMessage={handleEditMessage}
             onCancelEdit={handleCancelEdit}
@@ -936,6 +980,7 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
             onEditTextChange={setEditText}
             onRegenerateFromMessage={handleRegenerateFromMessage}
             onRestoreCheckpoint={handleRestoreCheckpoint}
+            onSuggestionClick={handleSuggestionClick}
           />
 
           {!hydrated || !selectedId ? null : (
@@ -955,6 +1000,9 @@ export function ChatClient({ initialData, conversationId }: ChatClientProps) {
               textareaRef={textareaRef}
               totalUsedTokens={totalUsedTokens}
               totalUsage={totalUsage}
+              suggestions={currentSuggestions}
+              onSuggestionClick={handleSuggestionClick}
+              editingMessageId={editingMessageId}
             />
           )}
         </div>
