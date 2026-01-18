@@ -27,12 +27,12 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  ERROR_MESSAGES,
+  PASSWORD_CONFIG,
+  SUCCESS_MESSAGES,
+  TEMPERATURE_CONFIG,
+  THEME_OPTIONS,
+} from "./constants";
 import {
   ModelSelector,
   ModelSelectorContent,
@@ -45,11 +45,18 @@ import {
   ModelSelectorLogoGroup,
   ModelSelectorName,
 } from "@/components/ai/model-selector";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { formatProviderName, getModelProvider } from "@/lib/models";
 import { useAccountInfo, useChangePassword, useSettingsSync } from "@/lib/settings/hooks";
-import { Badge } from "@/components/ui/badge";
-import { formatProviderName, getModelProvider, type Model } from "@/lib/models";
-import { useGroupedModels } from "@/features/chat/hooks/use-chat-hooks";
+import { useDeleteAccount, useLogout, usePasswordForm, useThemeChange } from "./hooks";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -58,18 +65,9 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { useSettingsStore } from "@/lib/settings/store";
-import {
-  CHAT_MODEL_OPTIONS,
-  ERROR_MESSAGES,
-  PASSWORD_CONFIG,
-  SUCCESS_MESSAGES,
-  SUGGESTIONS_MODEL_OPTIONS,
-  TEMPERATURE_CONFIG,
-  THEME_OPTIONS,
-} from "./constants";
-import { useDeleteAccount, useLogout, usePasswordForm, useThemeChange } from "./hooks";
+import { useGroupedModels } from "@/features/chat/hooks/use-chat-hooks";
 import { useModelManagement } from "@/features/chat/hooks/use-chat-hooks";
+import { useSettingsStore } from "@/lib/settings/store";
 import { useState } from "react";
 
 export default function SettingsPage() {

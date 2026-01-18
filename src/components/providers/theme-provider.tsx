@@ -2,7 +2,7 @@
 
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 import { useSettingsStore } from "@/lib/settings/store";
-import type { ReactNode } from "react";
+import type { ReactNode, ReactElement } from "react";
 
 interface ThemeProviderProps {
   children: ReactNode;
@@ -14,7 +14,7 @@ interface ThemeProviderProps {
  * Integrates next-themes with the settings store.
  * Theme is automatically synced via the forcedTheme prop.
  */
-export function ThemeProvider({ children }: ThemeProviderProps): JSX.Element {
+export function ThemeProvider({ children }: ThemeProviderProps): ReactElement {
   const theme = useSettingsStore((state) => state.settings.appearance.theme);
 
   return (
