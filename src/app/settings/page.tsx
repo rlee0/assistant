@@ -3,6 +3,7 @@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
   Lock,
   LogOut,
@@ -66,6 +67,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useGroupedModels } from "@/features/chat/hooks/use-chat-hooks";
 import { useModelManagement } from "@/features/chat/hooks/use-chat-hooks";
+import { useRouter } from "next/navigation";
 import { useSettingsStore } from "@/lib/settings/store";
 import { useState } from "react";
 
@@ -73,6 +75,7 @@ export default function SettingsPage() {
   // Initialize settings sync
   useSettingsSync();
 
+  const router = useRouter();
   const { settings, updateSettings } = useSettingsStore();
   const { accountInfo, loading: accountLoading } = useAccountInfo();
 
@@ -123,6 +126,14 @@ export default function SettingsPage() {
   return (
     <div className="flex min-h-screen items-start justify-center bg-background p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-4xl space-y-6">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => router.push("/chat")}
+          className="-ml-2 mb-2 gap-2">
+          <ArrowLeft className="h-4 w-4" />
+          Back to Chat
+        </Button>
         <div className="space-y-2">
           <h1 className="text-3xl font-bold tracking-tight md:text-4xl">Settings</h1>
           <p className="text-muted-foreground">
