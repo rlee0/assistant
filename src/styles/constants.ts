@@ -34,6 +34,7 @@ export const SPACING = {
   p2: "p-2",
   p3: "p-3",
   p4: "p-4",
+  pt4: "pt-4",
   px2: "px-2",
   px3: "px-3",
   px4: "px-4",
