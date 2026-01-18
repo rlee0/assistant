@@ -131,8 +131,6 @@ export default function SettingsPage() {
           </p>
         </div>
 
-        <Separator />
-
         {/* Appearance Settings */}
         <Card>
           <CardHeader>
