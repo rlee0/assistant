@@ -5,19 +5,47 @@
  * For real-time UI state, use the useChat hook from @ai-sdk/react.
  */
 
-import type { InitialChatData } from "@/lib/supabase/loaders";
-import type { LanguageModelUsage } from "ai";
+import type { LanguageModelUsage, UIMessage } from "ai";
+
 import type { Model } from "@/lib/models";
 import type { useChat } from "@ai-sdk/react";
-import { type ModelMessage } from "ai";
+
+/**
+ * Valid chat message roles
+ */
+export const VALID_MESSAGE_ROLES = ["user", "assistant", "system"] as const;
+export type MessageRole = (typeof VALID_MESSAGE_ROLES)[number];
+
+/**
+ * Validate that a string is a valid message role
+ */
+export function isValidMessageRole(value: unknown): value is MessageRole {
+  return typeof value === "string" && VALID_MESSAGE_ROLES.includes(value as MessageRole);
+}
 
 /**
  * A single message in a chat with metadata
  */
-export type ChatMessage = ModelMessage & {
+export interface ChatMessage {
   id: string;
+  role: MessageRole;
+  content: string; // JSON-serialized message parts or plain text
   createdAt: string;
-};
+}
+
+/**
+ * Validate message parts array
+ */
+export function isValidMessageParts(value: unknown): value is UIMessage["parts"] {
+  if (!Array.isArray(value)) return false;
+  return value.every(
+    (part): part is UIMessage["parts"][number] =>
+      typeof part === "object" &&
+      part !== null &&
+      "type" in part &&
+      typeof (part as Record<string, unknown>).type === "string"
+  );
+}
 
 /**
  * A checkpoint that marks a point in conversation history
@@ -45,10 +73,36 @@ export type ChatSession = {
 };
 
 /**
+ * Client-side conversation (UI representation)
+ */
+export interface Conversation {
+  id: string;
+  title: string;
+  pinned: boolean;
+  updatedAt: string;
+  lastUserMessageAt: string;
+  model: string;
+  context?: string;
+  suggestions: string[];
+  messages: UIMessage[];
+  checkpoints: ChatCheckpoint[];
+}
+
+/**
  * Type alias for useChat messages
  * This is the runtime type of individual messages from the useChat hook
  */
 export type UseChatMessage = ReturnType<typeof useChat>["messages"][number];
+
+/**
+ * Initial data passed from server to client
+ */
+export interface InitialChatData {
+  readonly chats: Record<string, ChatSession>;
+  readonly order: string[];
+  readonly selectedId?: string | undefined;
+  readonly userId?: string | undefined;
+}
 
 /**
  * Selected model information for display

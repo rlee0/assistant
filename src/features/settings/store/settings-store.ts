@@ -73,6 +73,7 @@ type SettingPath = Array<string | number>;
 type SettingsState = {
   settings: Settings;
   hydrated: boolean;
+  serverSyncComplete: boolean; // Track if server settings have been loaded this session
   hydrate: (data: unknown) => void;
   update: (path: SettingPath, value: unknown) => void;
   updateBatch: (updates: Partial<Settings>) => void;
@@ -100,6 +101,7 @@ export const useSettingsStore = create<SettingsState>()(
       (set, get) => ({
         settings: buildDefaultSettings(),
         hydrated: false,
+        serverSyncComplete: false,
 
         hydrate: (data: unknown) => {
           try {
@@ -114,6 +116,7 @@ export const useSettingsStore = create<SettingsState>()(
             set(() => ({
               settings: normalizeSettingsModels(validated),
               hydrated: true,
+              serverSyncComplete: true, // Mark server sync as complete after hydration
             }));
           } catch (error) {
             // Validation failed - clear corrupted data and use defaults
@@ -169,7 +172,8 @@ export const useSettingsStore = create<SettingsState>()(
 
               // Validate entire settings object before persisting
               const validated = settingsSchema.parse(clone);
-              return { settings: normalizeSettingsModels(validated) };
+              const normalized = normalizeSettingsModels(validated);
+              return { settings: normalized };
             } catch (error) {
               logError("[SettingsStore]", "Update validation failed", error as Error);
               return state; // Return unchanged on validation error
@@ -191,10 +195,21 @@ export const useSettingsStore = create<SettingsState>()(
             }
           }),
 
-        reset: () =>
+        reset: () => {
+          // Clear localStorage to prevent settings from persisting across different user sessions
+          try {
+            localStorage.removeItem("assistant-settings");
+          } catch (error) {
+            // localStorage may be disabled or unavailable
+            logError("[SettingsStore]", "Failed to clear settings from storage", error as Error);
+          }
+
           set(() => ({
             settings: buildDefaultSettings(),
-          })),
+            hydrated: false,
+            serverSyncComplete: false, // Reset sync flag on logout
+          }));
+        },
 
         get: <T = unknown>(path: SettingPath): T | undefined => {
           const settings = get().settings;
@@ -247,6 +262,8 @@ export const useSettingsStore = create<SettingsState>()(
               );
               state.settings = normalizeSettingsModels(buildDefaultSettings());
             }
+            // Set hydrated = true to make UI interactive immediately
+            // Server settings will override when they arrive via useSettingsSync
             state.hydrated = true;
           }
         },

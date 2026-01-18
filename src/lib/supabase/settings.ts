@@ -1,7 +1,8 @@
 import "server-only";
 
-import { createSupabaseServerClient } from "@/lib/supabase/server-client";
 import type { Settings } from "@/lib/settings";
+import { createSupabaseServerClient } from "@/lib/supabase/server-client";
+import { logError } from "@/lib/logging";
 
 /**
  * Load user settings from the database
@@ -15,10 +16,16 @@ import type { Settings } from "@/lib/settings";
  */
 export async function loadSettings(userId: string): Promise<Settings | null> {
   const supabase = await createSupabaseServerClient();
-  const { data } = await supabase
+
+  const { data, error } = await supabase
     .from("settings")
     .select("data")
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (error) {
+    logError("[loadSettings]", "Failed to load settings from database", error);
+  }
+
   return data?.data ?? null;
 }

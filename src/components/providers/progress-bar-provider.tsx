@@ -5,15 +5,25 @@ import { usePathname, useSearchParams } from "next/navigation";
 
 import { ProgressBar } from "@/components/ui/progress-bar";
 
+/**
+ * Context value for progress bar operations
+ */
 interface ProgressBarContextValue {
-  start: () => void;
-  complete: () => void;
-  isLoading: boolean;
+  readonly start: () => void;
+  readonly complete: () => void;
+  readonly isLoading: boolean;
 }
 
+/**
+ * Provider context - intentionally nullable to enforce hook usage boundary
+ */
 const ProgressBarContext = createContext<ProgressBarContextValue | null>(null);
 
-export function useProgressBarContext() {
+/**
+ * Hook to access progress bar context with safety check
+ * @throws {Error} If used outside ProgressBarProvider
+ */
+export function useProgressBarContext(): ProgressBarContextValue {
   const context = useContext(ProgressBarContext);
   if (!context) {
     throw new Error("useProgressBarContext must be used within ProgressBarProvider");
@@ -21,14 +31,30 @@ export function useProgressBarContext() {
   return context;
 }
 
-export function ProgressBarProvider({ children }: { children: React.ReactNode }) {
+/**
+ * Progress bar provider component
+ * Manages navigation progress bar state and auto-completion
+ *
+ * Features:
+ * - Auto-complete on route change (pathname/searchParams)
+ * - Cleanup of pending timers on unmount
+ * - Safe state updates deferred during server renders
+ */
+export function ProgressBarProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}): React.ReactElement {
   const [isLoading, setIsLoading] = useState(false);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const isFirstRender = useRef(true);
+  const isFirstRenderRef = useRef(true);
 
-  const start = useCallback(() => {
+  /**
+   * Start loading state and clear any pending completion timer
+   */
+  const start = useCallback((): void => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -36,7 +62,10 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
     setIsLoading(true);
   }, []);
 
-  const complete = useCallback(() => {
+  /**
+   * Complete loading state and clear any pending completion timer
+   */
+  const complete = useCallback((): void => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
@@ -44,21 +73,34 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
     setIsLoading(false);
   }, []);
 
-  // Auto-complete progress bar when navigation finishes
-  useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false;
-      return;
+  /**
+   * Auto-complete progress bar after route change
+   * Skip first render to avoid completion on initial mount
+   */
+  useEffect((): (() => void) => {
+    if (isFirstRenderRef.current) {
+      isFirstRenderRef.current = false;
+      return () => {
+        // No cleanup on first render
+      };
     }
-    const timer = setTimeout(() => {
-      complete();
-    }, 0);
-    return () => clearTimeout(timer);
+
+    // Schedule completion after route change is detected
+    timerRef.current = setTimeout(complete, 0);
+
+    return (): void => {
+      if (timerRef.current) {
+        clearTimeout(timerRef.current);
+        timerRef.current = null;
+      }
+    };
   }, [pathname, searchParams, complete]);
 
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
+  /**
+   * Cleanup all timers on unmount
+   */
+  useEffect((): (() => void) => {
+    return (): void => {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -66,21 +108,27 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
     };
   }, []);
 
-  // Track page unload
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Defer state update to avoid updating during Router render
-      queueMicrotask(() => start());
+  /**
+   * Track beforeunload to show progress for navigation
+   * Defer state update to avoid conflicts with React render cycle
+   */
+  useEffect((): (() => void) => {
+    const handleBeforeUnload = (): void => {
+      // Use queueMicrotask to defer state update after current event handlers
+      queueMicrotask(start);
     };
+
     window.addEventListener("beforeunload", handleBeforeUnload);
 
-    return () => {
+    return (): void => {
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
   }, [start]);
 
+  const contextValue: ProgressBarContextValue = { start, complete, isLoading };
+
   return (
-    <ProgressBarContext.Provider value={{ start, complete, isLoading }}>
+    <ProgressBarContext.Provider value={contextValue}>
       <ProgressBar isActive={isLoading} />
       {children}
     </ProgressBarContext.Provider>

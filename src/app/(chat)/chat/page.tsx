@@ -8,10 +8,15 @@ import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
-function ErrorDisplay() {
+/**
+ * Error display component with accessibility support
+ */
+function ErrorDisplay({ message }: { message: string }): React.ReactElement {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4">
-      <p className="text-sm text-red-600">Failed to load conversations.</p>
+      <p className="text-sm text-red-600" role="alert">
+        {message}
+      </p>
       <Link href="/" className="text-sm text-blue-600 underline underline-offset-4">
         Back home
       </Link>
@@ -19,15 +24,28 @@ function ErrorDisplay() {
   );
 }
 
-export default async function ChatIndexPage() {
+/**
+ * Chat index page (serves /chat route)
+ *
+ * Responsibilities:
+ * - Authentication verification
+ * - Loading initial chat data from Supabase
+ * - Passing data to client component
+ * - Handling errors gracefully
+ *
+ * Note: Does NOT auto-redirect to first conversation.
+ * Users must explicitly select a conversation or create new one.
+ */
+export default async function ChatIndexPage(): Promise<React.ReactElement> {
+  // Step 1: Authenticate user
   const supabase = await createSupabaseServerClient();
   const {
     data: { user },
-    error,
+    error: authError,
   } = await supabase.auth.getUser();
 
-  if (error) {
-    logError("[ChatIndexPage]", "Auth verification failed", error);
+  if (authError) {
+    logError("[ChatIndexPage]", "Auth verification failed", authError);
     redirect("/login");
   }
 
@@ -35,18 +53,22 @@ export default async function ChatIndexPage() {
     redirect("/login");
   }
 
+  // Step 2: Load chat data
   let initialData;
   try {
     initialData = await loadInitialChats(user.id);
-  } catch (err) {
-    // Re-throw Next.js redirects
-    if (isRedirectError(err)) {
-      throw err;
+  } catch (error) {
+    // Re-throw Next.js redirects (e.g., from other middleware)
+    if (isRedirectError(error)) {
+      throw error;
     }
-    logError("[ChatIndexPage]", "Failed to load chats", err);
-    return <ErrorDisplay />;
+
+    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    logError("[ChatIndexPage]", "Failed to load chats", error, { userId: user.id });
+
+    return <ErrorDisplay message={`Failed to load conversations: ${errorMessage}`} />;
   }
 
-  // Show chat interface with loaded data (selectedId will be null if not specified)
+  // Step 3: Render chat interface with loaded data
   return <ChatClient initialData={initialData} />;
 }

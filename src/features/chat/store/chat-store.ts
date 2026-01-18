@@ -1,25 +1,19 @@
 import { create } from "zustand";
 import { logWarn, logError } from "@/lib/logging";
 import { type UIMessage } from "ai";
-import { type InitialChatData } from "@/lib/supabase/loaders";
-import { type ChatCheckpoint, type ChatMessage, type ChatSession } from "@/features/chat/types";
+import {
+  type InitialChatData,
+  type ChatCheckpoint,
+  type ChatMessage,
+  type ChatSession,
+  type Conversation,
+  isValidMessageParts,
+  isValidMessageRole,
+} from "@/features/chat/types";
 import { MAX_CHECKPOINTS } from "@/features/chat/constants";
 import { nanoid } from "nanoid";
 
 export type ConversationStatus = "idle" | "loading" | "streaming" | "error";
-
-export type Conversation = {
-  id: string;
-  title: string;
-  pinned: boolean;
-  updatedAt: string;
-  lastUserMessageAt: string;
-  model: string;
-  context?: string;
-  suggestions: string[];
-  messages: UIMessage[];
-  checkpoints: ChatCheckpoint[];
-};
 
 type ChatState = {
   conversations: Record<string, Conversation>;
@@ -94,57 +88,67 @@ function normalizeOrder(order: string[]): string[] {
   });
 }
 
+/**
+ * Convert server ChatMessage to client UIMessage
+ *
+ * Handles multiple content formats:
+ * 1. JSON-serialized message parts (primary)
+ * 2. Plain text (fallback)
+ * 3. Already-parsed parts array (edge case)
+ *
+ * Always validates before type conversion.
+ */
 export function chatMessageToUIMessage(message: ChatMessage): UIMessage {
   let parts: UIMessage["parts"] = [];
 
-  // Try to parse the content as stored message parts (JSON array)
   if (typeof message.content === "string") {
     try {
-      // Attempt to parse as JSON array of parts
-      const parsed = JSON.parse(message.content);
+      // Attempt to parse as JSON
+      const parsed: unknown = JSON.parse(message.content);
 
-      // Check if it looks like a parts array (array of objects with type property)
-      if (
-        Array.isArray(parsed) &&
-        parsed.length > 0 &&
-        typeof parsed[0] === "object" &&
-        "type" in parsed[0]
-      ) {
-        // Type assertion: we trust that stored parts are valid UIMessage parts
+      // Validate it's a valid parts array before using it
+      if (isValidMessageParts(parsed)) {
+        // Type-safe assignment after validation
         parts = parsed as UIMessage["parts"];
       } else {
-        // Not a parts array, treat as plain text
-        parts = [{ type: "text", text: message.content }];
+        // Parsed JSON but not valid parts - treat as plain text
+        parts = [{ type: "text", text: message.content }] as const;
       }
-    } catch (error) {
-      // JSON parsing failed, treat as plain text
-      // In development, log this for debugging; in production, silently fallback
-      if (process.env.NODE_ENV === "development") {
-        console.debug("[ChatStore] Failed to parse message content as JSON", {
-          content: message.content.slice(0, 100),
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-      parts = [{ type: "text", text: message.content }];
+    } catch {
+      // JSON parse failed - treat content as plain text
+      parts = [{ type: "text", text: message.content }] as const;
     }
   } else if (Array.isArray(message.content)) {
-    // Content is already an array (shouldn't happen with current code, but handle it)
-    // Type assertion: trust that the array contains valid message parts
-    parts = message.content as UIMessage["parts"];
+    // Handle edge case where content is already an array
+    // Validate before using
+    if (isValidMessageParts(message.content)) {
+      // Type-safe assignment after validation
+      parts = message.content as UIMessage["parts"];
+    } else {
+      // Invalid parts array - convert to string
+      const text = JSON.stringify(message.content);
+      parts = [{ type: "text", text }] as const;
+    }
   } else {
-    // Content is some other type, convert to string and wrap in text part
-    const text =
-      typeof message.content === "string" ? message.content : JSON.stringify(message.content ?? "");
-    parts = [{ type: "text", text }];
+    // Handle other types (shouldn't happen in practice)
+    const text = JSON.stringify(message.content ?? "");
+    parts = [{ type: "text", text }] as const;
   }
+
+  // Validate role before assignment - default to "system" if invalid
+  const validRole = isValidMessageRole(message.role) ? message.role : "system";
+  const role: UIMessage["role"] = validRole as UIMessage["role"];
 
   return {
     id: message.id,
-    role: message.role as UIMessage["role"],
+    role,
     parts,
   };
 }
 
+/**
+ * Get the timestamp of the last user message in a conversation
+ */
 function getLastUserMessageTimestamp(messages: ChatMessage[]): string {
   for (let i = messages.length - 1; i >= 0; i -= 1) {
     if (messages[i].role === "user") {
@@ -154,6 +158,9 @@ function getLastUserMessageTimestamp(messages: ChatMessage[]): string {
   return new Date().toISOString();
 }
 
+/**
+ * Convert server ChatSession to client Conversation
+ */
 export function chatSessionToConversation(session: ChatSession): Conversation {
   const messages = session.messages.map(chatMessageToUIMessage);
   const lastUserMessageAt = getLastUserMessageTimestamp(session.messages);
@@ -263,8 +270,9 @@ export const useChatStore = create<ChatState>((set) => ({
       const conversations: Record<string, Conversation> = {};
       const statuses: Record<string, ConversationStatus> = {};
 
+      // validated.chats is already type-checked, safe to use
       for (const [id, session] of Object.entries(validated.chats)) {
-        conversations[id] = chatSessionToConversation(session);
+        conversations[id] = chatSessionToConversation(session as ChatSession);
         statuses[id] = "idle";
       }
 

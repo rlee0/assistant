@@ -60,7 +60,7 @@ interface LogContext {
 /** Minimum set of fallback models when all sources fail */
 const FALLBACK_MODELS: Model[] = [
   {
-    id: "gpt-4o-mini",
+    id: "openai/gpt-4o-mini",
     name: "GPT-4o mini",
     provider: "openai",
   },
@@ -190,11 +190,14 @@ function normalizeModel(raw: RawGatewayModel): Model | null {
   // Determine provider from explicit field or extract from ID
   const provider = raw.provider?.trim() || extractProviderFromId(id);
 
+  // Normalize ID to include provider prefix for consistency
+  const normalizedId = id.includes("/") ? id : `${provider}/${id}`;
+
   // Handle both naming conventions for context tokens
   const contextTokens = raw.contextTokens ?? raw.context_tokens ?? raw.context_window;
 
   return {
-    id,
+    id: normalizedId,
     name,
     provider,
     contextTokens: typeof contextTokens === "number" ? contextTokens : undefined,
@@ -507,7 +510,9 @@ export async function GET(request?: NextRequest): Promise<NextResponse<Model[]>>
     // Merge capabilities from Vercel AI Gateway
     const capabilities = await capabilitiesPromise;
     const enhancedModels = models.map((model) => {
-      const capability = capabilities.get(model.id);
+      // Try lookup with both normalized and unnormalized IDs (for Vercel compatibility)
+      const unnormalizedId = model.id.includes("/") ? model.id.split("/")[1] : model.id;
+      const capability = capabilities.get(model.id) || capabilities.get(unnormalizedId);
       if (capability) {
         return {
           ...model,

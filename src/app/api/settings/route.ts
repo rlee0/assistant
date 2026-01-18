@@ -120,13 +120,12 @@ export async function PUT(request: NextRequest) {
 
     // Persist to database with upsert semantics
     // The settings table uses user_id as a required column to link settings to users
-    const { error: upsertError } = await supabase
+    const { data: upsertData, error: upsertError } = await supabase
       .from("settings")
       .upsert(
         {
           user_id: user.id,
           data: validatedSettings,
-          updated_at: new Date().toISOString(),
         },
         {
           onConflict: "user_id",

@@ -8,24 +8,8 @@ import type { Settings } from "@/lib/settings";
 import { logError } from "@/lib/logging";
 import { useSettingsStore } from "@/features/settings/store/settings-store";
 
-/** Debounce interval for settings save operations (ms) */
-const SETTINGS_SAVE_DEBOUNCE_MS = 500;
-
+/** Request timeout for settings operations (ms) */
 const SETTINGS_REQUEST_TIMEOUT_MS = 10000;
-
-/** Max retry attempts for failed persist operations */
-const MAX_PERSIST_RETRIES = 3;
-
-/** Exponential backoff base for retry delays (ms) */
-const RETRY_BACKOFF_MS = 1000;
-
-/**
- * Calculate exponential backoff delay for retry
- * @private
- */
-function getRetryDelay(attempt: number): number {
-  return RETRY_BACKOFF_MS * Math.pow(2, attempt);
-}
 
 /**
  * Fetch user settings from the server with timeout and abort support
@@ -85,17 +69,15 @@ async function fetchServerSettings(signal?: AbortSignal): Promise<Settings | nul
 }
 
 /**
- * Persist user settings to the server with timeout, abort support, and retry logic
+ * Persist user settings to the server with timeout and abort support
  *
  * @param settings - The settings object to persist
  * @param signal Optional AbortSignal for request cancellation
- * @param attempt Current retry attempt (0-indexed)
  * @returns true if persistence was successful, false otherwise
  */
 async function persistServerSettings(
   settings: Settings | null,
-  signal?: AbortSignal,
-  attempt: number = 0
+  signal?: AbortSignal
 ): Promise<boolean> {
   // Skip persistence if settings are null or invalid
   if (!settings) {
@@ -120,12 +102,6 @@ async function persistServerSettings(
       clearTimeout(timeoutId);
 
       if (!response.ok) {
-        // Retry on 5xx errors, give up on 4xx client errors
-        if (response.status >= 500 && attempt < MAX_PERSIST_RETRIES) {
-          const delay = getRetryDelay(attempt);
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          return persistServerSettings(settings, signal, attempt + 1);
-        }
         throw new Error(`Settings persist failed: ${response.status} ${response.statusText}`);
       }
 
@@ -139,11 +115,7 @@ async function persistServerSettings(
 
     // Don't log abort errors (these are expected during unmount)
     if (!message.includes("abort")) {
-      logError(
-        "[SettingsSync]",
-        `Failed to persist to server (attempt ${attempt + 1}/${MAX_PERSIST_RETRIES + 1})`,
-        error as Error
-      );
+      logError("[SettingsSync]", "Failed to persist to server", error as Error);
     }
     return false;
   }
@@ -154,12 +126,10 @@ async function persistServerSettings(
  *
  * Features:
  * - Loads user settings from server on mount
- * - Persists settings changes with debouncing to prevent excessive requests
+ * - Persists settings changes immediately to prevent data loss
  * - Handles authentication state gracefully (unauthenticated users skip sync)
- * - Proper cleanup of timeouts, AbortControllers, and async operations
+ * - Proper cleanup of AbortControllers and async operations
  * - Returns hydration status for UI coordination
- * - Waits for hydration before persisting to avoid sending incomplete data
- * - Guards against localStorage unavailability
  *
  * @returns Object containing hydration state
  */
@@ -167,23 +137,34 @@ export function useSettingsSync(): { hydrated: boolean } {
   const settings = useSettingsStore((state) => state.settings);
   const hydrate = useSettingsStore((state) => state.hydrate);
   const hydrated = useSettingsStore((state) => state.hydrated);
+  const serverSyncComplete = useSettingsStore((state) => state.serverSyncComplete);
 
   // Track refs for cleanup
   const abortControllerRef = useRef<AbortController | null>(null);
-  const debounceTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  const isInitialLoadRef = useRef(true);
+  const previousSettingsRef = useRef<Settings | null>(null);
 
-  // Effect 1: Load settings from server on component mount
+  // Effect 1: Load settings from server on component mount (only once per session)
   useEffect(() => {
+    // Skip if we've already synced from server (prevents HMR from overwriting changes)
+    if (serverSyncComplete) {
+      return;
+    }
+
     isMountedRef.current = true;
     abortControllerRef.current = new AbortController();
 
     fetchServerSettings(abortControllerRef.current.signal).then((serverSettings) => {
       // Only update if component is still mounted and signal wasn't aborted
-      if (isMountedRef.current && !abortControllerRef.current?.signal.aborted && serverSettings) {
+      if (isMountedRef.current && !abortControllerRef.current?.signal.aborted) {
         // Server settings override any localStorage settings
         // Call hydrate to merge server settings with defaults and trigger persistence
-        hydrate(serverSettings);
+        // If serverSettings is null (error or unauthenticated), use empty object to trigger hydration with defaults
+        hydrate(serverSettings ?? {});
+        isInitialLoadRef.current = false;
+        // Store initial settings to detect real changes
+        previousSettingsRef.current = settings;
       }
     });
 
@@ -191,36 +172,30 @@ export function useSettingsSync(): { hydrated: boolean } {
       abortControllerRef.current?.abort();
       isMountedRef.current = false;
     };
-  }, [hydrate]);
+  }, [hydrate, serverSyncComplete, settings]);
 
-  // Effect 2: Persist settings to server when they change (with debouncing)
+  // Effect 2: Persist settings to server immediately when they change
   useEffect(() => {
-    // Only persist after hydration completes
-    if (!hydrated) return;
-
-    // Clear any pending debounce
-    if (debounceTimeoutRef.current) {
-      clearTimeout(debounceTimeoutRef.current);
+    // Skip initial load and only persist after hydration completes
+    if (!hydrated || isInitialLoadRef.current) {
+      return;
     }
 
-    // Set new debounce timer
-    debounceTimeoutRef.current = setTimeout(() => {
-      // Only persist if component is still mounted
-      if (isMountedRef.current) {
-        persistServerSettings(settings).catch((error) => {
-          // Errors already logged in persistServerSettings
-          // This catch is just to prevent unhandled promise rejection
-          void error;
-        });
-      }
-    }, SETTINGS_SAVE_DEBOUNCE_MS);
+    // Skip if settings haven't actually changed (prevents unnecessary saves during hydration)
+    if (
+      previousSettingsRef.current &&
+      JSON.stringify(previousSettingsRef.current) === JSON.stringify(settings)
+    ) {
+      return;
+    }
 
-    return () => {
-      // Clean up timeout on effect cleanup or dependency change
-      if (debounceTimeoutRef.current) {
-        clearTimeout(debounceTimeoutRef.current);
-      }
-    };
+    // Update the reference
+    previousSettingsRef.current = settings;
+
+    // Persist immediately (no debounce) to prevent data loss on quick logout
+    persistServerSettings(settings).catch((error) => {
+      logError("[SettingsSync]", "Failed to persist settings", error as Error);
+    });
   }, [settings, hydrated]);
 
   return { hydrated };
