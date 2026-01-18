@@ -283,23 +283,26 @@ export const ChatInput = memo<ChatInputProps>(
                             <ModelSelectorLogo provider={getModelProvider(model)} />
                           </ModelSelectorLogoGroup>
                           <div
-                            className={cn(
-                              LAYOUT.flexRow,
-                              "flex-1 items-baseline",
-                              SPACING.gap2,
-                              OVERFLOW.hidden
-                            )}>
-                            <ModelSelectorName className="flex-none">
-                              {model.name}
-                            </ModelSelectorName>
-                            <span className={CSS_CLASSES.modelId}>({model.id})</span>
+                            className={cn(LAYOUT.flexCol, "flex-1", SPACING.gap1, OVERFLOW.hidden)}>
+                            <div
+                              className={cn(
+                                LAYOUT.flexRow,
+                                "items-baseline",
+                                SPACING.gap2,
+                                OVERFLOW.hidden
+                              )}>
+                              <ModelSelectorName className="flex-none">
+                                {model.name}
+                              </ModelSelectorName>
+                              <span className={CSS_CLASSES.modelId}>({model.id})</span>
+                            </div>
                             {model.tags && model.tags.length > 0 && (
                               <div className="flex flex-wrap gap-1">
                                 {model.tags.map((tag) => (
                                   <Badge
                                     key={tag}
                                     variant="secondary"
-                                    className={cn(TEXT.xs, TEXT.normal)}>
+                                    className="text-[10px] font-normal px-1 py-0 h-4">
                                     {tag}
                                   </Badge>
                                 ))}
