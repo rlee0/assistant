@@ -68,7 +68,10 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
 
   // Track page unload
   useEffect(() => {
-    const handleBeforeUnload = () => start();
+    const handleBeforeUnload = () => {
+      // Defer state update to avoid updating during Router render
+      queueMicrotask(() => start());
+    };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
     return () => {
