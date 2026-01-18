@@ -1,36 +1,61 @@
 import { create } from "zustand";
 import { persist, devtools } from "zustand/middleware";
 import { settingsSchema, buildDefaultSettings, type Settings } from "@/lib/settings";
-import { DEFAULT_MODEL, DEFAULT_SUGGESTIONS_MODEL } from "@/lib/constants/models";
 import { logError } from "@/lib/logging";
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * Path-based accessor for nested settings properties
+ * Enables type-safe deep access: ['models', 'defaultModel']
+ */
+type SettingPath = ReadonlyArray<string | number>;
+
+/**
+ * Zustand store state and actions
+ */
+type SettingsState = {
+  settings: Settings;
+  hydrated: boolean;
+  serverSyncComplete: boolean;
+  hydrate: (data: unknown) => void;
+  update: (path: SettingPath, value: unknown) => void;
+  updateBatch: (updates: Partial<Settings>) => void;
+  reset: () => void;
+  get: <T = unknown>(path: SettingPath) => T | undefined;
+  tryGet: <T = unknown>(path: SettingPath) => T | null;
+};
+
+// ============================================================================
+// Utilities
+// ============================================================================
+
+/**
+ * Type guard: Checks if value is a plain object (not array, null, or primitive)
+ */
+function isPlainObject(value: unknown): value is Record<string | number | symbol, unknown> {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
 
 /**
  * Deep merge utility for recursive object merging
+ * Only recurses into plain objects; arrays and other values are replaced.
  * @private
  */
 function deepMerge(
-  target: Record<string, unknown>,
-  source: Record<string, unknown>
-): Record<string, unknown> {
+  target: Record<string | number | symbol, unknown>,
+  source: Record<string | number | symbol, unknown>
+): Record<string | number | symbol, unknown> {
   const result = { ...target };
 
   for (const [key, value] of Object.entries(source)) {
-    // Only recurse if both values are plain objects (not arrays, null, etc.)
+    if (value === undefined) continue;
+
     const targetValue = result[key];
-    if (
-      value !== undefined &&
-      value !== null &&
-      typeof value === "object" &&
-      !Array.isArray(value) &&
-      targetValue !== undefined &&
-      targetValue !== null &&
-      typeof targetValue === "object" &&
-      !Array.isArray(targetValue)
-    ) {
-      result[key] = deepMerge(
-        targetValue as Record<string, unknown>,
-        value as Record<string, unknown>
-      );
+    if (isPlainObject(value) && isPlainObject(targetValue)) {
+      result[key] = deepMerge(targetValue, value);
     } else {
       result[key] = value;
     }
@@ -40,60 +65,32 @@ function deepMerge(
 }
 
 /**
- * Normalize model identifiers in settings to a consistent format
- * - Trims whitespace
- * - Adds default provider prefix ("openai/") when missing
- * - Falls back to safe defaults if values are empty
+ * Validates and parses raw data into Settings type
+ * Returns tuple: [validSettings | null, error | null]
  */
-function normalizeModelId(value: unknown, fallback: string, defaultProvider = "openai"): string {
-  if (typeof value !== "string") return fallback;
-  const trimmed = value.trim();
-  if (!trimmed) return fallback;
-  return trimmed.includes("/") ? trimmed : `${defaultProvider}/${trimmed}`;
-}
-
-function normalizeSettingsModels(settings: Settings): Settings {
-  const normalized = structuredClone(settings);
-
-  normalized.models.defaultModel = normalizeModelId(settings.models.defaultModel, DEFAULT_MODEL);
-
-  normalized.suggestions.model = normalizeModelId(
-    settings.suggestions.model,
-    DEFAULT_SUGGESTIONS_MODEL
-  );
-
-  return normalized;
+function validateSettings(data: unknown): [Settings | null, Error | null] {
+  try {
+    const settings = settingsSchema.parse(data);
+    return [settings, null];
+  } catch (error) {
+    return [null, error instanceof Error ? error : new Error("Unknown validation error")];
+  }
 }
 
 /**
- * Path-based getter/setter with type safety
- */
-type SettingPath = Array<string | number>;
-
-type SettingsState = {
-  settings: Settings;
-  hydrated: boolean;
-  serverSyncComplete: boolean; // Track if server settings have been loaded this session
-  hydrate: (data: unknown) => void;
-  update: (path: SettingPath, value: unknown) => void;
-  updateBatch: (updates: Partial<Settings>) => void;
-  reset: () => void;
-  get: <T = unknown>(path: SettingPath) => T | undefined;
-  tryGet: <T = unknown>(path: SettingPath) => T | null;
-};
-
-/**
- * Schema-driven settings store
+ * Schema-driven settings store with strict validation and error handling
  *
- * This store is completely configuration-driven - it doesn't hardcode any
- * specific settings fields. All structure comes from the settingsSchema.
+ * Design Principles:
+ * - All data must pass schema validation before being stored
+ * - Hydration and updates use the same validation pipeline
+ * - Errors are logged structured, not silently swallowed
+ * - Dynamic path-based access is intentionally constrained to prevent misuse
  *
  * Features:
- * - Validates all updates against schema
- * - Provides safe path-based access with type inference
- * - Handles errors gracefully during hydration
- * - Persists to localStorage with recovery on corruption
- * - DevTools integration for development debugging (when NODE_ENV=development)
+ * - LocalStorage persistence with automatic corruption recovery
+ * - Zustand DevTools integration for state inspection
+ * - Atomic updates with rollback on validation failure
+ * - Migration-friendly: merges with defaults to handle schema changes
  */
 export const useSettingsStore = create<SettingsState>()(
   devtools(
@@ -103,38 +100,44 @@ export const useSettingsStore = create<SettingsState>()(
         hydrated: false,
         serverSyncComplete: false,
 
+        /**
+         * Hydrate store from external data source (e.g., localStorage, API)
+         * Merges with defaults and validates before storing
+         */
         hydrate: (data: unknown) => {
           try {
-            // Merge stored data with defaults to handle schema migrations
             const defaults = buildDefaultSettings();
-            const merged =
-              typeof data === "object" && data !== null
-                ? deepMerge(defaults as Record<string, unknown>, data as Record<string, unknown>)
-                : defaults;
 
-            const validated = settingsSchema.parse(merged);
+            // Merge external data with defaults to handle schema evolution
+            const merged = isPlainObject(data)
+              ? deepMerge(defaults as Record<string | number | symbol, unknown>, data)
+              : defaults;
+
+            const [settings, error] = validateSettings(merged);
+            if (settings === null) {
+              throw error;
+            }
+
             set(() => ({
-              settings: normalizeSettingsModels(validated),
+              settings,
               hydrated: true,
-              serverSyncComplete: true, // Mark server sync as complete after hydration
+              serverSyncComplete: true,
             }));
           } catch (error) {
-            // Validation failed - clear corrupted data and use defaults
             logError(
               "[SettingsStore]",
               "Hydration validation failed, using defaults",
-              error as Error
+              error instanceof Error ? error : new Error(String(error))
             );
 
-            // Clear corrupted localStorage data to prevent re-corruption on next load
+            // Clear corrupted localStorage to prevent re-corruption
             try {
               localStorage.removeItem("assistant-settings");
             } catch (storageError) {
-              // localStorage may be disabled or unavailable - log but don't crash
               logError(
                 "[SettingsStore]",
                 "Failed to clear corrupted settings from storage",
-                storageError as Error
+                storageError instanceof Error ? storageError : new Error(String(storageError))
               );
             }
 
@@ -145,86 +148,132 @@ export const useSettingsStore = create<SettingsState>()(
           }
         },
 
+        /**
+         * Update a nested setting via path and value
+         * Validates entire settings object before persisting
+         * Returns unchanged state on validation error
+         */
         update: (path, value) =>
           set((state) => {
             try {
-              type Mutable = Record<string | number, unknown>;
-              const clone = structuredClone(state.settings) as Mutable;
+              const clone = structuredClone(state.settings);
+              let current: unknown = clone;
 
-              // Navigate to parent and set value
-              let current: Mutable = clone;
-              for (let i = 0; i < path.length - 1; i += 1) {
+              // Navigate to parent object
+              for (let i = 0; i < path.length - 1; i++) {
                 const key = path[i];
-                if (!(key in current)) {
+                if (!isPlainObject(current) || !(String(key) in current)) {
                   logError(
                     "[SettingsStore]",
-                    `Path component not found: ${String(key)}`,
-                    new Error("Invalid path for settings update")
+                    `Invalid path [${path.join("/")}] at depth ${i}`,
+                    new Error("Path component not found in settings")
                   );
-                  return state; // Return unchanged state
+                  return state;
                 }
-                current = current[key] as Mutable;
+                current = current[String(key)];
               }
 
-              if (path.length > 0) {
-                current[path[path.length - 1]] = value;
+              // Set value at final key
+              if (path.length > 0 && isPlainObject(current)) {
+                const lastKey = String(path[path.length - 1]);
+                current[lastKey] = value;
               }
 
-              // Validate entire settings object before persisting
-              const validated = settingsSchema.parse(clone);
-              const normalized = normalizeSettingsModels(validated);
-              return { settings: normalized };
+              const [settings, error] = validateSettings(clone);
+              if (settings === null) {
+                logError(
+                  "[SettingsStore]",
+                  `Update validation failed at path [${path.join("/")}]`,
+                  error
+                );
+                return state;
+              }
+
+              return { settings };
             } catch (error) {
-              logError("[SettingsStore]", "Update validation failed", error as Error);
-              return state; // Return unchanged on validation error
+              logError(
+                "[SettingsStore]",
+                "Update failed",
+                error instanceof Error ? error : new Error(String(error))
+              );
+              return state;
             }
           }),
 
+        /**
+         * Batch update multiple settings at once
+         * All updates validated together before persisting
+         */
         updateBatch: (updates) =>
           set((state) => {
             try {
               const merged = deepMerge(
-                state.settings as Record<string, unknown>,
-                updates as Record<string, unknown>
+                state.settings as Record<string | number | symbol, unknown>,
+                updates as Record<string | number | symbol, unknown>
               );
-              const validated = settingsSchema.parse(merged);
-              return { settings: normalizeSettingsModels(validated) };
+
+              const [settings, error] = validateSettings(merged);
+              if (settings === null) {
+                logError("[SettingsStore]", "Batch update validation failed", error);
+                return state;
+              }
+
+              return { settings };
             } catch (error) {
-              logError("[SettingsStore]", "Batch update validation failed", error as Error);
-              return state; // Return unchanged on validation error
+              logError(
+                "[SettingsStore]",
+                "Batch update failed",
+                error instanceof Error ? error : new Error(String(error))
+              );
+              return state;
             }
           }),
 
+        /**
+         * Reset to default settings and clear all persistent storage
+         * Safe to call during logout
+         */
         reset: () => {
-          // Clear localStorage to prevent settings from persisting across different user sessions
           try {
             localStorage.removeItem("assistant-settings");
           } catch (error) {
-            // localStorage may be disabled or unavailable
-            logError("[SettingsStore]", "Failed to clear settings from storage", error as Error);
+            logError(
+              "[SettingsStore]",
+              "Failed to clear settings from storage",
+              error instanceof Error ? error : new Error(String(error))
+            );
           }
 
           set(() => ({
             settings: buildDefaultSettings(),
             hydrated: false,
-            serverSyncComplete: false, // Reset sync flag on logout
+            serverSyncComplete: false,
           }));
         },
 
+        /**
+         * Retrieve a nested setting by path
+         * Returns undefined if path is invalid or value doesn't exist
+         * Type parameter allows inference: store.get<string>(['account', 'email'])
+         */
         get: <T = unknown>(path: SettingPath): T | undefined => {
           const settings = get().settings;
           let current: unknown = settings;
 
           for (const key of path) {
-            if (!current || typeof current !== "object") {
+            if (!isPlainObject(current)) {
               return undefined;
             }
-            current = (current as Record<string | number, unknown>)[key];
+            current = current[String(key)];
           }
 
           return current as T;
         },
 
+        /**
+         * Safe getter with error suppression
+         * Use this only when null is acceptable; prefer get() with optional chaining
+         */
         tryGet: <T = unknown>(path: SettingPath): T | null => {
           try {
             const result = get().get<T>(path);
@@ -236,36 +285,36 @@ export const useSettingsStore = create<SettingsState>()(
       }),
       {
         name: "assistant-settings",
-        // Only persist settings when they're fully hydrated
         partialize: (state) => ({
-          // Return empty object if not hydrated to prevent persisting incomplete data
+          // Only persist after hydration to avoid partially initialized data
           ...(state.hydrated && { settings: state.settings }),
         }),
         onRehydrateStorage: () => (state) => {
-          if (state) {
-            try {
-              // Merge loaded settings with defaults to handle schema migrations
-              // This ensures new fields added to the schema are available even in old stored data
-              const defaults = buildDefaultSettings();
-              const merged = deepMerge(
-                defaults as Record<string, unknown>,
-                state.settings as Record<string, unknown>
-              );
-              const validated = settingsSchema.parse(merged);
-              state.settings = normalizeSettingsModels(validated);
-            } catch (error) {
-              // If validation fails, use defaults
-              logError(
-                "[SettingsStore]",
-                "Settings rehydration validation failed, using defaults",
-                error as Error
-              );
-              state.settings = normalizeSettingsModels(buildDefaultSettings());
+          if (!state) return;
+
+          try {
+            const defaults = buildDefaultSettings();
+            const merged = deepMerge(
+              defaults as Record<string | number | symbol, unknown>,
+              state.settings as Record<string | number | symbol, unknown>
+            );
+
+            const [settings, error] = validateSettings(merged);
+            if (settings === null) {
+              throw error;
             }
-            // Set hydrated = true to make UI interactive immediately
-            // Server settings will override when they arrive via useSettingsSync
-            state.hydrated = true;
+
+            state.settings = settings;
+          } catch (error) {
+            logError(
+              "[SettingsStore]",
+              "Settings rehydration validation failed, using defaults",
+              error instanceof Error ? error : new Error(String(error))
+            );
+            state.settings = buildDefaultSettings();
           }
+
+          state.hydrated = true;
         },
       }
     ),
